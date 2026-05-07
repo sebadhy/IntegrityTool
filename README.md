@@ -1,10 +1,8 @@
 # Asistente exploratorio de neutralidad competitiva en pliegos
 
-Paquete Python local: `src/analyzer`.
-
 Aplicación exploratoria local para apoyar la revisión humana de neutralidad competitiva en pliegos de contratación pública.
 
-El objetivo es identificar señales preliminares de restricción competitiva, requisitos potencialmente limitantes, baja neutralidad competitiva y condiciones que podrían reducir concurrencia.
+La herramienta ayuda a priorizar y contextualizar señales preliminares de restricción competitiva, requisitos potencialmente limitantes, baja neutralidad competitiva y condiciones que podrían reducir concurrencia.
 
 Las señales identificadas son insumos preliminares para revisión humana de neutralidad competitiva. No constituyen dictamen técnico, legal ni determinación de responsabilidad.
 
