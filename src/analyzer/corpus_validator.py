@@ -285,6 +285,7 @@ def _exact_normalized_matches(folder: Path, normalized_expected: str) -> list[Pa
         candidate
         for candidate in folder.iterdir()
         if candidate.is_file()
+        and not _is_ignored_filesystem_entry(candidate)
         and candidate.suffix.lower() == ".pdf"
         and normalize_filename(candidate.name) == normalized_expected
     ]
@@ -315,7 +316,7 @@ def _orphan_rows(
             continue
         referenced_names = referenced_by_folder.get(folder.resolve(), set())
         for candidate in sorted(folder.iterdir()):
-            if not candidate.is_file():
+            if not candidate.is_file() or _is_ignored_filesystem_entry(candidate):
                 continue
             if candidate.name in referenced_names:
                 continue
@@ -372,6 +373,11 @@ def _validation_summary(validation_rows: list[dict[str, str]]) -> dict[str, int]
         "metadata_incompleta": incomplete,
         "errores_naming": inconsistencies,
     }
+
+
+def _is_ignored_filesystem_entry(path: Path) -> bool:
+    ignored_names = {".DS_Store", "Thumbs.db", "desktop.ini"}
+    return path.name.startswith(".") or path.name in ignored_names
 
 
 def _clean_text(value: Any) -> str:
