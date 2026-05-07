@@ -1,6 +1,8 @@
 # Asistente exploratorio de neutralidad competitiva en pliegos
 
-Herramienta exploratoria local para apoyar la revisión humana de neutralidad competitiva en pliegos de contratación pública.
+Paquete Python local: `src/analyzer`.
+
+Aplicación exploratoria local para apoyar la revisión humana de neutralidad competitiva en pliegos de contratación pública.
 
 El objetivo es identificar señales preliminares de restricción competitiva, requisitos potencialmente limitantes, baja neutralidad competitiva y condiciones que podrían reducir concurrencia.
 
@@ -33,7 +35,7 @@ Las señales identificadas son insumos preliminares para revisión humana de neu
 ├── requirements.txt
 ├── README.md
 └── src
-    └── sercop_pliegos_ai
+    └── analyzer
         ├── corpus_loader.py
         ├── corpus_validator.py
         ├── __init__.py
@@ -224,7 +226,7 @@ Cada señal sugerida para revisión incluye:
 
 ## Priorización
 
-El módulo `src/sercop_pliegos_ai/prioritizer.py` agrega una priorización explicable. No calcula un indicador acusatorio; organiza señales para responder qué revisar primero y por qué.
+El módulo `src/analyzer/prioritizer.py` agrega una priorización explicable. No calcula un indicador acusatorio; organiza señales para responder qué revisar primero y por qué.
 
 Campos principales:
 
@@ -327,7 +329,7 @@ Errores comunes:
 
 ## Validación documental del corpus
 
-El módulo `src/sercop_pliegos_ai/corpus_validator.py` valida antes de cargar documentos:
+El módulo `src/analyzer/corpus_validator.py` valida antes de cargar documentos:
 
 - PDFs faltantes
 - nombres inconsistentes

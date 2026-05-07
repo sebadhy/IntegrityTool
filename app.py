@@ -7,21 +7,21 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from src.sercop_pliegos_ai.corpus_loader import (
+from src.analyzer.corpus_loader import (
     analyze_corpus_documents,
     load_corpus_documents,
     validate_corpus_state,
 )
-from src.sercop_pliegos_ai.detector import detect_patterns
-from src.sercop_pliegos_ai.llm_reviewer import (
+from src.analyzer.detector import detect_patterns
+from src.analyzer.llm_reviewer import (
     explain_priority_with_llm,
     generate_document_brief,
     test_llm_connection,
 )
-from src.sercop_pliegos_ai.normative_reference import NORMATIVE_SOURCES
-from src.sercop_pliegos_ai.pdf_extractor import extract_text_by_page
-from src.sercop_pliegos_ai.prioritizer import prioritize_signals, top_priorities
-from src.sercop_pliegos_ai.review_synthesis import (
+from src.analyzer.normative_reference import NORMATIVE_SOURCES
+from src.analyzer.pdf_extractor import extract_text_by_page
+from src.analyzer.prioritizer import prioritize_signals, top_priorities
+from src.analyzer.review_synthesis import (
     THEME_ORDER,
     build_corpus_context,
     build_executive_brief,
