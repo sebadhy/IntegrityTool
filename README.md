@@ -38,9 +38,13 @@ Las señales identificadas son insumos preliminares para revisión humana de neu
         ├── corpus_validator.py
         ├── __init__.py
         ├── detector.py
+        ├── finding_model.py
         ├── llm_reviewer.py
         ├── normative_reference.py
         ├── pdf_extractor.py
+        ├── patterns
+        │   ├── __init__.py
+        │   └── competitive_neutrality_patterns.py
         ├── prioritizer.py
         └── review_synthesis.py
 ```
@@ -160,6 +164,26 @@ Ejemplos de mitigantes:
 - criterios funcionales en vez de referencias cerradas
 
 Los mitigantes reducen la atención contextual de señales relacionadas y se muestran como aspectos que favorecen apertura competitiva.
+
+
+## Modelo estructurado de hallazgos
+
+La app incorpora una primera capa estructurada de hallazgos mediante `src/analyzer/finding_model.py` y un catálogo inicial en `src/analyzer/patterns/competitive_neutrality_patterns.py`.
+
+Cada hallazgo conserva:
+
+- identificador trazable
+- título y categoría analítica
+- severidad prudente: `low`, `medium` o `contextual`
+- evidencia textual y página
+- justificación de revisión
+- `pattern_id`
+- factores mitigantes
+- condiciones de escalamiento
+- preguntas sugeridas
+- marca de revisión humana requerida
+
+Los resultados son preliminares, no constituyen dictamen legal o técnico definitivo y no reemplazan la revisión humana.
 
 ## Capa normativa orientativa
 

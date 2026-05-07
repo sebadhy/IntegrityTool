@@ -14,6 +14,7 @@ RULE_VERSION = "neutralidad-competitiva-v1"
 ATTENTION_SCORE = {"Bajo": 1, "Medio": 2, "Alto": 3}
 RELEVANCE_SCORE = {"Bajo": 1, "Medio": 2, "Alto": 3}
 RARE_LABELS = {"Poco frecuente", "Sin histórico"}
+STRUCTURED_SEVERITY_SCORE = {"low": 0, "medium": 1, "contextual": 2}
 CRITICAL_SECTION_TERMS = (
     "requisito",
     "especificacion",
@@ -100,13 +101,35 @@ def top_priorities(prioritized_df: pd.DataFrame, limit: int = 3) -> pd.DataFrame
         sort_df.get("número de coincidencias", 1),
         errors="coerce",
     ).fillna(1)
+    sort_df["_escalation_order"] = sort_df.apply(
+        lambda row: len(_list_field(row.get("escalation_factors", []))),
+        axis=1,
+    )
+    sort_df["_mitigation_order"] = sort_df.apply(
+        lambda row: len(_list_field(row.get("mitigating_factors", []))),
+        axis=1,
+    )
 
     return (
         sort_df.sort_values(
-            by=["_relevance_order", "_attention_order", "_history_order", "_match_order"],
-            ascending=[True, True, True, False],
+            by=[
+                "_relevance_order",
+                "_attention_order",
+                "_escalation_order",
+                "_mitigation_order",
+                "_history_order",
+                "_match_order",
+            ],
+            ascending=[True, True, False, True, True, False],
         )
-        .drop(columns=["_relevance_order", "_attention_order", "_history_order", "_match_order"])
+        .drop(columns=[
+            "_relevance_order",
+            "_attention_order",
+            "_history_order",
+            "_match_order",
+            "_escalation_order",
+            "_mitigation_order",
+        ])
         .head(limit)
     )
 
@@ -122,6 +145,14 @@ def _criteria_for_row(row: pd.Series, related_count: int) -> list[str]:
         return [
             "Elemento que favorece concurrencia y reduce atención contextual sobre requisitos cerrados."
         ]
+
+    mitigating_factors = _list_field(row.get("mitigating_factors", []))
+    escalation_factors = _list_field(row.get("escalation_factors", []))
+
+    for factor in escalation_factors:
+        criteria.append(f"Condición de escalamiento contextual: {factor}.")
+    for factor in mitigating_factors:
+        criteria.append(f"Factor mitigante identificado: {factor}.")
 
     text = _normalized_text(
         " ".join(
@@ -176,7 +207,10 @@ def _relevance_from_criteria(row: pd.Series, criteria: list[str]) -> str:
         return "Bajo"
 
     score = 0
+    score += STRUCTURED_SEVERITY_SCORE.get(str(row.get("severity", "")).lower(), 0)
     score += ATTENTION_SCORE.get(str(row.get("atención sugerida") or row.get("nivel de atención")), 1)
+    score += min(len(_list_field(row.get("escalation_factors", []))), 3)
+    score -= min(len(_list_field(row.get("mitigating_factors", []))), 2)
     if str(row.get("clasificación histórica")) in RARE_LABELS:
         score += 2
     if any("combinación" in item.lower() for item in criteria):
@@ -206,6 +240,8 @@ def _attention_from_relevance(row: pd.Series, relevance: str, criteria: list[str
 
     score = ATTENTION_SCORE.get(str(row.get("nivel de atención")), 1)
     score = max(score, RELEVANCE_SCORE.get(relevance, 1))
+    score += min(len(_list_field(row.get("escalation_factors", []))), 2)
+    score -= min(len(_list_field(row.get("mitigating_factors", []))), 2)
     if str(row.get("clasificación histórica")) == "Poco frecuente":
         score += 1
     if any("combinación" in item.lower() for item in criteria):
@@ -272,6 +308,25 @@ def _normalized_text(value: str) -> str:
     for source, target in replacements.items():
         text = text.replace(source, target)
     return text
+
+
+def _list_field(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, tuple):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return []
+        try:
+            parsed = json.loads(stripped)
+        except json.JSONDecodeError:
+            return [stripped]
+        if isinstance(parsed, list):
+            return [str(item).strip() for item in parsed if str(item).strip()]
+        return [str(parsed).strip()] if str(parsed).strip() else []
+    return []
 
 
 def _unique(values: list[str]) -> list[str]:

@@ -42,6 +42,15 @@ LLM_COLUMNS = [
 ]
 
 EXPORT_COLUMNS = [
+    "finding_id",
+    "title",
+    "pattern_id",
+    "severity",
+    "mitigating_factors",
+    "escalation_factors",
+    "suggested_questions",
+    "requires_human_review",
+    "output_label",
     "signal_id",
     "rule_id",
     "rule_version",

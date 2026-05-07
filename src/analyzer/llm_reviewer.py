@@ -19,8 +19,8 @@ SYSTEM_PROMPT = (
     "y apoyar la priorización de revisión humana. Puedes apoyarte en principios normativos "
     "como concurrencia, igualdad, trato justo, no discriminación, transparencia, mejor valor "
     "por dinero, claridad de especificaciones, proporcionalidad y justificación técnica. "
-    "No emites dictámenes legales ni concluyes ilegalidad, corrupción, direccionamiento "
-    "contractual o responsabilidad administrativa."
+    "No emites dictámenes legales, no atribuyes intencionalidad y no concluyes "
+    "responsabilidad administrativa."
 )
 
 DEFAULT_MODEL = "gpt-5.4-mini"

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 
+from .finding_model import Finding, SEVERITY_LOW, SEVERITY_MEDIUM
+from .patterns.competitive_neutrality_patterns import PATTERNS
 from .pdf_extractor import PageText
 
 
@@ -23,32 +26,37 @@ class PatternRule:
     signal_type: str = SIGNAL_REVIEW
 
 
-@dataclass
-class Detection:
-    page: int
-    detected_pattern: str
-    category: str
-    attention_level: str
-    match_count: int
-    text_fragment: str
-    prudent_observation: str
-    possible_competition_effect: str
-    suggested_validation: str
-    signal_type: str
-
-    def to_dict(self) -> dict[str, str | int]:
-        return {
-            "tipo_señal": self.signal_type,
-            "página": self.page,
-            "categoría": self.category,
-            "patrón detectado": self.detected_pattern,
-            "nivel de atención": self.attention_level,
-            "número de coincidencias": self.match_count,
-            "fragmento textual": self.text_fragment,
-            "observación prudente": self.prudent_observation,
-            "posible efecto sobre concurrencia": self.possible_competition_effect,
-            "validación sugerida": self.suggested_validation,
-        }
+class Detection(Finding):
+    def __init__(
+        self,
+        page: int,
+        detected_pattern: str,
+        category: str,
+        attention_level: str,
+        match_count: int,
+        text_fragment: str,
+        prudent_observation: str,
+        possible_competition_effect: str,
+        suggested_validation: str,
+        signal_type: str,
+    ) -> None:
+        super().__init__(
+            id=_finding_id(f"legacy-{detected_pattern}", page, text_fragment),
+            title=detected_pattern,
+            category=category,
+            severity=SEVERITY_LOW if attention_level == "Bajo" else SEVERITY_MEDIUM,
+            evidence=text_fragment,
+            page=page,
+            rationale=prudent_observation,
+            pattern_id=f"legacy-{_slug(detected_pattern)}",
+            mitigating_factors=[],
+            escalation_factors=[],
+            suggested_questions=[suggested_validation],
+            requires_human_review=signal_type == SIGNAL_REVIEW,
+            output_label="aspecto a revisar",
+            signal_type=signal_type,
+            match_count=match_count,
+        )
 
 
 RULES = [
@@ -531,6 +539,36 @@ def detect_patterns(pages: list[PageText]) -> list[Detection]:
                     )
                 )
 
+
+        for pattern in PATTERNS:
+            for term, start, end in find_terms(normalized_text, pattern["trigger_terms"]):
+                fragment = extract_context_window(normalized_text, start, end)
+                mitigating_factors = _unique(
+                    _matched_terms(fragment, pattern["mitigating_terms"])
+                    + _matched_terms(fragment, pattern.get("non_restrictive_contexts", []))
+                )
+                escalation_factors = _escalation_factors(fragment, pattern, mitigating_factors)
+                raw_detections.append(
+                    Finding(
+                        id=_finding_id(pattern["id"], page.page_number, fragment),
+                        title=pattern["title"],
+                        category=pattern["category"],
+                        severity=_catalog_severity(mitigating_factors, escalation_factors),
+                        evidence=fragment,
+                        page=page.page_number,
+                        rationale=(
+                            f"{pattern['description']} Se detectó el término '{term}'. "
+                            "Requiere revisión humana contextual antes de extraer conclusiones."
+                        ),
+                        pattern_id=pattern["id"],
+                        mitigating_factors=mitigating_factors,
+                        escalation_factors=escalation_factors,
+                        suggested_questions=pattern["suggested_questions"],
+                        requires_human_review=bool(escalation_factors) or not mitigating_factors,
+                        output_label=pattern["output_label"],
+                    )
+                )
+
     return _deduplicate(raw_detections)
 
 
@@ -570,6 +608,26 @@ def _find_similar_detection(
     return None
 
 
+def normalize_text(text: str) -> str:
+    return _normalize_whitespace(text).lower()
+
+
+def find_terms(text: str, terms: list[str]) -> list[tuple[str, int, int]]:
+    matches: list[tuple[str, int, int]] = []
+    for term in terms:
+        for match in re.finditer(_pattern_regex(term), text, re.IGNORECASE):
+            matches.append((term, match.start(), match.end()))
+    return matches
+
+
+def extract_context_window(text: str, start: int, end: int, context_chars: int = 260) -> str:
+    fragment_start = max(0, start - context_chars)
+    fragment_end = min(len(text), end + context_chars)
+    prefix = "... " if fragment_start > 0 else ""
+    suffix = " ..." if fragment_end < len(text) else ""
+    return f"{prefix}{text[fragment_start:fragment_end].strip()}{suffix}"
+
+
 def _normalize_whitespace(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
@@ -584,6 +642,8 @@ def _pattern_regex(pattern: str) -> str:
 def _should_skip_match(rule: PatternRule, fragment: str) -> bool:
     normalized_fragment = _normalize_for_similarity(fragment)
     if rule.pattern.lower() == "domicilio" and "domicilio fiscal" in normalized_fragment:
+        return True
+    if rule.signal_type == SIGNAL_MITIGANT and _has_negated_equivalence(normalized_fragment):
         return True
     return False
 
@@ -641,3 +701,68 @@ def _text_similarity(left: str, right: str) -> float:
 def _normalize_for_similarity(text: str) -> str:
     text = re.sub(r"\W+", " ", text.lower())
     return _normalize_whitespace(text)
+
+
+def _matched_terms(text: str, terms: list[str]) -> list[str]:
+    matched = []
+    for term, start, end in find_terms(text, terms):
+        window = normalize_text(text[max(0, start - 35): min(len(text), end + 35)])
+        if "equivalent" in normalize_text(term) or "equivalente" in normalize_text(term):
+            if _has_negated_equivalence(window):
+                continue
+        matched.append(term)
+    return matched
+
+
+def _has_negated_equivalence(text: str) -> bool:
+    negated_patterns = (
+        "no se menciona equivalente",
+        "no se aceptan equivalentes",
+        "sin equivalente",
+        "sin equivalentes",
+        "no admite equivalente",
+        "no admite equivalentes",
+    )
+    return any(pattern in text for pattern in negated_patterns)
+
+
+def _escalation_factors(fragment: str, pattern: dict, mitigating_factors: list[str]) -> list[str]:
+    normalized_fragment = normalize_text(fragment)
+    factors = []
+    for condition in pattern["escalation_conditions"]:
+        condition_text = normalize_text(condition)
+        if "ausencia" in condition_text and not mitigating_factors:
+            factors.append(condition)
+        elif condition_text in normalized_fragment:
+            factors.append(condition)
+    return factors
+
+
+def _catalog_severity(mitigating_factors: list[str], escalation_factors: list[str]) -> str:
+    if len(escalation_factors) >= 2:
+        return "contextual"
+    if escalation_factors:
+        return "medium"
+    if mitigating_factors:
+        return "low"
+    return "medium"
+
+
+def _finding_id(pattern_id: str, page: int, fragment: str) -> str:
+    digest = hashlib.sha1(f"{pattern_id}|{page}|{fragment[:240]}".encode("utf-8")).hexdigest()
+    return f"finding-{digest[:12]}"
+
+
+def _slug(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", normalize_text(value)).strip("-")
+
+
+def _unique(values: list[str]) -> list[str]:
+    seen = set()
+    result = []
+    for value in values:
+        clean_value = value.strip()
+        if clean_value and clean_value not in seen:
+            result.append(clean_value)
+            seen.add(clean_value)
+    return result
