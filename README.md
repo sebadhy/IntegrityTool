@@ -1,4 +1,4 @@
-# sercop-pliegos-ai
+# Asistente exploratorio de neutralidad competitiva en pliegos
 
 Herramienta exploratoria local para apoyar la revisión humana de neutralidad competitiva en pliegos de contratación pública.
 
