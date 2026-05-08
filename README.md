@@ -501,6 +501,24 @@ La app muestra mensajes comprensibles cuando detecta:
 - API key no configurada
 - error o timeout del proveedor LLM
 
+## Referencias conceptuales y metodológicas
+
+La arquitectura conceptual, los principios analíticos, el enfoque metodológico y los lineamientos de gobernanza de esta herramienta se documentan en:
+
+- [docs/technical_and_conceptual_framework.md](docs/technical_and_conceptual_framework.md)
+
+Este documento incluye:
+
+- enfoque de neutralidad competitiva;
+- principios de prudencia analítica, revisión humana y trazabilidad;
+- estrategia de corpus histórico;
+- arquitectura conceptual;
+- uso prudente de IA generativa;
+- mitigación de falsos positivos;
+- gobernanza y lineamientos de evolución futura.
+
+La herramienta constituye un ejercicio exploratorio de apoyo analítico documental y no reemplaza revisión técnica, jurídica o institucional.
+
 ## Advertencia institucional
 
 Las señales identificadas son insumos preliminares para revisión humana de neutralidad competitiva. No constituyen dictamen técnico, legal ni determinación de responsabilidad.
