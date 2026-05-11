@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import os
 from html import escape
 from pathlib import Path
@@ -32,6 +33,21 @@ from src.analyzer.review_synthesis import (
 
 APP_DIR = Path(__file__).parent
 STYLE_PATH = APP_DIR / "assets" / "styles.css"
+
+DIMENSION_LABELS = {
+    "barrier_to_entry": "Barreras de entrada",
+    "vendor_lock_in": "Dependencia de proveedor o fabricante",
+    "reduced_market_access": "Acceso reducido al mercado",
+    "qualification_restriction": "Restricción de calificación",
+    "administrative_burden": "Carga administrativa",
+    "geographic_restriction": "Restricción geográfica o presencia local",
+    "evaluation_discretion": "Discrecionalidad de evaluación",
+    "interoperability_lock_in": "Dependencia por interoperabilidad",
+    "timeline_restriction": "Restricción de plazos",
+    "financial_restriction": "Restricción financiera",
+    "technical_restriction": "Restricción técnica",
+    "low_competitive_neutrality": "Baja neutralidad competitiva",
+}
 
 LLM_COLUMNS = [
     "llm_explanation",
@@ -162,7 +178,8 @@ def prepare_results_dataframe(detections: list) -> pd.DataFrame:
     results_df = pd.DataFrame([detection.to_dict() for detection in detections])
     results_df = results_df.rename(columns={"categoría": "categoría de revisión"})
     for column in LLM_COLUMNS:
-        results_df[column] = "No disponible"
+        if column not in results_df.columns:
+            results_df[column] = "No disponible"
     return results_df
 
 
@@ -229,6 +246,44 @@ def history_badge(label: str) -> str:
 
 def safe_text(value: object) -> str:
     return escape(str(value))
+
+
+def dimension_label(value: object) -> str:
+    raw_value = str(value or "").strip()
+    if not raw_value or raw_value == "No disponible":
+        return "No disponible"
+    return DIMENSION_LABELS.get(raw_value, raw_value.replace("_", " ").capitalize())
+
+
+def display_list(value: object) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if _is_useful_text(item)]
+    if isinstance(value, tuple):
+        return [str(item).strip() for item in value if _is_useful_text(item)]
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not _is_useful_text(stripped):
+            return []
+        if stripped.startswith("[") and stripped.endswith("]"):
+            try:
+                parsed = ast.literal_eval(stripped)
+            except (SyntaxError, ValueError):
+                return [stripped]
+            return display_list(parsed)
+        return [stripped]
+    return [str(value).strip()] if _is_useful_text(value) else []
+
+
+def display_joined_list(value: object, fallback: str = "No identificado") -> str:
+    items = display_list(value)
+    return "; ".join(items) if items else fallback
+
+
+def _is_useful_text(value: object) -> bool:
+    text = str(value).strip()
+    return bool(text) and text not in {"[]", "No disponible", "None", "nan"}
 
 
 def render_institutional_header() -> None:
@@ -429,20 +484,20 @@ def render_dimension_summary(enriched_df: pd.DataFrame) -> None:
     for index, (dimension, count) in enumerate(dimension_counts.items()):
         with cols[index % len(cols)]:
             render_executive_card(
-                str(dimension).replace("_", " "),
+                dimension_label(dimension),
                 str(count),
                 "Señales consolidadas asociadas",
             )
 
 
 def render_review_questions(enriched_df: pd.DataFrame) -> None:
-    st.subheader("Preguntas sugeridas para revisión humana")
     questions: list[str] = []
-    for value in enriched_df.get("human_review_questions", []):
-        if isinstance(value, list):
-            questions.extend(value)
-        elif isinstance(value, str) and value.strip():
-            questions.append(value)
+    for column in ("human_review_questions", "suggested_questions", "pregunta_normativa_sugerida"):
+        if column not in enriched_df.columns:
+            continue
+        for value in enriched_df[column]:
+            questions.extend(display_list(value))
+
     unique_questions = []
     seen = set()
     for question in questions:
@@ -450,9 +505,11 @@ def render_review_questions(enriched_df: pd.DataFrame) -> None:
         if clean and clean not in seen:
             unique_questions.append(clean)
             seen.add(clean)
+
     if not unique_questions:
-        st.info("No hay preguntas adicionales generadas por la taxonomía para los filtros actuales.")
         return
+
+    st.subheader("Preguntas sugeridas para revisión humana")
     for question in unique_questions[:8]:
         st.markdown(f"- {safe_text(question)}")
 
@@ -492,7 +549,7 @@ def render_top_priorities(priority_df: pd.DataFrame, corpus_context: dict | None
             with header_cols[0]:
                 st.markdown(f"**{position}. {row['patrón detectado']}**")
                 st.caption(f"{row['tema de revisión']} · página {row['página']}")
-                st.caption(f"{safe_text(row.get('prioridad de revisión', 'revisión sugerida'))} · {safe_text(row.get('competition_dimension', 'dimensión no disponible'))}")
+                st.caption(f"{safe_text(row.get('prioridad de revisión', 'revisión sugerida'))} · {safe_text(dimension_label(row.get('competition_dimension', 'No disponible')))}")
             with header_cols[1]:
                 st.markdown(attention_badge(row["nivel_atencion"]), unsafe_allow_html=True)
                 st.caption(f"Relevancia {row['relevancia_analitica']}")
@@ -543,7 +600,7 @@ def render_aspect_card(row: pd.Series, corpus_context: dict | None = None) -> No
             </div>
             <div class="aspect-grid">
                 <div><strong>Frecuencia histórica</strong><br>{safe_text(row["frecuencia en corpus"])}</div>
-                <div><strong>Dimensión competitiva</strong><br>{safe_text(row.get("competition_dimension", "No disponible"))}</div>
+                <div><strong>Dimensión competitiva</strong><br>{safe_text(dimension_label(row.get("competition_dimension", "No disponible")))}</div>
                 <div><strong>Prioridad de revisión</strong><br>{safe_text(row.get("prioridad de revisión", "revisión sugerida"))}</div>
                 <div><strong>Comparación histórica</strong><br>{safe_text(row["comentario contextual"])}</div>
                 <div><strong>Posible efecto sobre concurrencia</strong><br>{safe_text(row["posible efecto sobre concurrencia"])}</div>
@@ -565,8 +622,8 @@ def render_aspect_card(row: pd.Series, corpus_context: dict | None = None) -> No
             </div>
             <div class="aspect-section">
                 <strong>Factores mitigantes e información faltante</strong>
-                <p><strong>Mitigantes:</strong> {safe_text(row.get("mitigating_factors", "No disponible"))}</p>
-                <p><strong>Información faltante:</strong> {safe_text(row.get("missing_information", "No disponible"))}</p>
+                <p><strong>Mitigantes:</strong> {safe_text(display_joined_list(row.get("mitigating_factors", [])))}</p>
+                <p><strong>Información faltante:</strong> {safe_text(display_joined_list(row.get("missing_information", [])))}</p>
             </div>
             <div class="aspect-section">
                 <strong>Revisión sugerida</strong>
