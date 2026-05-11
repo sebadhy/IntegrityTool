@@ -5,14 +5,52 @@ import re
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 
-from .finding_model import Finding, SEVERITY_LOW, SEVERITY_MEDIUM
+from .finding_model import (
+    Finding,
+    REVIEW_GENERAL,
+    REVIEW_PRIORITY,
+    REVIEW_SUGGESTED,
+    SEVERITY_CONTEXTUAL,
+    SEVERITY_LOW,
+    SEVERITY_MEDIUM,
+)
 from .patterns.competitive_neutrality_patterns import PATTERNS
 from .pdf_extractor import PageText
+from .taxonomy_loader import TaxonomyPattern, load_taxonomy
 
 
 SIGNAL_REVIEW = "señal_revision"
 SIGNAL_MITIGANT = "mitigante_concurrencia"
 SIGNAL_HABITUAL = "requisito_habitual"
+
+GLOBAL_MITIGATING_TERMS = [
+    "o equivalente",
+    "se aceptarán equivalentes",
+    "o superior",
+    "personas naturales o jurídicas",
+    "consorcios",
+    "consorcio",
+    "asociaciones",
+    "proveedores nacionales o extranjeros",
+]
+
+GLOBAL_JUSTIFICATION_TERMS = [
+    "según normativa aplicable",
+    "debidamente justificado",
+    "por razones de interoperabilidad",
+    "por compatibilidad con infraestructura existente",
+    "por seguridad",
+    "por continuidad operativa",
+]
+
+SECTION_HINTS = {
+    "especificaciones técnicas": ["especificaciones técnicas", "ficha técnica", "requisitos técnicos"],
+    "evaluación": ["evaluación", "calificación", "puntaje", "metodología"],
+    "cronograma": ["cronograma", "plazo", "fecha", "ofertas"],
+    "experiencia": ["experiencia", "contratos", "capacidad técnica"],
+    "requisitos administrativos": ["documentación", "administrativo", "rup", "domicilio fiscal"],
+    "postventa": ["garantía", "repuestos", "mantenimiento", "servicio técnico"],
+}
 
 
 @dataclass(frozen=True)
@@ -515,7 +553,10 @@ def detect_patterns(pages: list[PageText]) -> list[Detection]:
 
     for page in pages:
         normalized_text = _normalize_whitespace(page.text)
+        taxonomy_terms = _taxonomy_terms_set()
         for rule in RULES:
+            if rule.signal_type == SIGNAL_REVIEW and normalize_text(rule.pattern) in taxonomy_terms:
+                continue
             for match in re.finditer(_pattern_regex(rule.pattern), normalized_text, re.IGNORECASE):
                 fragment = _build_clause_fragment(
                     normalized_text,
@@ -540,36 +581,294 @@ def detect_patterns(pages: list[PageText]) -> list[Detection]:
                 )
 
 
-        for pattern in PATTERNS:
-            for term, start, end in find_terms(normalized_text, pattern["trigger_terms"]):
+        active_patterns = _active_taxonomy_patterns()
+        page_pattern_ids: set[str] = set()
+        for pattern in active_patterns:
+            for term, start, end in find_terms(normalized_text, pattern.textual_signals):
                 fragment = extract_context_window(normalized_text, start, end)
-                mitigating_factors = _unique(
-                    _matched_terms(fragment, pattern["mitigating_terms"])
-                    + _matched_terms(fragment, pattern.get("non_restrictive_contexts", []))
+                mitigating_factors = _contextual_mitigating_factors(fragment, pattern)
+                possible_justifications = _contextual_justifications(fragment, pattern)
+                escalation_factors = _taxonomy_escalation_factors(
+                    fragment=fragment,
+                    pattern=pattern,
+                    term=term,
+                    mitigating_factors=mitigating_factors,
+                    possible_justifications=possible_justifications,
+                    page_pattern_ids=page_pattern_ids,
                 )
-                escalation_factors = _escalation_factors(fragment, pattern, mitigating_factors)
+                page_pattern_ids.add(pattern.id)
+                document_section = _document_section(fragment, pattern)
+                missing_information = _missing_information(
+                    pattern,
+                    mitigating_factors,
+                    possible_justifications,
+                )
                 raw_detections.append(
                     Finding(
-                        id=_finding_id(pattern["id"], page.page_number, fragment),
-                        title=pattern["title"],
-                        category=pattern["category"],
-                        severity=_catalog_severity(mitigating_factors, escalation_factors),
+                        id=_finding_id(pattern.id, page.page_number, fragment),
+                        title=pattern.name,
+                        category=_category_from_dimension(pattern.competition_dimension),
+                        severity=_taxonomy_severity(pattern, mitigating_factors, escalation_factors),
                         evidence=fragment,
                         page=page.page_number,
-                        rationale=(
-                            f"{pattern['description']} Se detectó el término '{term}'. "
-                            "Requiere revisión humana contextual antes de extraer conclusiones."
-                        ),
-                        pattern_id=pattern["id"],
+                        rationale=_taxonomy_rationale(pattern, term, mitigating_factors, possible_justifications),
+                        pattern_id=pattern.id,
                         mitigating_factors=mitigating_factors,
                         escalation_factors=escalation_factors,
-                        suggested_questions=pattern["suggested_questions"],
-                        requires_human_review=bool(escalation_factors) or not mitigating_factors,
-                        output_label=pattern["output_label"],
+                        suggested_questions=pattern.human_review_questions,
+                        requires_human_review=True,
+                        output_label="aspecto a revisar",
+                        signal_type=SIGNAL_REVIEW,
+                        pattern_name=pattern.name,
+                        competition_dimension=pattern.competition_dimension,
+                        document_section=document_section,
+                        clause_excerpt=fragment,
+                        reason_for_review=_taxonomy_rationale(
+                            pattern, term, mitigating_factors, possible_justifications
+                        ),
+                        possible_legitimate_justifications=pattern.possible_legitimate_justifications
+                        + possible_justifications,
+                        missing_information=missing_information,
+                        suggested_neutral_wording=pattern.recommended_language,
+                        confidence=_taxonomy_confidence(pattern, mitigating_factors, escalation_factors),
+                        review_priority=_taxonomy_review_priority(
+                            pattern, mitigating_factors, escalation_factors
+                        ),
+                        contextual_notes=_contextual_notes(
+                            mitigating_factors, possible_justifications, missing_information
+                        ),
                     )
                 )
 
     return _deduplicate(raw_detections)
+
+
+
+_TAXONOMY_CACHE: list[TaxonomyPattern] | None = None
+
+
+def _active_taxonomy_patterns() -> list[TaxonomyPattern]:
+    global _TAXONOMY_CACHE
+    if _TAXONOMY_CACHE is not None:
+        return _TAXONOMY_CACHE
+
+    result = load_taxonomy()
+    if result.patterns:
+        _TAXONOMY_CACHE = result.patterns
+        return _TAXONOMY_CACHE
+
+    _TAXONOMY_CACHE = [_legacy_pattern_to_taxonomy(pattern) for pattern in PATTERNS]
+    return _TAXONOMY_CACHE
+
+
+def _taxonomy_terms_set() -> set[str]:
+    return {
+        normalize_text(term)
+        for pattern in _active_taxonomy_patterns()
+        for term in pattern.textual_signals
+    }
+
+
+def _legacy_pattern_to_taxonomy(pattern: dict) -> TaxonomyPattern:
+    return TaxonomyPattern(
+        id=str(pattern["id"]),
+        name=str(pattern["title"]),
+        description=str(pattern["description"]),
+        competition_dimension="low_competitive_neutrality",
+        risk_type="consideración analítica",
+        document_sections=[str(pattern["category"])],
+        textual_signals=list(pattern.get("trigger_terms", [])),
+        semantic_signals=[],
+        possible_indicators=[],
+        mitigating_factors=list(pattern.get("mitigating_terms", []))
+        + list(pattern.get("non_restrictive_contexts", [])),
+        possible_legitimate_justifications=[],
+        human_review_questions=list(pattern.get("suggested_questions", [])),
+        recommended_language=[str(pattern.get("output_label", "aspecto a revisar"))],
+        prohibited_language=[],
+        severity_guidance="suggested",
+        confidence_guidance="medium",
+        related_patterns=[],
+    )
+
+
+def _category_from_dimension(dimension: str) -> str:
+    return {
+        "barrier_to_entry": "Combinaciones de requisitos potencialmente limitantes",
+        "vendor_lock_in": "Referencias a marca, origen o fabricante",
+        "reduced_market_access": "Autorizaciones comerciales o de fabricante",
+        "qualification_restriction": "Experiencia o capacidad excesivamente específica",
+        "administrative_burden": "Completitud y trazabilidad documental",
+        "geographic_restriction": "Restricciones geográficas o de presencia local",
+        "evaluation_discretion": "Combinaciones de requisitos potencialmente limitantes",
+        "interoperability_lock_in": "Requisitos técnicos cerrados",
+        "timeline_restriction": "Combinaciones de requisitos potencialmente limitantes",
+        "financial_restriction": "Experiencia o capacidad excesivamente específica",
+        "technical_restriction": "Requisitos técnicos cerrados",
+        "low_competitive_neutrality": "Combinaciones de requisitos potencialmente limitantes",
+    }.get(dimension, "Combinaciones de requisitos potencialmente limitantes")
+
+
+def _contextual_mitigating_factors(fragment: str, pattern: TaxonomyPattern) -> list[str]:
+    return _unique(
+        _matched_terms(fragment, pattern.mitigating_factors)
+        + _matched_terms(fragment, GLOBAL_MITIGATING_TERMS)
+    )
+
+
+def _contextual_justifications(fragment: str, pattern: TaxonomyPattern) -> list[str]:
+    return _unique(
+        _matched_terms(fragment, GLOBAL_JUSTIFICATION_TERMS)
+        + [
+            justification
+            for justification in pattern.possible_legitimate_justifications
+            if normalize_text(justification) in normalize_text(fragment)
+        ]
+    )
+
+
+def _taxonomy_escalation_factors(
+    fragment: str,
+    pattern: TaxonomyPattern,
+    term: str,
+    mitigating_factors: list[str],
+    possible_justifications: list[str],
+    page_pattern_ids: set[str],
+) -> list[str]:
+    factors: list[str] = []
+    normalized_fragment = normalize_text(fragment)
+    if not mitigating_factors and pattern.id in {
+        "cn-brand-model-provider-reference",
+        "cn-weak-equivalence-clause",
+        "cn-technical-closed-requirement",
+        "cn-specific-certification",
+    }:
+        factors.append("No se observa mitigante de equivalencia cerca del fragmento.")
+    if not possible_justifications and pattern.competition_dimension in {
+        "interoperability_lock_in",
+        "geographic_restriction",
+        "timeline_restriction",
+        "financial_restriction",
+    }:
+        factors.append("No se observa justificación técnica cercana en el fragmento.")
+    for indicator in pattern.possible_indicators + pattern.semantic_signals:
+        indicator_text = normalize_text(indicator)
+        if indicator_text and indicator_text in normalized_fragment:
+            factors.append(indicator)
+    related_seen = sorted(set(pattern.related_patterns).intersection(page_pattern_ids))
+    if related_seen:
+        factors.append("Coexistencia con patrones relacionados en la misma página.")
+    if normalize_text(term) in {"adicionalmente", "además deberá", "conjuntamente"}:
+        factors.append("Lenguaje acumulativo de requisitos.")
+    return _unique(factors)
+
+
+def _document_section(fragment: str, pattern: TaxonomyPattern) -> str:
+    normalized_fragment = normalize_text(fragment)
+    for section, hints in SECTION_HINTS.items():
+        if any(hint in normalized_fragment for hint in hints):
+            return section
+    if pattern.document_sections:
+        return pattern.document_sections[0]
+    return "No determinada"
+
+
+def _missing_information(
+    pattern: TaxonomyPattern,
+    mitigating_factors: list[str],
+    possible_justifications: list[str],
+) -> list[str]:
+    missing: list[str] = []
+    if not mitigating_factors and pattern.id in {
+        "cn-brand-model-provider-reference",
+        "cn-technical-closed-requirement",
+        "cn-specific-certification",
+    }:
+        missing.append("No se identifica equivalencia funcional cercana.")
+    if not possible_justifications and pattern.competition_dimension in {
+        "geographic_restriction",
+        "interoperability_lock_in",
+        "financial_restriction",
+        "timeline_restriction",
+    }:
+        missing.append("No se identifica justificación técnica cercana.")
+    return missing
+
+
+def _taxonomy_rationale(
+    pattern: TaxonomyPattern,
+    term: str,
+    mitigating_factors: list[str],
+    possible_justifications: list[str],
+) -> str:
+    parts = [
+        f"Se identificó una señal preliminar asociada a '{pattern.name}' por la expresión '{term}'.",
+        "Convendría revisar si el requisito es proporcional, verificable y compatible con concurrencia.",
+    ]
+    if mitigating_factors:
+        parts.append(
+            "Se identificó un factor mitigante asociado a apertura competitiva; conviene validar si opera de forma efectiva."
+        )
+    if possible_justifications:
+        parts.append(
+            "También aparece una posible justificación técnica cercana que debería ser revisada en contexto."
+        )
+    if not mitigating_factors:
+        parts.append("No se observa mitigante cercano en el fragmento revisado.")
+    return " ".join(parts)
+
+
+def _taxonomy_severity(
+    pattern: TaxonomyPattern,
+    mitigating_factors: list[str],
+    escalation_factors: list[str],
+) -> str:
+    if mitigating_factors and not escalation_factors:
+        return SEVERITY_LOW
+    if pattern.severity_guidance == REVIEW_PRIORITY or len(escalation_factors) >= 2:
+        return SEVERITY_CONTEXTUAL
+    return SEVERITY_MEDIUM
+
+
+def _taxonomy_confidence(
+    pattern: TaxonomyPattern,
+    mitigating_factors: list[str],
+    escalation_factors: list[str],
+) -> str:
+    if mitigating_factors and not escalation_factors:
+        return "medium"
+    if escalation_factors:
+        return pattern.confidence_guidance
+    return "low" if pattern.confidence_guidance == "low" else "medium"
+
+
+def _taxonomy_review_priority(
+    pattern: TaxonomyPattern,
+    mitigating_factors: list[str],
+    escalation_factors: list[str],
+) -> str:
+    if mitigating_factors and not escalation_factors:
+        return REVIEW_GENERAL
+    if pattern.severity_guidance == REVIEW_PRIORITY or len(escalation_factors) >= 2:
+        return REVIEW_PRIORITY
+    if pattern.severity_guidance == REVIEW_GENERAL and not escalation_factors:
+        return REVIEW_GENERAL
+    return REVIEW_SUGGESTED
+
+
+def _contextual_notes(
+    mitigating_factors: list[str],
+    possible_justifications: list[str],
+    missing_information: list[str],
+) -> list[str]:
+    notes: list[str] = []
+    if mitigating_factors:
+        notes.append("Factor mitigante identificado; revisar si la equivalencia o apertura es efectiva.")
+    if possible_justifications:
+        notes.append("Posible justificación legítima cercana; revisar soporte técnico o documental.")
+    if missing_information:
+        notes.append("Información faltante o no visible en el fragmento requiere validación humana.")
+    return notes
 
 
 def _deduplicate(detections: list[Detection], similarity_threshold: float = 0.82) -> list[Detection]:

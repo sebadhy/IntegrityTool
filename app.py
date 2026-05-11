@@ -45,10 +45,26 @@ EXPORT_COLUMNS = [
     "finding_id",
     "title",
     "pattern_id",
+    "pattern_name",
+    "competition_dimension",
+    "dimensión competitiva",
+    "document_section",
+    "sección documental probable",
+    "clause_excerpt",
+    "reason_for_review",
+    "confidence",
+    "review_priority",
+    "prioridad de revisión",
     "severity",
     "mitigating_factors",
     "escalation_factors",
     "suggested_questions",
+    "human_review_questions",
+    "possible_legitimate_justifications",
+    "missing_information",
+    "suggested_neutral_wording",
+    "contextual_notes",
+    "prohibited_interpretation",
     "requires_human_review",
     "output_label",
     "signal_id",
@@ -386,6 +402,49 @@ def render_analytical_balance(brief: dict) -> None:
         )
 
 
+
+def render_dimension_summary(enriched_df: pd.DataFrame) -> None:
+    st.subheader("Señales por dimensión de competencia")
+    if "competition_dimension" not in enriched_df.columns or enriched_df.empty:
+        st.info("No hay dimensiones competitivas disponibles para los filtros actuales.")
+        return
+    review_df = enriched_df[enriched_df.get("tipo_señal", "señal_revision") == "señal_revision"]
+    if review_df.empty:
+        st.info("No hay señales de revisión para resumir por dimensión competitiva.")
+        return
+    dimension_counts = review_df["competition_dimension"].fillna("No disponible").value_counts()
+    cols = st.columns(min(3, max(1, len(dimension_counts))))
+    for index, (dimension, count) in enumerate(dimension_counts.items()):
+        with cols[index % len(cols)]:
+            render_executive_card(
+                str(dimension).replace("_", " "),
+                str(count),
+                "Señales consolidadas asociadas",
+            )
+
+
+def render_review_questions(enriched_df: pd.DataFrame) -> None:
+    st.subheader("Preguntas sugeridas para revisión humana")
+    questions: list[str] = []
+    for value in enriched_df.get("human_review_questions", []):
+        if isinstance(value, list):
+            questions.extend(value)
+        elif isinstance(value, str) and value.strip():
+            questions.append(value)
+    unique_questions = []
+    seen = set()
+    for question in questions:
+        clean = str(question).strip()
+        if clean and clean not in seen:
+            unique_questions.append(clean)
+            seen.add(clean)
+    if not unique_questions:
+        st.info("No hay preguntas adicionales generadas por la taxonomía para los filtros actuales.")
+        return
+    for question in unique_questions[:8]:
+        st.markdown(f"- {safe_text(question)}")
+
+
 def render_finding_explanation(explanation: dict) -> None:
     questions = explanation.get("questions_for_reviewer", ["No disponible"])
     questions_html = "<ul>" + "".join(f"<li>{safe_text(item)}</li>" for item in questions) + "</ul>"
@@ -421,6 +480,7 @@ def render_top_priorities(priority_df: pd.DataFrame, corpus_context: dict | None
             with header_cols[0]:
                 st.markdown(f"**{position}. {row['patrón detectado']}**")
                 st.caption(f"{row['tema de revisión']} · página {row['página']}")
+                st.caption(f"{safe_text(row.get('prioridad de revisión', 'revisión sugerida'))} · {safe_text(row.get('competition_dimension', 'dimensión no disponible'))}")
             with header_cols[1]:
                 st.markdown(attention_badge(row["nivel_atencion"]), unsafe_allow_html=True)
                 st.caption(f"Relevancia {row['relevancia_analitica']}")
@@ -434,6 +494,10 @@ def render_top_priorities(priority_df: pd.DataFrame, corpus_context: dict | None
             detail_cols[2].markdown(
                 f"**Validación sugerida**  \n{safe_text(row['validación sugerida'])}"
             )
+            if row.get("mitigating_factors"):
+                st.markdown(f"**Factores mitigantes identificados**  \n{safe_text(row['mitigating_factors'])}")
+            if row.get("missing_information"):
+                st.markdown(f"**Información faltante para validar**  \n{safe_text(row['missing_information'])}")
             st.markdown(f"**Posible justificación legítima**  \n{safe_text(row['posible justificación legítima'])}")
             st.markdown(f"**Evidencia textual breve**  \n> {safe_text(row['fragmento textual'])}")
 
@@ -467,8 +531,11 @@ def render_aspect_card(row: pd.Series, corpus_context: dict | None = None) -> No
             </div>
             <div class="aspect-grid">
                 <div><strong>Frecuencia histórica</strong><br>{safe_text(row["frecuencia en corpus"])}</div>
+                <div><strong>Dimensión competitiva</strong><br>{safe_text(row.get("competition_dimension", "No disponible"))}</div>
+                <div><strong>Prioridad de revisión</strong><br>{safe_text(row.get("prioridad de revisión", "revisión sugerida"))}</div>
                 <div><strong>Comparación histórica</strong><br>{safe_text(row["comentario contextual"])}</div>
                 <div><strong>Posible efecto sobre concurrencia</strong><br>{safe_text(row["posible efecto sobre concurrencia"])}</div>
+                <div><strong>Sección probable</strong><br>{safe_text(row.get("document_section", "No determinada"))}</div>
             </div>
             <div class="aspect-section">
                 <strong>Por qué se sugiere revisar</strong>
@@ -483,6 +550,11 @@ def render_aspect_card(row: pd.Series, corpus_context: dict | None = None) -> No
                 <p>{safe_text(row["fragmento textual"])}</p>
                 <p><strong>Documento origen:</strong> {safe_text(row.get("documento origen", "Documento cargado"))}</p>
                 <p><strong>Página:</strong> {safe_text(row["página"])}</p>
+            </div>
+            <div class="aspect-section">
+                <strong>Factores mitigantes e información faltante</strong>
+                <p><strong>Mitigantes:</strong> {safe_text(row.get("mitigating_factors", "No disponible"))}</p>
+                <p><strong>Información faltante:</strong> {safe_text(row.get("missing_information", "No disponible"))}</p>
             </div>
             <div class="aspect-section">
                 <strong>Revisión sugerida</strong>
@@ -893,6 +965,8 @@ def render_review_flow() -> None:
 
     brief = build_executive_brief(filtered_df)
     render_briefing(brief)
+    render_dimension_summary(filtered_df)
+    render_review_questions(filtered_df)
 
     if filtered_df.empty:
         st.warning("No hay señales para los filtros seleccionados.")

@@ -13,6 +13,12 @@ RULE_VERSION = "neutralidad-competitiva-v1"
 
 ATTENTION_SCORE = {"Bajo": 1, "Medio": 2, "Alto": 3}
 RELEVANCE_SCORE = {"Bajo": 1, "Medio": 2, "Alto": 3}
+REVIEW_PRIORITY_SCORE = {"general": 1, "suggested": 2, "priority": 3}
+REVIEW_PRIORITY_LABEL = {
+    "general": "revisión general",
+    "suggested": "revisión sugerida",
+    "priority": "revisión prioritaria",
+}
 RARE_LABELS = {"Poco frecuente", "Sin histórico"}
 STRUCTURED_SEVERITY_SCORE = {"low": 0, "medium": 1, "contextual": 2}
 CRITICAL_SECTION_TERMS = (
@@ -48,6 +54,7 @@ def prioritize_signals(enriched_df: pd.DataFrame) -> pd.DataFrame:
         criteria = _criteria_for_row(row, int(theme_counts.get(row["tema de revisión"], 1)))
         relevance = _relevance_from_criteria(row, criteria)
         attention = _attention_from_relevance(row, relevance, criteria)
+        review_priority = _review_priority_from_context(row, criteria, relevance)
         rows.append(
             {
                 "signal_id": _signal_id(row),
@@ -63,6 +70,8 @@ def prioritize_signals(enriched_df: pd.DataFrame) -> pd.DataFrame:
                 ),
                 "nivel_atencion": attention,
                 "relevancia_analitica": relevance,
+                "review_priority": review_priority,
+                "prioridad de revisión": REVIEW_PRIORITY_LABEL.get(review_priority, "revisión sugerida"),
                 "criterios_de_priorizacion": json.dumps(criteria, ensure_ascii=False),
                 "explicacion_priorizacion": _priority_explanation(row, criteria, relevance),
                 "interpretación_comparativa": row.get(
@@ -73,6 +82,9 @@ def prioritize_signals(enriched_df: pd.DataFrame) -> pd.DataFrame:
         )
 
     priority_df = pd.DataFrame(rows, index=prioritized_df.index)
+    overlapping_columns = [column for column in priority_df.columns if column in prioritized_df.columns]
+    if overlapping_columns:
+        prioritized_df = prioritized_df.drop(columns=overlapping_columns)
     prioritized_df = pd.concat([prioritized_df, priority_df], axis=1)
     prioritized_df["atención sugerida"] = prioritized_df["nivel_atencion"]
     return prioritized_df
@@ -88,6 +100,10 @@ def top_priorities(prioritized_df: pd.DataFrame, limit: int = 3) -> pd.DataFrame
         sort_df = sort_df[sort_df["tipo_señal"] == "señal_revision"]
     if sort_df.empty:
         return sort_df
+    sort_df["_review_priority_order"] = sort_df.get("review_priority", "suggested")
+    sort_df["_review_priority_order"] = sort_df["_review_priority_order"].map(
+        {"priority": 0, "suggested": 1, "general": 2}
+    ).fillna(1)
     sort_df["_relevance_order"] = sort_df["relevancia_analitica"].map(
         {"Alto": 0, "Medio": 1, "Bajo": 2}
     )
@@ -113,6 +129,7 @@ def top_priorities(prioritized_df: pd.DataFrame, limit: int = 3) -> pd.DataFrame
     return (
         sort_df.sort_values(
             by=[
+                "_review_priority_order",
                 "_relevance_order",
                 "_attention_order",
                 "_escalation_order",
@@ -120,9 +137,10 @@ def top_priorities(prioritized_df: pd.DataFrame, limit: int = 3) -> pd.DataFrame
                 "_history_order",
                 "_match_order",
             ],
-            ascending=[True, True, False, True, True, False],
+            ascending=[True, True, True, False, True, True, False],
         )
         .drop(columns=[
+            "_review_priority_order",
             "_relevance_order",
             "_attention_order",
             "_history_order",
@@ -153,6 +171,14 @@ def _criteria_for_row(row: pd.Series, related_count: int) -> list[str]:
         criteria.append(f"Condición de escalamiento contextual: {factor}.")
     for factor in mitigating_factors:
         criteria.append(f"Factor mitigante identificado: {factor}.")
+
+    dimension = str(row.get("competition_dimension") or row.get("dimensión competitiva", "")).strip()
+    if dimension:
+        criteria.append(f"Dimensión competitiva asociada: {dimension}.")
+
+    missing_information = _list_field(row.get("missing_information", []))
+    for item in missing_information:
+        criteria.append(f"Información faltante para validar contexto: {item}.")
 
     text = _normalized_text(
         " ".join(
@@ -223,6 +249,7 @@ def _relevance_from_criteria(row: pd.Series, criteria: list[str]) -> str:
         score += 1
     if any("Mitigantes identificados" in item for item in criteria):
         score -= 1
+    score += REVIEW_PRIORITY_SCORE.get(str(row.get("review_priority", "suggested")), 2) - 1
 
     if score >= 6:
         return "Alto"
@@ -254,6 +281,30 @@ def _attention_from_relevance(row: pd.Series, relevance: str, criteria: list[str
     if score >= 2:
         return "Medio"
     return "Bajo"
+
+
+def _review_priority_from_context(row: pd.Series, criteria: list[str], relevance: str) -> str:
+    if str(row.get("tipo_señal", "señal_revision")) in {
+        "requisito_habitual",
+        "mitigante_concurrencia",
+    }:
+        return "general"
+    existing = str(row.get("review_priority", "")).strip()
+    if existing in REVIEW_PRIORITY_SCORE:
+        base = REVIEW_PRIORITY_SCORE[existing]
+    else:
+        base = 2
+    base += min(len(_list_field(row.get("escalation_factors", []))), 2)
+    base -= min(len(_list_field(row.get("mitigating_factors", []))), 1)
+    if str(row.get("clasificación histórica")) in RARE_LABELS:
+        base += 1
+    if relevance == "Alto":
+        base += 1
+    if base >= 4:
+        return "priority"
+    if base >= 2:
+        return "suggested"
+    return "general"
 
 
 def _priority_explanation(row: pd.Series, criteria: list[str], relevance: str) -> str:

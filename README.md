@@ -44,8 +44,10 @@ Las señales identificadas son insumos preliminares para revisión humana de neu
         ├── pdf_extractor.py
         ├── patterns
         │   ├── __init__.py
-        │   └── competitive_neutrality_patterns.py
+        │   ├── competitive_neutrality_patterns.py
+        │   └── risk_taxonomy.yaml
         ├── prioritizer.py
+        ├── taxonomy_loader.py
         └── review_synthesis.py
 ```
 
@@ -166,22 +168,35 @@ Ejemplos de mitigantes:
 Los mitigantes reducen la atención contextual de señales relacionadas y se muestran como aspectos que favorecen apertura competitiva.
 
 
+## Taxonomía de patrones documentales
+
+La app incorpora una taxonomía editable en `src/analyzer/patterns/risk_taxonomy.yaml`. Esta taxonomía permite ajustar patrones documentales sin modificar código Python. Cada patrón define dimensión competitiva, señales textuales, señales semánticas, posibles indicadores, mitigantes, justificaciones legítimas, preguntas de revisión humana y lenguaje recomendado.
+
+El loader `src/analyzer/taxonomy_loader.py` valida campos obligatorios y aplica fallback seguro si el YAML falta o contiene errores parciales. La herramienta conserva compatibilidad con el catálogo Python inicial en `src/analyzer/patterns/competitive_neutrality_patterns.py`.
+
+La diferencia metodológica central es que una señal preliminar no equivale a una conclusión legal o técnica. El motor preserva evidencia y contexto para revisión humana: equivalencias, justificaciones cercanas, acumulación de condiciones y frecuencia histórica.
+
+Los mitigantes no eliminan automáticamente una señal. La contextualizan. Por ejemplo, una mención a marca con “o equivalente” se mantiene como aspecto revisable, pero con menor prioridad y con una pregunta sobre si la equivalencia es efectiva y verificable.
+
 ## Modelo estructurado de hallazgos
 
-La app incorpora una primera capa estructurada de hallazgos mediante `src/analyzer/finding_model.py` y un catálogo inicial en `src/analyzer/patterns/competitive_neutrality_patterns.py`.
+La app incorpora una capa estructurada de hallazgos mediante `src/analyzer/finding_model.py`, alimentada por la taxonomía YAML y el catálogo inicial de respaldo.
 
 Cada hallazgo conserva:
 
 - identificador trazable
-- título y categoría analítica
+- `pattern_id` y `pattern_name`
+- dimensión competitiva
+- sección documental probable
 - severidad prudente: `low`, `medium` o `contextual`
 - evidencia textual y página
-- justificación de revisión
-- `pattern_id`
+- razón de revisión
 - factores mitigantes
-- condiciones de escalamiento
+- posibles justificaciones legítimas
+- información faltante
 - preguntas sugeridas
-- marca de revisión humana requerida
+- prioridad de revisión: `general`, `suggested` o `priority`
+- advertencia metodológica
 
 Los resultados son preliminares, no constituyen dictamen legal o técnico definitivo y no reemplazan la revisión humana.
 
@@ -222,6 +237,12 @@ Cada señal sugerida para revisión incluye:
 
 - `signal_id`
 - `rule_id`
+- `pattern_id`
+- `pattern_name`
+- dimensión competitiva
+- sección documental probable
+- prioridad de revisión
+- confidence
 - `rule_version`
 - `timestamp_analisis`
 - `engine_version`
@@ -252,7 +273,9 @@ El módulo `src/analyzer/prioritizer.py` agrega una priorización explicable. No
 
 Campos principales:
 
-- `nivel_atencion`: Bajo, Medio o Alto
+- `nivel_atencion`: Bajo, Medio o Alto, usado como etiqueta de atención visual
+- `review_priority`: `general`, `suggested` o `priority`
+- `prioridad de revisión`: revisión general, revisión sugerida o revisión prioritaria
 - `relevancia_analitica`: Bajo, Medio o Alto
 - `criterios_de_priorizacion`: razones concretas usadas por el motor
 - `explicacion_priorizacion`: síntesis prudente para revisión humana
@@ -459,7 +482,7 @@ La lectura asistida por IA:
 
 - usa máximo 12.000 caracteres del documento
 - prioriza fragmentos vinculados a señales sugeridas
-- recibe señales priorizadas, categorías, atención sugerida y frecuencias comparativas
+- recibe señales priorizadas, categorías, atención sugerida, taxonomía documental y frecuencias comparativas
 - recibe mitigantes y requisitos habituales como contexto de balance
 - recibe criterios normativos orientativos curados
 - no debe proponer señales nuevas sin soporte en el análisis previo
@@ -481,6 +504,14 @@ La salida del brief incluye:
 - razones de las prioridades principales
 - preguntas sugeridas para revisión humana
 - nota metodológica
+
+## Tests
+
+La suite cubre carga de taxonomía, fallback seguro, mitigantes, señales contextuales, priorización y control de lenguaje en outputs principales.
+
+```bash
+pytest
+```
 
 ## Exportaciones
 

@@ -8,6 +8,8 @@ from typing import Any
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from .taxonomy_loader import taxonomy_context
+
 
 load_dotenv()
 
@@ -16,11 +18,12 @@ LOGGER = logging.getLogger(__name__)
 SYSTEM_PROMPT = (
     "Eres un asistente técnico para revisión preliminar de neutralidad competitiva en "
     "documentos de contratación pública de Ecuador. Tu función es resumir, contextualizar "
-    "y apoyar la priorización de revisión humana. Puedes apoyarte en principios normativos "
+    "y apoyar la priorización de revisión humana a partir de señales documentales ya detectadas. Puedes apoyarte en principios normativos "
     "como concurrencia, igualdad, trato justo, no discriminación, transparencia, mejor valor "
     "por dinero, claridad de especificaciones, proporcionalidad y justificación técnica. "
-    "No emites dictámenes legales, no atribuyes intencionalidad y no concluyes "
-    "responsabilidad administrativa."
+    "No emites dictámenes legales, no atribuyes intencionalidad, no infieres proveedores beneficiados "
+    "y no inventas evidencia. Si el fragmento no sustenta una señal documental, responde: "
+    "No se identifica una señal documental suficiente en el fragmento revisado."
 )
 
 DEFAULT_MODEL = "gpt-5.4-mini"
@@ -257,7 +260,8 @@ def _build_document_brief_prompt(
         "- Usa únicamente el extracto documental, las señales sugeridas y el contexto comparativo provisto.\n"
         "- No inventes señales nuevas ni agregues conclusiones no soportadas.\n"
         "- No emitas dictámenes legales ni asignes responsabilidad.\n"
-        "- No atribuyas intencionalidad.\n"
+        "- No atribuyas intencionalidad ni infieras proveedores beneficiados.\n"
+        "- Usa la taxonomía únicamente como marco de explicación y no como conclusión automática.\n"
         "- Usa la capa normativa solo como referencia orientativa para revisión humana.\n"
         "- Distingue requisitos regulatorios o habituales de señales atípicas o acumuladas.\n"
         "- Reconoce mitigantes como equivalentes funcionales, consorcios, apertura a oferentes "
@@ -266,6 +270,7 @@ def _build_document_brief_prompt(
         "- Usa lenguaje prudente: señales de restricción competitiva, requisitos potencialmente "
         "limitantes, baja neutralidad competitiva, condiciones que podrían reducir concurrencia, "
         "validación de proporcionalidad, revisión humana sugerida, posible afectación a concurrencia.\n"
+        "- Si no hay evidencia suficiente, indícalo de forma explícita y prudente.\n"
         "- Devuelve únicamente JSON estricto con las claves solicitadas.\n\n"
         "Objeto de contratación: No disponible en el documento cargado.\n\n"
         f"Extracto representativo del documento (máximo {MAX_DOCUMENT_CHARS} caracteres):\n"
@@ -276,6 +281,8 @@ def _build_document_brief_prompt(
         f"{json.dumps(comparative_summary, ensure_ascii=False, indent=2)}\n"
         "\nCapa normativa orientativa curada:\n"
         f"{json.dumps(normative_context or _default_normative_context(), ensure_ascii=False, indent=2)}\n"
+        "\nTaxonomía documental de referencia:\n"
+        f"{json.dumps(taxonomy_context(), ensure_ascii=False, indent=2)}\n"
     )
 
 
@@ -288,6 +295,7 @@ def _build_finding_prompt(finding: dict, corpus_context: dict | None) -> str:
         "Condiciones:\n"
         "- La señal ya fue detectada por reglas; no inventes señales adicionales.\n"
         "- No emitas dictámenes legales ni asignes responsabilidad.\n"
+        "- No infieras intención ni proveedor beneficiado.\n"
         "- Usa la referencia normativa de la señal solo como apoyo orientativo.\n"
         "- Distingue si se trata de un requisito habitual, un mitigante o una señal que requiere revisión.\n"
         "- Reconoce factores que favorecen concurrencia y explica si reducen la atención sugerida.\n"
@@ -295,7 +303,8 @@ def _build_finding_prompt(finding: dict, corpus_context: dict | None) -> str:
         "- Usa lenguaje técnico, breve y orientado a decisión.\n"
         "- Devuelve únicamente JSON estricto con las claves solicitadas.\n\n"
         f"Señal sugerida:\n{json.dumps(_compact_finding(finding), ensure_ascii=False, indent=2)}\n\n"
-        f"Contexto histórico del patrón:\n{json.dumps(context, ensure_ascii=False, indent=2)}\n"
+        f"Contexto histórico del patrón:\n{json.dumps(context, ensure_ascii=False, indent=2)}\n\n"
+        f"Taxonomía documental de referencia:\n{json.dumps(taxonomy_context(limit=6), ensure_ascii=False, indent=2)}\n"
     )
 
 
@@ -336,6 +345,10 @@ def _compact_finding(finding: dict) -> dict[str, Any]:
         "tema": finding.get("tema de revisión", "No disponible"),
         "pagina": finding.get("página", "No disponible"),
         "patron": finding.get("patrón detectado", "No disponible"),
+        "pattern_id": finding.get("pattern_id", "No disponible"),
+        "pattern_name": finding.get("pattern_name", finding.get("patrón detectado", "No disponible")),
+        "dimension_competitiva": finding.get("competition_dimension", finding.get("dimensión competitiva", "No disponible")),
+        "seccion_documental_probable": finding.get("document_section", finding.get("sección documental probable", "No disponible")),
         "categoria_revision": finding.get("categoría de revisión", "No disponible"),
         "atencion_sugerida": finding.get(
             "atención sugerida",
@@ -351,10 +364,15 @@ def _compact_finding(finding: dict) -> dict[str, Any]:
                 finding.get("validación sugerida", "No disponible"),
             ),
         ),
+        "prioridad_revision": finding.get("prioridad de revisión", finding.get("review_priority", "No disponible")),
         "criterios_de_priorizacion": finding.get(
             "criterios_de_priorizacion",
             finding.get("validación sugerida", "No disponible"),
         ),
+        "factores_mitigantes": finding.get("mitigating_factors", []),
+        "justificaciones_posibles": finding.get("possible_legitimate_justifications", []),
+        "informacion_faltante": finding.get("missing_information", []),
+        "lenguaje_recomendado": finding.get("suggested_neutral_wording", finding.get("lenguaje recomendado", "No disponible")),
         "posible_efecto_sobre_concurrencia": finding.get(
             "posible efecto sobre concurrencia",
             "No disponible",
