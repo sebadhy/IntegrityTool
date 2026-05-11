@@ -191,9 +191,21 @@ def empty_corpus_payload() -> dict:
 
 
 def ordered_export(df: pd.DataFrame) -> pd.DataFrame:
-    existing_columns = [column for column in EXPORT_COLUMNS if column in df.columns]
-    remaining_columns = [column for column in df.columns if column not in existing_columns]
-    return df[existing_columns + remaining_columns]
+    export_df = df.loc[:, ~df.columns.duplicated()].copy()
+    export_order = _unique_columns(EXPORT_COLUMNS)
+    existing_columns = [column for column in export_order if column in export_df.columns]
+    remaining_columns = [column for column in export_df.columns if column not in existing_columns]
+    return export_df[existing_columns + remaining_columns]
+
+
+def _unique_columns(columns: list[str]) -> list[str]:
+    seen: set[str] = set()
+    unique: list[str] = []
+    for column in columns:
+        if column not in seen:
+            unique.append(column)
+            seen.add(column)
+    return unique
 
 
 def attention_badge(level: str) -> str:
