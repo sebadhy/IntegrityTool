@@ -515,7 +515,13 @@ def render_review_questions(enriched_df: pd.DataFrame) -> None:
 
 
 def render_finding_explanation(explanation: dict) -> None:
-    questions = explanation.get("questions_for_reviewer", ["No disponible"])
+    if explanation.get("llm_available") is False:
+        st.warning(
+            "La explicación asistida por IA no se pudo generar. "
+            f"Detalle: {explanation.get('llm_error', 'No disponible')}"
+        )
+
+    questions = display_list(explanation.get("questions_for_reviewer", []))
     questions_html = "<ul>" + "".join(f"<li>{safe_text(item)}</li>" for item in questions) + "</ul>"
     st.markdown(
         f"""

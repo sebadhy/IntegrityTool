@@ -120,7 +120,7 @@ def generate_document_brief(
 ) -> dict:
     """Generate a cautious executive brief from document text and prior rule findings."""
     if not os.getenv("OPENAI_API_KEY"):
-        return _unavailable_document_brief()
+        return _unavailable_document_brief("OPENAI_API_KEY no está configurada.")
 
     try:
         response = _client().chat.completions.create(
@@ -143,7 +143,7 @@ def generate_document_brief(
         return _normalize_document_brief(json.loads(content))
     except Exception as exc:
         LOGGER.warning("Document brief LLM failed: %s", exc)
-        return _unavailable_document_brief()
+        return _unavailable_document_brief(_friendly_llm_error(exc))
 
 
 def explain_priority_with_llm(
@@ -152,7 +152,7 @@ def explain_priority_with_llm(
 ) -> dict:
     """Explain one prioritized signal in plain language."""
     if not os.getenv("OPENAI_API_KEY"):
-        return _unavailable_finding_explanation()
+        return _unavailable_finding_explanation("OPENAI_API_KEY no está configurada.")
 
     try:
         response = _client().chat.completions.create(
@@ -173,7 +173,7 @@ def explain_priority_with_llm(
         return _normalize_finding_explanation(json.loads(content))
     except Exception as exc:
         LOGGER.warning("Finding explanation LLM failed: %s", exc)
-        return _unavailable_finding_explanation()
+        return _unavailable_finding_explanation(_friendly_llm_error(exc))
 
 
 def explain_finding_with_llm(
@@ -451,7 +451,7 @@ def _normalize_attention(value: Any) -> str:
     return UNAVAILABLE
 
 
-def _unavailable_document_brief() -> dict:
+def _unavailable_document_brief(reason: str = UNAVAILABLE) -> dict:
     return {
         "document_summary": UNAVAILABLE,
         "overall_attention_level": UNAVAILABLE,
@@ -461,16 +461,23 @@ def _unavailable_document_brief() -> dict:
         "top_priorities_rationale": [UNAVAILABLE],
         "suggested_human_review_questions": [UNAVAILABLE],
         "methodological_note": UNAVAILABLE,
+        "llm_available": False,
+        "llm_error": reason,
     }
 
 
-def _unavailable_finding_explanation() -> dict:
+def _unavailable_finding_explanation(reason: str = UNAVAILABLE) -> dict:
     return {
-        "plain_language_explanation": UNAVAILABLE,
-        "why_it_matters": UNAVAILABLE,
-        "possible_legitimate_justification": UNAVAILABLE,
-        "suggested_review_action": UNAVAILABLE,
-        "questions_for_reviewer": [UNAVAILABLE],
+        "plain_language_explanation": "La explicación asistida por IA no está disponible en este momento.",
+        "why_it_matters": "Se mantiene la revisión basada en reglas, taxonomía documental y contexto comparativo.",
+        "possible_legitimate_justification": "Revise la posible justificación legítima indicada por el análisis estructurado de la señal.",
+        "suggested_review_action": "Use la evidencia textual, mitigantes y preguntas de revisión ya mostradas para continuar la revisión humana.",
+        "questions_for_reviewer": [
+            "¿La señal cuenta con justificación técnica proporcional en el documento?",
+            "¿Existen mitigantes o equivalencias aplicables en la práctica?",
+        ],
+        "llm_available": False,
+        "llm_error": reason,
     }
 
 
