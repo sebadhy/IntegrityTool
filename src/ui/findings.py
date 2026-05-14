@@ -192,7 +192,8 @@ def render_theme_groups(enriched_df: pd.DataFrame, corpus_context: dict | None =
 
 def render_feedback_buttons(row: pd.Series) -> None:
     signal_id = str(row.get("signal_id", str(row.name)))
-    fb_state_key = f"fb_{signal_id}"
+    row_idx = str(row.name)
+    fb_state_key = f"fb_{signal_id}_{row_idx}"
 
     if st.session_state.get(fb_state_key):
         st.caption(f"Feedback registrado: {st.session_state[fb_state_key]}")
@@ -206,7 +207,7 @@ def render_feedback_buttons(row: pd.Series) -> None:
         (fb_cols[2], "Más contexto", "needs_context", "No puedo decidir con la información disponible"),
     ]
     for col, label, verdict, help_text in options:
-        if col.button(label, key=f"fb_{signal_id}_{verdict}", help=help_text):
+        if col.button(label, key=f"fb_{signal_id}_{row_idx}_{verdict}", help=help_text):
             _save_feedback_case(row, verdict)
             st.session_state[fb_state_key] = label
 
