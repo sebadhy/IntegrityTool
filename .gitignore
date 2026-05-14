@@ -25,6 +25,10 @@ data/raw/pliegos/*.pdf
 data/raw/especificaciones/*.pdf
 data/processed/
 
+# Casos de feedback del revisor: pueden contener fragmentos de pliegos reales.
+# Se trackea solo la carpeta (via .gitkeep), no los casos acumulados.
+data/feedback/cases.jsonl
+
 # Exports y reportes generados por la app.
 exports/
 

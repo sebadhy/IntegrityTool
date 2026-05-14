@@ -7,6 +7,7 @@ from typing import Any
 
 import pandas as pd
 
+from .taxonomy_loader import taxonomy_sha256
 from .text_cleaner import normalize_for_matching
 
 
@@ -51,6 +52,7 @@ def prioritize_signals(enriched_df: pd.DataFrame) -> pd.DataFrame:
     timestamp = datetime.now(timezone.utc).isoformat()
     theme_counts = prioritized_df["tema de revisión"].value_counts().to_dict()
 
+    tax_hash = taxonomy_sha256()
     rows: list[dict[str, Any]] = []
     for _, row in prioritized_df.iterrows():
         criteria = _criteria_for_row(row, int(theme_counts.get(row["tema de revisión"], 1)))
@@ -62,6 +64,7 @@ def prioritize_signals(enriched_df: pd.DataFrame) -> pd.DataFrame:
                 "signal_id": _signal_id(row),
                 "rule_id": _rule_id(row),
                 "rule_version": RULE_VERSION,
+                "taxonomy_sha256": tax_hash,
                 "timestamp_analisis": timestamp,
                 "engine_version": ENGINE_VERSION,
                 "frecuencia_corpus": row.get("frecuencia en corpus", "No disponible"),

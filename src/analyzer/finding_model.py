@@ -57,6 +57,8 @@ class Finding:
     review_priority: str = REVIEW_SUGGESTED
     contextual_notes: list[str] = field(default_factory=list)
     prohibited_interpretation: str = PROHIBITED_INTERPRETATION
+    section_id: str = "desconocido"
+    section_label: str = "No determinada"
 
     def __post_init__(self) -> None:
         if not self.pattern_name:
@@ -112,6 +114,8 @@ class Finding:
             "prohibited_interpretation": self.prohibited_interpretation,
             "requires_human_review": self.requires_human_review,
             "output_label": self.output_label,
+            "section_id": self.section_id,
+            "section_label": self.section_label,
             "tipo_señal": self.signal_type,
             "página": self.page,
             "categoría": self.category,

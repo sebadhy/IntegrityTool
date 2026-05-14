@@ -4,7 +4,9 @@ import hashlib
 import re
 from dataclasses import dataclass
 from difflib import SequenceMatcher
+from functools import lru_cache
 
+from .document_segmenter import DocumentSection, segment_document
 from .finding_model import (
     Finding,
     REVIEW_GENERAL,
@@ -95,6 +97,8 @@ class Detection(Finding):
         possible_competition_effect: str,
         suggested_validation: str,
         signal_type: str,
+        section_id: str = "desconocido",
+        section_label: str = "No determinada",
     ) -> None:
         super().__init__(
             id=_finding_id(f"legacy-{detected_pattern}", page, text_fragment),
@@ -112,6 +116,8 @@ class Detection(Finding):
             output_label="aspecto a revisar",
             signal_type=signal_type,
             match_count=match_count,
+            section_id=section_id,
+            section_label=section_label,
         )
 
 
@@ -566,21 +572,42 @@ RULES = [
 ]
 
 
-def detect_patterns(pages: list[PageText]) -> list[Detection]:
+def detect_patterns(
+    pages: list[PageText],
+    sections: list[DocumentSection] | None = None,
+) -> list[Detection]:
+    if sections is None:
+        sections = segment_document(pages)
+
+    page_to_section: dict[int, DocumentSection] = {}
+    for section in sections:
+        for page in pages:
+            if section.start_page <= page.page_number <= section.end_page:
+                page_to_section[page.page_number] = section
+
     raw_detections: list[Detection] = []
+    taxonomy_terms = _taxonomy_terms_set()
+    active_patterns = _active_taxonomy_patterns()
 
     for page in pages:
+        section = page_to_section.get(page.page_number)
+        profile = section.detection_profile if section else "full"
+        context_mult = section.context_multiplier if section else 1.0
+        section_id = section.section_id if section else "desconocido"
+        section_label = section.section_label if section else "No determinada"
+
+        if profile == "skip":
+            continue
+
         normalized_text = _normalize_whitespace(page.text)
-        taxonomy_terms = _taxonomy_terms_set()
+
         for rule in RULES:
+            if profile == "restricted" and rule.signal_type != SIGNAL_REVIEW:
+                continue
             if rule.signal_type == SIGNAL_REVIEW and normalize_text(rule.pattern) in taxonomy_terms:
                 continue
             for match in re.finditer(_pattern_regex(rule.pattern), normalized_text, re.IGNORECASE):
-                fragment = _build_clause_fragment(
-                    normalized_text,
-                    match.start(),
-                    match.end(),
-                )
+                fragment = _build_clause_fragment(normalized_text, match.start(), match.end())
                 if _should_skip_match(rule, fragment):
                     continue
                 raw_detections.append(
@@ -595,17 +622,16 @@ def detect_patterns(pages: list[PageText]) -> list[Detection]:
                         possible_competition_effect=rule.possible_competition_effect,
                         suggested_validation=rule.suggested_validation,
                         signal_type=rule.signal_type,
+                        section_id=section_id,
+                        section_label=section_label,
                     )
                 )
 
-
-        active_patterns = _active_taxonomy_patterns()
         page_pattern_ids: set[str] = set()
         for pattern in active_patterns:
+            context_chars = int(_context_chars_for_pattern(pattern.id) * context_mult)
             for term, start, end in find_terms(normalized_text, pattern.textual_signals):
-                fragment = extract_context_window(
-                    normalized_text, start, end, _context_chars_for_pattern(pattern.id)
-                )
+                fragment = extract_context_window(normalized_text, start, end, context_chars)
                 mitigating_factors = _contextual_mitigating_factors(fragment, pattern)
                 possible_justifications = _contextual_justifications(fragment, pattern)
                 escalation_factors = _taxonomy_escalation_factors(
@@ -657,6 +683,8 @@ def detect_patterns(pages: list[PageText]) -> list[Detection]:
                         contextual_notes=_contextual_notes(
                             mitigating_factors, possible_justifications, missing_information
                         ),
+                        section_id=section_id,
+                        section_label=section_label,
                     )
                 )
 
@@ -664,21 +692,12 @@ def detect_patterns(pages: list[PageText]) -> list[Detection]:
 
 
 
-_TAXONOMY_CACHE: list[TaxonomyPattern] | None = None
-
-
-def _active_taxonomy_patterns() -> list[TaxonomyPattern]:
-    global _TAXONOMY_CACHE
-    if _TAXONOMY_CACHE is not None:
-        return _TAXONOMY_CACHE
-
+@lru_cache(maxsize=1)
+def _active_taxonomy_patterns() -> tuple[TaxonomyPattern, ...]:
     result = load_taxonomy()
     if result.patterns:
-        _TAXONOMY_CACHE = result.patterns
-        return _TAXONOMY_CACHE
-
-    _TAXONOMY_CACHE = [_legacy_pattern_to_taxonomy(pattern) for pattern in PATTERNS]
-    return _TAXONOMY_CACHE
+        return tuple(result.patterns)
+    return tuple(_legacy_pattern_to_taxonomy(pattern) for pattern in PATTERNS)
 
 
 def _taxonomy_terms_set() -> set[str]:

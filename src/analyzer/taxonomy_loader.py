@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -201,6 +202,13 @@ def taxonomy_context(limit: int = 12) -> dict[str, Any]:
         "messages": result.messages[:8],
         "patterns": [pattern.to_dict() for pattern in result.patterns[:limit]],
     }
+
+
+def taxonomy_sha256() -> str:
+    """Return first 16 hex chars of SHA256 of the active taxonomy YAML file."""
+    if not TAXONOMY_PATH.exists():
+        return "no-taxonomy"
+    return hashlib.sha256(TAXONOMY_PATH.read_bytes()).hexdigest()[:16]
 
 
 def _as_list(value: Any) -> list[str]:
