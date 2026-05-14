@@ -1,0 +1,656 @@
+- id: cn-brand-model-provider-reference
+  name: Referencia a marca, modelo, tecnología o proveedor específico
+  description: Identifica menciones a marcas, modelos, tecnologías propietarias, fabricantes o proveedores específicos que podrían requerir validación de equivalencias funcionales.
+  competition_dimension: vendor_lock_in
+  risk_type: criterio potencialmente limitante
+  document_sections:
+    - especificaciones técnicas
+    - requisitos técnicos
+    - ficha técnica
+  textual_signals:
+    - marca
+    - modelo
+    - fabricante
+    - proveedor específico
+    - tecnología propietaria
+    - marca específica
+    - distribuidor autorizado
+    - comercializador autorizado
+    - concesionario
+    - fabricante autorizado
+  semantic_signals:
+    - referencia a una solución comercial particular
+    - dependencia de fabricante o proveedor
+    - denominación técnica que podría cerrar alternativas
+  possible_indicators:
+    - Se menciona marca, modelo o fabricante sin aclarar equivalencia.
+    - La referencia aparece en especificaciones técnicas o requisitos de cumplimiento.
+  mitigating_factors:
+    - o equivalente
+    - equivalente funcional
+    - referencial
+    - marcas equivalentes
+    - se aceptarán equivalentes
+  possible_legitimate_justifications:
+    - Compatibilidad técnica con infraestructura existente.
+    - Continuidad operativa o estandarización técnicamente justificada.
+  human_review_questions:
+    - ¿La referencia admite alternativas funcionalmente equivalentes?
+    - ¿La mención es referencial o constituye una condición obligatoria?
+  recommended_language:
+    - revisión sugerida por posible impacto sobre concurrencia
+    - validar equivalencia funcional y necesidad técnica
+  prohibited_language:
+    - corrupción
+    - fraude
+    - direccionamiento
+    - ilegalidad detectada
+  severity_guidance: suggested
+  confidence_guidance: medium
+  related_patterns:
+    - cn-weak-equivalence-clause
+    - cn-technical-closed-requirement
+    - cn-interoperability-lock-in
+
+- id: cn-weak-equivalence-clause
+  name: Ausencia o debilidad de cláusula de equivalencia
+  description: Identifica condiciones que podrían operar de forma cerrada cuando no se observan cláusulas claras de equivalencia funcional.
+  competition_dimension: low_competitive_neutrality
+  risk_type: ausencia de mitigante competitivo
+  document_sections:
+    - especificaciones técnicas
+    - requisitos mínimos
+  textual_signals:
+    - deberá ser exactamente
+    - características exactas
+    - medidas exactas
+    - sin equivalente
+    - no se aceptan equivalentes
+  semantic_signals:
+    - falta de alternativa funcional
+    - requisito formulado como condición única
+  possible_indicators:
+    - La cláusula exige cumplimiento exacto sin fórmula de equivalencia.
+    - La equivalencia aparece negada o no resulta verificable.
+  mitigating_factors:
+    - o equivalente
+    - se aceptarán equivalentes
+    - o superior
+    - equivalente funcional
+  possible_legitimate_justifications:
+    - Requisito mínimo necesario para desempeño, seguridad o compatibilidad.
+  human_review_questions:
+    - ¿La equivalencia está permitida de forma clara y verificable?
+    - ¿La exigencia exacta responde a una necesidad técnica documentada?
+  recommended_language:
+    - convendría validar si se aceptan alternativas equivalentes
+  prohibited_language:
+    - corrupción
+    - fraude
+    - direccionamiento
+    - ilegalidad detectada
+  severity_guidance: suggested
+  confidence_guidance: medium
+  related_patterns:
+    - cn-brand-model-provider-reference
+    - cn-technical-closed-requirement
+
+- id: cn-specific-experience
+  name: Experiencia previa potencialmente desproporcionada
+  description: Identifica experiencia solicitada de forma muy específica, idéntica o acumulativa respecto del objeto contractual.
+  competition_dimension: qualification_restriction
+  risk_type: requisito de calificación potencialmente limitante
+  document_sections:
+    - experiencia
+    - requisitos mínimos
+    - evaluación
+  textual_signals:
+    - experiencia específica
+    - contratos idénticos
+    - mismo objeto
+    - experiencia exclusiva
+    - experiencia en el mismo objeto
+  semantic_signals:
+    - requisito de experiencia exacta
+    - umbral de experiencia acumulado con otros requisitos
+  possible_indicators:
+    - Se exige experiencia idéntica en lugar de experiencia similar.
+    - La experiencia se combina con montos, plazos o tecnologías muy específicas.
+  mitigating_factors:
+    - experiencia similar
+    - experiencia relacionada
+    - equivalente
+    - consorcios
+    - asociaciones
+  possible_legitimate_justifications:
+    - Complejidad técnica del objeto contractual.
+    - Necesidad de asegurar capacidad de ejecución verificable.
+  human_review_questions:
+    - ¿La experiencia solicitada es proporcional al objeto contractual?
+    - ¿Se aceptan experiencias similares o capacidades equivalentes?
+  recommended_language:
+    - revisar proporcionalidad de la experiencia exigida
+  prohibited_language:
+    - corrupción
+    - fraude
+    - direccionamiento
+    - ilegalidad detectada
+  severity_guidance: suggested
+  confidence_guidance: medium
+  related_patterns:
+    - cn-cumulative-requirements
+    - cn-financial-restrictive
+
+- id: cn-financial-restrictive
+  name: Requisito financiero potencialmente restrictivo
+  description: Identifica umbrales financieros que podrían elevar barreras de entrada si no guardan proporción con el objeto contractual.
+  competition_dimension: financial_restriction
+  risk_type: barrera financiera potencial
+  document_sections:
+    - requisitos financieros
+    - capacidad económica
+    - evaluación
+  textual_signals:
+    - patrimonio mínimo
+    - capital mínimo
+    - índice financiero
+    - liquidez
+    - solvencia
+  semantic_signals:
+    - umbral financiero elevado
+    - acumulación de requisitos económicos
+  possible_indicators:
+    - El requisito financiero no explica relación con presupuesto o complejidad.
+    - El umbral se combina con experiencia específica.
+  mitigating_factors:
+    - proporcional
+    - según presupuesto referencial
+    - debidamente justificado
+    - consorcios
+  possible_legitimate_justifications:
+    - Necesidad de asegurar capacidad financiera durante la ejecución.
+  human_review_questions:
+    - ¿El umbral financiero está justificado y es proporcional?
+    - ¿Se permite cumplir mediante consorcio u otra figura admisible?
+  recommended_language:
+    - validación de proporcionalidad financiera sugerida
+  prohibited_language:
+    - corrupción
+    - fraude
+    - direccionamiento
+    - ilegalidad detectada
+  severity_guidance: suggested
+  confidence_guidance: medium
+  related_patterns:
+    - cn-specific-experience
+    - cn-cumulative-requirements
+
+- id: cn-specific-certification
+  name: Certificación específica o no justificada
+  description: Identifica certificaciones específicas que podrían requerir revisión de proporcionalidad, equivalencia y relación con el objeto contractual.
+  competition_dimension: qualification_restriction
+  risk_type: certificación potencialmente limitante
+  document_sections:
+    - certificaciones
+    - requisitos técnicos
+    - evaluación
+  textual_signals:
+    - certificación ISO
+    - ISO 9001
+    - ISO 14001
+    - certificación específica
+    - certificado del fabricante
+    - acreditación
+    - certificación ISO
+  semantic_signals:
+    - certificación como requisito habilitante
+    - estándar específico sin equivalentes
+  possible_indicators:
+    - La certificación se exige sin justificar relación con el objeto.
+    - No se aceptan certificaciones equivalentes.
+  mitigating_factors:
+    - equivalente
+    - estándares equivalentes
+    - debidamente justificado
+    - según normativa aplicable
+  possible_legitimate_justifications:
+    - Seguridad, calidad, trazabilidad o cumplimiento normativo aplicable al bien.
+  human_review_questions:
+    - ¿La certificación es necesaria y proporcional al objeto contractual?
+    - ¿Se aceptan certificaciones o estándares equivalentes?
+  recommended_language:
+    - revisar justificación técnica y equivalencias aceptables
+  prohibited_language:
+    - corrupción
+    - fraude
+    - direccionamiento
+    - ilegalidad detectada
+  severity_guidance: suggested
+  confidence_guidance: medium
+  related_patterns:
+    - cn-brand-model-provider-reference
+    - cn-cumulative-requirements
+
+- id: cn-short-submission-deadline
+  name: Plazo reducido de presentación
+  description: Identifica plazos que podrían limitar preparación de ofertas cuando son breves respecto de la carga documental o complejidad técnica.
+  competition_dimension: timeline_restriction
+  risk_type: restricción temporal potencial
+  document_sections:
+    - cronograma
+    - presentación de ofertas
+  textual_signals:
+    - plazo de presentación
+    - entrega de ofertas
+    - término de
+    - plazo máximo
+    - cronograma
+  semantic_signals:
+    - plazo breve para preparar oferta
+    - acumulación de documentación y visitas en poco tiempo
+  possible_indicators:
+    - El plazo se combina con visita obligatoria o documentación extensa.
+  mitigating_factors:
+    - prórroga
+    - ampliación de plazo
+    - cronograma actualizado
+  possible_legitimate_justifications:
+    - Necesidad operativa documentada o procedimiento con plazos normativos aplicables.
+  human_review_questions:
+    - ¿El plazo permite preparar ofertas de forma razonable?
+    - ¿La complejidad del proceso justifica ampliar el plazo?
+  recommended_language:
+    - convendría revisar suficiencia del plazo en contexto
+  prohibited_language:
+    - corrupción
+    - fraude
+    - direccionamiento
+    - ilegalidad detectada
+  severity_guidance: general
+  confidence_guidance: low
+  related_patterns:
+    - cn-mandatory-technical-visit
+    - cn-excessive-administrative-documentation
+
+- id: cn-limited-execution-delivery-deadline
+  name: Plazo de ejecución o entrega potencialmente limitante
+  description: Identifica plazos de ejecución o entrega que podrían requerir validación de factibilidad y proporcionalidad.
+  competition_dimension: timeline_restriction
+  risk_type: restricción temporal potencial
+  document_sections:
+    - plazo de entrega
+    - plazo de ejecución
+    - condiciones contractuales
+  textual_signals:
+    - entrega inmediata
+    - plazo de entrega
+    - plazo de ejecución
+    - en 24 horas
+    - en 48 horas
+    - máximo 5 días
+  semantic_signals:
+    - plazo operativo exigente
+    - plazo compatible solo con inventario local
+  possible_indicators:
+    - El plazo podría favorecer oferentes con stock o presencia previa.
+  mitigating_factors:
+    - plazo prorrogable
+    - justificado por emergencia
+    - disponibilidad progresiva
+  possible_legitimate_justifications:
+    - Urgencia operativa, continuidad del servicio o necesidad pública documentada.
+  human_review_questions:
+    - ¿El plazo de entrega es técnicamente factible para oferentes diversos?
+    - ¿La urgencia o continuidad operativa está justificada?
+  recommended_language:
+    - validación de factibilidad y proporcionalidad del plazo
+  prohibited_language:
+    - corrupción
+    - fraude
+    - direccionamiento
+    - ilegalidad detectada
+  severity_guidance: suggested
+  confidence_guidance: medium
+  related_patterns:
+    - cn-local-presence-requirement
+
+- id: cn-mandatory-technical-visit
+  name: Visita técnica obligatoria
+  description: Identifica visitas obligatorias que podrían limitar participación si exigen presencia física, fecha única o plazo breve.
+  competition_dimension: geographic_restriction
+  risk_type: condición logística potencialmente limitante
+  document_sections:
+    - visita técnica
+    - cronograma
+    - requisitos de participación
+  textual_signals:
+    - visita técnica obligatoria
+    - visita obligatoria
+    - asistencia obligatoria
+    - visita al sitio
+  semantic_signals:
+    - presencia física como requisito habilitante
+    - única fecha disponible para visita
+  possible_indicators:
+    - La visita es obligatoria y no admite mecanismos alternativos.
+  mitigating_factors:
+    - visita opcional
+    - registro virtual
+    - acta disponible
+    - más de una fecha
+  possible_legitimate_justifications:
+    - Necesidad de conocer condiciones físicas no reproducibles documentalmente.
+  human_review_questions:
+    - ¿La visita obligatoria está justificada por el objeto contractual?
+    - ¿Existen alternativas documentales o virtuales para no limitar concurrencia?
+  recommended_language:
+    - revisión sugerida de proporcionalidad logística
+  prohibited_language:
+    - corrupción
+    - fraude
+    - direccionamiento
+    - ilegalidad detectada
+  severity_guidance: suggested
+  confidence_guidance: medium
+  related_patterns:
+    - cn-short-submission-deadline
+    - cn-local-presence-requirement
+
+- id: cn-local-presence-requirement
+  name: Exigencia de presencia local
+  description: Identifica domicilio, oficina, sucursal o presencia local previa que podría requerir justificación técnica.
+  competition_dimension: geographic_restriction
+  risk_type: restricción geográfica potencial
+  document_sections:
+    - requisitos de participación
+    - soporte técnico
+    - postventa
+  textual_signals:
+    - presencia local
+    - oficina local
+    - sucursal en
+    - domicilio en
+    - taller autorizado local
+  semantic_signals:
+    - obligación de infraestructura local previa
+    - soporte condicionado a ubicación territorial
+  possible_indicators:
+    - Se exige presencia antes de adjudicación o sin alternativas de cobertura.
+  mitigating_factors:
+    - cobertura nacional
+    - atención remota
+    - durante ejecución
+    - instalación posterior
+  possible_legitimate_justifications:
+    - Necesidad de atención rápida, soporte presencial o continuidad operativa.
+  human_review_questions:
+    - ¿La presencia local previa es necesaria o basta con capacidad de atención?
+    - ¿Se aceptan alternativas logísticas o remotas equivalentes?
+  recommended_language:
+    - validar necesidad y proporcionalidad de presencia local
+  prohibited_language:
+    - corrupción
+    - fraude
+    - direccionamiento
+    - ilegalidad detectada
+  severity_guidance: suggested
+  confidence_guidance: medium
+  related_patterns:
+    - cn-limited-execution-delivery-deadline
+    - cn-mandatory-technical-visit
+
+- id: cn-cumulative-requirements
+  name: Requisitos acumulativos que podrían reducir concurrencia
+  description: Identifica coexistencia de requisitos de autorización, certificación, experiencia, soporte o presencia que podrían elevar barreras de entrada en conjunto.
+  competition_dimension: low_competitive_neutrality
+  risk_type: acumulación de condiciones potencialmente limitantes
+  document_sections:
+    - requisitos mínimos
+    - especificaciones técnicas
+    - evaluación
+  textual_signals:
+    - además deberá
+    - adicionalmente
+    - conjuntamente
+    - deberá cumplir todos
+    - requisitos acumulativos
+  semantic_signals:
+    - acumulación de condiciones habilitantes
+    - requisitos técnicos y comerciales simultáneos
+  possible_indicators:
+    - Varias condiciones potencialmente limitantes aparecen en una misma cláusula o página.
+  mitigating_factors:
+    - alternativas equivalentes
+    - cumplimiento por consorcio
+    - criterios funcionales
+  possible_legitimate_justifications:
+    - Complejidad del objeto contractual y necesidad de asegurar cumplimiento integral.
+  human_review_questions:
+    - ¿La combinación completa de requisitos es necesaria y proporcional?
+    - ¿Puede acreditarse cumplimiento por medios alternativos o complementarios?
+  recommended_language:
+    - revisar efecto acumulativo de requisitos
+  prohibited_language:
+    - corrupción
+    - fraude
+    - direccionamiento
+    - ilegalidad detectada
+  severity_guidance: priority
+  confidence_guidance: medium
+  related_patterns:
+    - cn-specific-certification
+    - cn-specific-experience
+    - cn-local-presence-requirement
+
+- id: cn-subjective-evaluation-criteria
+  name: Criterio de evaluación subjetivo o poco trazable
+  description: Identifica criterios de evaluación que podrían requerir parámetros objetivos, trazables y comparables.
+  competition_dimension: evaluation_discretion
+  risk_type: discrecionalidad evaluativa potencial
+  document_sections:
+    - evaluación
+    - metodología
+    - calificación
+  textual_signals:
+    - a criterio de la entidad
+    - a satisfacción
+    - mejor criterio
+    - idoneidad
+    - se valorará subjetivamente
+  semantic_signals:
+    - falta de metodología objetiva
+    - ponderación no verificable
+  possible_indicators:
+    - El criterio no detalla parámetros verificables.
+  mitigating_factors:
+    - matriz objetiva
+    - parámetros verificables
+    - metodología
+    - criterios objetivos
+  possible_legitimate_justifications:
+    - Evaluación técnica cualitativa con metodología documentada y verificable.
+  human_review_questions:
+    - ¿El criterio cuenta con parámetros verificables?
+    - ¿La evaluación permite comparación objetiva entre ofertas?
+  recommended_language:
+    - revisar trazabilidad y objetividad del criterio de evaluación
+  prohibited_language:
+    - corrupción
+    - fraude
+    - direccionamiento
+    - ilegalidad detectada
+  severity_guidance: suggested
+  confidence_guidance: medium
+  related_patterns:
+    - cn-excessive-administrative-documentation
+
+- id: cn-interoperability-lock-in
+  name: Compatibilidad técnica o interoperabilidad con posible lock-in
+  description: Identifica requisitos de compatibilidad que podrían ser legítimos, pero requieren revisar si cierran innecesariamente alternativas.
+  competition_dimension: interoperability_lock_in
+  risk_type: dependencia técnica potencial
+  document_sections:
+    - especificaciones técnicas
+    - interoperabilidad
+    - compatibilidad
+  textual_signals:
+    - compatible con
+    - interoperabilidad
+    - integración con
+    - infraestructura existente
+    - sistema existente
+  semantic_signals:
+    - dependencia de sistema instalado
+    - compatibilidad como condición de admisibilidad
+  possible_indicators:
+    - La compatibilidad se formula sin estándares abiertos o equivalentes.
+  mitigating_factors:
+    - estándares abiertos
+    - por razones de interoperabilidad
+    - por compatibilidad con infraestructura existente
+    - debidamente justificado
+  possible_legitimate_justifications:
+    - Continuidad operativa, seguridad, integración y reducción de costos de transición.
+  human_review_questions:
+    - ¿La compatibilidad está justificada y se basa en estándares verificables?
+    - ¿Se permiten soluciones equivalentes que garanticen interoperabilidad?
+  recommended_language:
+    - revisar justificación técnica de interoperabilidad y alternativas equivalentes
+  prohibited_language:
+    - corrupción
+    - fraude
+    - direccionamiento
+    - ilegalidad detectada
+  severity_guidance: suggested
+  confidence_guidance: high
+  related_patterns:
+    - cn-brand-model-provider-reference
+    - cn-technical-closed-requirement
+
+- id: cn-substantive-amendments
+  name: Adendas que modifican requisitos sustantivos
+  description: Identifica adendas o reformas que podrían afectar trazabilidad, plazo disponible o condiciones de preparación de oferta.
+  competition_dimension: administrative_burden
+  risk_type: trazabilidad documental potencial
+  document_sections:
+    - adendas
+    - reformas
+    - cronograma
+  textual_signals:
+    - adenda
+    - modificación del pliego
+    - reforma al pliego
+    - alcance modificado
+    - cambio sustantivo
+  semantic_signals:
+    - modificación de requisitos luego de publicado el pliego
+    - necesidad de ampliar plazo ante cambios sustantivos
+  possible_indicators:
+    - Se modifican requisitos sin claridad sobre comunicación o plazo.
+  mitigating_factors:
+    - ampliación de plazo
+    - publicado para todos
+    - notificado
+    - cronograma actualizado
+  possible_legitimate_justifications:
+    - Corrección, aclaración o mejora de especificaciones comunicada oportunamente.
+  human_review_questions:
+    - ¿La modificación fue comunicada y trazable para todos los oferentes?
+    - ¿El cambio sustantivo dio tiempo suficiente para ajustar ofertas?
+  recommended_language:
+    - validar trazabilidad de adendas y suficiencia de plazo
+  prohibited_language:
+    - corrupción
+    - fraude
+    - direccionamiento
+    - ilegalidad detectada
+  severity_guidance: general
+  confidence_guidance: medium
+  related_patterns:
+    - cn-short-submission-deadline
+
+- id: cn-excessive-administrative-documentation
+  name: Documentación administrativa excesiva
+  description: Identifica cargas documentales que podrían requerir revisión si exceden requisitos habituales o se acumulan con plazos breves.
+  competition_dimension: administrative_burden
+  risk_type: carga administrativa potencial
+  document_sections:
+    - requisitos administrativos
+    - documentación
+    - presentación de ofertas
+  textual_signals:
+    - documentación administrativa
+    - certificados notarizados
+    - copias certificadas
+    - apostillado
+    - legalizado
+  semantic_signals:
+    - carga documental elevada
+    - formalidades acumuladas con plazo breve
+  possible_indicators:
+    - Se exigen múltiples documentos formales sin explicación clara.
+  mitigating_factors:
+    - según normativa aplicable
+    - subsanable
+    - formato digital
+    - documentación estándar
+  possible_legitimate_justifications:
+    - Verificación administrativa exigida por normativa o control documental.
+  human_review_questions:
+    - ¿La documentación solicitada es estándar y proporcional?
+    - ¿La carga documental puede cumplirse dentro del plazo establecido?
+  recommended_language:
+    - revisar carga administrativa y proporcionalidad documental
+  prohibited_language:
+    - corrupción
+    - fraude
+    - direccionamiento
+    - ilegalidad detectada
+  severity_guidance: general
+  confidence_guidance: low
+  related_patterns:
+    - cn-short-submission-deadline
+
+- id: cn-technical-closed-requirement
+  name: Requisito técnico cerrado
+  description: Identifica especificaciones técnicas formuladas con rasgos exactos o prescriptivos que podrían requerir validación de equivalencia.
+  competition_dimension: technical_restriction
+  risk_type: especificación técnica potencialmente cerrada
+  document_sections:
+    - especificaciones técnicas
+    - ficha técnica
+    - requisitos mínimos
+  textual_signals:
+    - ficha técnica
+    - característica exacta
+    - medidas exactas
+    - deberá ser exactamente
+    - especificaciones cerradas
+    - manuales técnicos
+  semantic_signals:
+    - descripción prescriptiva en vez de funcional
+    - parámetros que podrían corresponder a una solución particular
+  possible_indicators:
+    - Las características se expresan como exactas y sin equivalencia funcional.
+  mitigating_factors:
+    - mínimo requerido
+    - o superior
+    - o equivalente
+    - criterios funcionales
+  possible_legitimate_justifications:
+    - Necesidad técnica, seguridad, desempeño mínimo o compatibilidad documentada.
+  human_review_questions:
+    - ¿La especificación describe una necesidad funcional o una solución específica?
+    - ¿Existen parámetros de equivalencia verificables?
+  recommended_language:
+    - validar apertura técnica y equivalencias funcionales
+  prohibited_language:
+    - corrupción
+    - fraude
+    - direccionamiento
+    - ilegalidad detectada
+  severity_guidance: suggested
+  confidence_guidance: medium
+  related_patterns:
+    - cn-brand-model-provider-reference
+    - cn-weak-equivalence-clause

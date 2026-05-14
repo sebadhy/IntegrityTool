@@ -1,0 +1,57 @@
+# =============================================================
+# ARCHIVOS SENSIBLES — NUNCA SUBIR AL REPOSITORIO
+# =============================================================
+
+# Variables de entorno: contienen API keys, credenciales Azure,
+# configuración de Claude Foundry y otros secretos.
+# Si ves este archivo en un commit, es un error grave.
+.env
+.env.*
+!.env.example
+
+# Script de arranque local: carga variables de entorno sensibles
+# (ANTHROPIC_FOUNDRY_API_KEY, configuración Azure, modelos custom).
+# Contiene lógica específica del entorno del desarrollador.
+start-claude.sh
+
+# =============================================================
+# DATOS LOCALES — NO PERTENECEN AL REPOSITORIO
+# =============================================================
+
+# Corpus documental histórico: PDFs y metadata de procesos reales.
+# Pueden contener información institucional sensible.
+data/
+
+# Exports y reportes generados por la app.
+exports/
+
+# =============================================================
+# HERRAMIENTAS DE DESARROLLO LOCAL
+# =============================================================
+
+# Claude Code
+.claude/settings.local.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# =============================================================
+# SISTEMA OPERATIVO
+# =============================================================
+
+.DS_Store
+Thumbs.db
