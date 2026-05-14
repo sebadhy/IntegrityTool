@@ -17,6 +17,7 @@ from .finding_model import (
 from .patterns.competitive_neutrality_patterns import PATTERNS
 from .pdf_extractor import PageText
 from .taxonomy_loader import TaxonomyPattern, load_taxonomy
+from .text_cleaner import normalize_for_matching
 
 
 SIGNAL_REVIEW = "señal_revision"
@@ -42,6 +43,23 @@ GLOBAL_JUSTIFICATION_TERMS = [
     "por seguridad",
     "por continuidad operativa",
 ]
+
+CONTEXT_CHARS_BY_PATTERN: dict[str, int] = {
+    "cn-brand-model-provider-reference": 500,
+    "cn-weak-equivalence-clause": 400,
+    "cn-technical-closed-requirement": 450,
+    "cn-specific-certification": 380,
+    "cn-local-presence-requirement": 420,
+    "cn-specific-experience": 380,
+    "cn-incomplete-technical-reference": 180,
+    "cn-missing-annex-reference": 180,
+}
+_DEFAULT_CONTEXT_CHARS = 260
+
+
+def _context_chars_for_pattern(pattern_id: str) -> int:
+    return CONTEXT_CHARS_BY_PATTERN.get(pattern_id, _DEFAULT_CONTEXT_CHARS)
+
 
 SECTION_HINTS = {
     "especificaciones técnicas": ["especificaciones técnicas", "ficha técnica", "requisitos técnicos"],
@@ -585,7 +603,9 @@ def detect_patterns(pages: list[PageText]) -> list[Detection]:
         page_pattern_ids: set[str] = set()
         for pattern in active_patterns:
             for term, start, end in find_terms(normalized_text, pattern.textual_signals):
-                fragment = extract_context_window(normalized_text, start, end)
+                fragment = extract_context_window(
+                    normalized_text, start, end, _context_chars_for_pattern(pattern.id)
+                )
                 mitigating_factors = _contextual_mitigating_factors(fragment, pattern)
                 possible_justifications = _contextual_justifications(fragment, pattern)
                 escalation_factors = _taxonomy_escalation_factors(
@@ -758,7 +778,7 @@ def _taxonomy_escalation_factors(
     related_seen = sorted(set(pattern.related_patterns).intersection(page_pattern_ids))
     if related_seen:
         factors.append("Coexistencia con patrones relacionados en la misma página.")
-    if normalize_text(term) in {"adicionalmente", "además deberá", "conjuntamente"}:
+    if normalize_text(term) in {"adicionalmente", "ademas debera", "conjuntamente"}:
         factors.append("Lenguaje acumulativo de requisitos.")
     return _unique(factors)
 
@@ -908,7 +928,7 @@ def _find_similar_detection(
 
 
 def normalize_text(text: str) -> str:
-    return _normalize_whitespace(text).lower()
+    return normalize_for_matching(text)
 
 
 def find_terms(text: str, terms: list[str]) -> list[tuple[str, int, int]]:

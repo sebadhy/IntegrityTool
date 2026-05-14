@@ -7,6 +7,8 @@ from typing import Any
 
 import pandas as pd
 
+from .text_cleaner import normalize_for_matching
+
 
 ENGINE_VERSION = "0.4.0"
 RULE_VERSION = "neutralidad-competitiva-v1"
@@ -180,7 +182,7 @@ def _criteria_for_row(row: pd.Series, related_count: int) -> list[str]:
     for item in missing_information:
         criteria.append(f"Información faltante para validar contexto: {item}.")
 
-    text = _normalized_text(
+    text = normalize_for_matching(
         " ".join(
             [
                 str(row.get("fragmento textual", "")),
@@ -341,24 +343,11 @@ def _signal_id(row: pd.Series) -> str:
 
 def _rule_id(row: pd.Series) -> str:
     raw_value = f"{row.get('categoría de revisión', '')}-{row.get('patrón detectado', '')}"
-    slug = _normalized_text(raw_value).replace(" ", "-")
+    slug = normalize_for_matching(raw_value).replace(" ", "-")
     slug = "".join(character for character in slug if character.isalnum() or character == "-")
     return f"rule-{slug[:80].strip('-')}"
 
 
-def _normalized_text(value: str) -> str:
-    replacements = {
-        "á": "a",
-        "é": "e",
-        "í": "i",
-        "ó": "o",
-        "ú": "u",
-        "ñ": "n",
-    }
-    text = value.lower()
-    for source, target in replacements.items():
-        text = text.replace(source, target)
-    return text
 
 
 def _list_field(value: Any) -> list[str]:

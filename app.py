@@ -8,6 +8,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from src.analyzer.text_cleaner import clean_page_text
 from src.analyzer.corpus_loader import (
     analyze_corpus_documents,
     load_corpus_documents,
@@ -205,6 +206,16 @@ def empty_corpus_payload() -> dict:
         "analysis": {},
         "context": {},
     }
+
+
+def clean_export_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """Clean text fields for CSV export without altering the original DataFrame."""
+    export_df = df.copy()
+    if "fragmento textual" in export_df.columns:
+        export_df["fragmento textual"] = export_df["fragmento textual"].apply(
+            lambda v: clean_page_text(str(v)) if v and str(v) not in {"nan", "None", "No disponible"} else v
+        )
+    return export_df
 
 
 def ordered_export(df: pd.DataFrame) -> pd.DataFrame:
@@ -1051,7 +1062,7 @@ def render_review_flow() -> None:
 
     with st.expander("Detalle tabular y exportación", expanded=False):
         st.dataframe(ordered_export(filtered_df), width="stretch", hide_index=True)
-        csv_data = ordered_export(enriched_df).to_csv(index=False).encode("utf-8")
+        csv_data = clean_export_dataframe(ordered_export(enriched_df)).to_csv(index=False).encode("utf-8")
         st.download_button(
             "Descargar reporte de revisión asistida",
             data=csv_data,
