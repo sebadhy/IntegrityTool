@@ -15,6 +15,9 @@ from .finding_model import (
     SEVERITY_MEDIUM,
 )
 from .patterns.competitive_neutrality_patterns import PATTERNS
+from src.config import APP_DEFAULT_CONTEXT_CHARS
+
+from .document_segmenter import DocumentSection, section_for_page
 from .pdf_extractor import PageText
 from .taxonomy_loader import TaxonomyPattern, load_taxonomy
 
@@ -175,33 +178,25 @@ RULES = [
     ),
     PatternRule(
         pattern="fabricante",
-        category="Referencias a marca, origen o fabricante",
-        attention_level="Medio",
+        category="Requisitos regulatorios o habituales",
+        attention_level="Bajo",
         observation=(
-            "Se detectó una referencia a fabricante; conviene validar si opera como "
-            "referencia técnica abierta o como condición cerrada."
+            "La referencia general a fabricante puede ser habitual en fichas técnicas; por sí sola no se prioriza."
         ),
-        possible_competition_effect=(
-            "Podría reducir concurrencia si privilegia un origen o fabricante específico."
-        ),
-        suggested_validation=(
-            "Confirmar si se aceptan alternativas equivalentes."
-        ),
+        possible_competition_effect="No se aprecia efecto limitante por sí solo.",
+        suggested_validation="Revisar solo si se combina con autorización exclusiva, marca cerrada o ausencia de equivalentes.",
+        signal_type=SIGNAL_HABITUAL,
     ),
     PatternRule(
         pattern="marca",
-        category="Referencias a marca, origen o fabricante",
-        attention_level="Medio",
+        category="Requisitos regulatorios o habituales",
+        attention_level="Bajo",
         observation=(
-            "Se detectó referencia a marca; conviene revisar si la especificación admite "
-            "equivalentes funcionales."
+            "La palabra marca puede aparecer en formularios o referencias generales; por sí sola no se prioriza."
         ),
-        possible_competition_effect=(
-            "Podría reducir participación si se interpreta como preferencia cerrada."
-        ),
-        suggested_validation=(
-            "Confirmar si se aceptan alternativas equivalentes."
-        ),
+        possible_competition_effect="No se aprecia efecto limitante por sí solo.",
+        suggested_validation="Revisar solo si la mención opera como requisito cerrado sin equivalentes.",
+        signal_type=SIGNAL_HABITUAL,
     ),
     PatternRule(
         pattern="repuestos",
@@ -534,6 +529,25 @@ RULES = [
         suggested_validation="Confirmar consistencia con el resto de requisitos del pliego.",
         signal_type=SIGNAL_MITIGANT,
     ),
+
+    PatternRule(
+        pattern="homologación ANT",
+        category="Requisitos regulatorios o habituales",
+        attention_level="Bajo",
+        observation="La homologación ANT puede corresponder a un requisito regulatorio aplicable en Ecuador.",
+        possible_competition_effect="No se aprecia efecto limitante por sí solo.",
+        suggested_validation="Confirmar que se exige conforme al tipo de bien y normativa aplicable.",
+        signal_type=SIGNAL_HABITUAL,
+    ),
+    PatternRule(
+        pattern="norma INEN",
+        category="Requisitos regulatorios o habituales",
+        attention_level="Bajo",
+        observation="La referencia a norma INEN puede corresponder a un estándar técnico nacional.",
+        possible_competition_effect="No se aprecia efecto limitante por sí solo.",
+        suggested_validation="Confirmar relación con el objeto contractual y aceptación de estándares equivalentes cuando corresponda.",
+        signal_type=SIGNAL_HABITUAL,
+    ),
     PatternRule(
         pattern="marcas equivalentes",
         category="Elementos que favorecen concurrencia",
@@ -548,13 +562,21 @@ RULES = [
 ]
 
 
-def detect_patterns(pages: list[PageText]) -> list[Detection]:
+def detect_patterns(
+    pages: list[PageText],
+    sections: list[DocumentSection] | None = None,
+) -> list[Detection]:
     raw_detections: list[Detection] = []
 
     for page in pages:
         normalized_text = _normalize_whitespace(page.text)
+        section = section_for_page(sections or [], page.page_number)
+        if section and section.detection_profile == "skip":
+            continue
         taxonomy_terms = _taxonomy_terms_set()
         for rule in RULES:
+            if section and section.detection_profile == "restricted" and rule.signal_type != SIGNAL_REVIEW:
+                continue
             if rule.signal_type == SIGNAL_REVIEW and normalize_text(rule.pattern) in taxonomy_terms:
                 continue
             for match in re.finditer(_pattern_regex(rule.pattern), normalized_text, re.IGNORECASE):
@@ -581,11 +603,16 @@ def detect_patterns(pages: list[PageText]) -> list[Detection]:
                 )
 
 
+        if section and section.detection_profile == "restricted":
+            continue
+
         active_patterns = _active_taxonomy_patterns()
         page_pattern_ids: set[str] = set()
+        context_chars = int(APP_DEFAULT_CONTEXT_CHARS * (section.context_multiplier if section else 1.0))
         for pattern in active_patterns:
+            pattern_context_chars = _context_chars_for_pattern(pattern.id, context_chars)
             for term, start, end in find_terms(normalized_text, pattern.textual_signals):
-                fragment = extract_context_window(normalized_text, start, end)
+                fragment = extract_context_window(normalized_text, start, end, context_chars=pattern_context_chars)
                 mitigating_factors = _contextual_mitigating_factors(fragment, pattern)
                 possible_justifications = _contextual_justifications(fragment, pattern)
                 escalation_factors = _taxonomy_escalation_factors(
@@ -621,7 +648,7 @@ def detect_patterns(pages: list[PageText]) -> list[Detection]:
                         signal_type=SIGNAL_REVIEW,
                         pattern_name=pattern.name,
                         competition_dimension=pattern.competition_dimension,
-                        document_section=document_section,
+                        document_section=section.section_label if section else document_section,
                         clause_excerpt=fragment,
                         reason_for_review=_taxonomy_rationale(
                             pattern, term, mitigating_factors, possible_justifications
@@ -636,7 +663,7 @@ def detect_patterns(pages: list[PageText]) -> list[Detection]:
                         ),
                         contextual_notes=_contextual_notes(
                             mitigating_factors, possible_justifications, missing_information
-                        ),
+                        ) + ([f"Sección documental: {section.section_label}"] if section else []),
                     )
                 )
 
@@ -690,6 +717,16 @@ def _legacy_pattern_to_taxonomy(pattern: dict) -> TaxonomyPattern:
         confidence_guidance="medium",
         related_patterns=[],
     )
+
+
+
+def _context_chars_for_pattern(pattern_id: str, default_chars: int) -> int:
+    overrides = {
+        "cn-medical-device-platform-lock-in": 600,
+        "cn-interoperability-lock-in": 500,
+        "cn-equipment-series-specific-reference": 500,
+    }
+    return max(default_chars, overrides.get(pattern_id, default_chars))
 
 
 def _category_from_dimension(dimension: str) -> str:
@@ -919,7 +956,7 @@ def find_terms(text: str, terms: list[str]) -> list[tuple[str, int, int]]:
     return matches
 
 
-def extract_context_window(text: str, start: int, end: int, context_chars: int = 260) -> str:
+def extract_context_window(text: str, start: int, end: int, context_chars: int = APP_DEFAULT_CONTEXT_CHARS) -> str:
     fragment_start = max(0, start - context_chars)
     fragment_end = min(len(text), end + context_chars)
     prefix = "... " if fragment_start > 0 else ""

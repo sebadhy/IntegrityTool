@@ -8,9 +8,6 @@
     - requisitos técnicos
     - ficha técnica
   textual_signals:
-    - marca
-    - modelo
-    - fabricante
     - proveedor específico
     - tecnología propietaria
     - marca específica
@@ -18,6 +15,10 @@
     - comercializador autorizado
     - concesionario
     - fabricante autorizado
+    - representante autorizado
+    - distribuidor exclusivo
+    - empresa representante
+    - proveedor oficial del fabricante
   semantic_signals:
     - referencia a una solución comercial particular
     - dependencia de fabricante o proveedor
@@ -371,6 +372,10 @@
     - sucursal en
     - domicilio en
     - taller autorizado local
+    - representante local
+    - distribuidor local
+    - empresa distribuidora
+    - representantes locales autorizados
   semantic_signals:
     - obligación de infraestructura local previa
     - soporte condicionado a ubicación territorial
@@ -409,10 +414,9 @@
     - especificaciones técnicas
     - evaluación
   textual_signals:
-    - además deberá
-    - adicionalmente
-    - conjuntamente
-    - deberá cumplir todos
+    - deberá cumplir con todos los
+    - cumplir con todos los siguientes requisitos
+    - deberá cumplir todos los requisitos
     - requisitos acumulativos
   semantic_signals:
     - acumulación de condiciones habilitantes
@@ -499,6 +503,11 @@
     - integración con
     - infraestructura existente
     - sistema existente
+    - plataforma compatible de energía
+    - para utilizar con plataforma
+    - compatible con el generador
+    - compatible con la plataforma de energía
+    - equipo existente en la institución
   semantic_signals:
     - dependencia de sistema instalado
     - compatibilidad como condición de admisibilidad
@@ -654,3 +663,130 @@
   related_patterns:
     - cn-brand-model-provider-reference
     - cn-weak-equivalence-clause
+
+- id: cn-medical-device-platform-lock-in
+  name: Compatibilidad con plataforma médica instalada
+  description: Identifica consumibles o dispositivos que exigen compatibilidad con una plataforma médica o generador existente, condición que puede ser legítima pero requiere revisar alternativas equivalentes.
+  competition_dimension: interoperability_lock_in
+  risk_type: dependencia técnica potencial
+  document_sections:
+    - especificaciones técnicas
+    - ficha técnica
+  textual_signals:
+    - plataforma compatible de energía
+    - compatible con el generador
+    - compatible con la plataforma de energía
+    - para utilizar con plataforma
+    - generador ultrasónico
+    - generador ultrasonico
+  semantic_signals:
+    - consumible dependiente de equipo instalado
+    - compatibilidad con plataforma médica específica
+  possible_indicators:
+    - El requisito puede depender de una plataforma o generador existente en la entidad.
+  mitigating_factors:
+    - compatible con equipos equivalentes
+    - estándares abiertos
+    - por compatibilidad con infraestructura existente
+    - debidamente justificado
+  possible_legitimate_justifications:
+    - Continuidad operativa, seguridad clínica o compatibilidad con equipos existentes.
+  human_review_questions:
+    - ¿La compatibilidad se justifica por equipos existentes y está documentada?
+    - ¿Se aceptan soluciones equivalentes compatibles con la infraestructura instalada?
+  recommended_language:
+    - validar interoperabilidad y equivalencias técnicas
+  prohibited_language:
+    - corrupción
+    - fraude
+    - direccionamiento
+    - ilegalidad detectada
+  severity_guidance: priority
+  confidence_guidance: high
+  related_patterns:
+    - cn-interoperability-lock-in
+    - cn-brand-model-provider-reference
+
+- id: cn-equipment-series-specific-reference
+  name: Referencia a serie o código específico de equipo
+  description: Identifica series, códigos o modelos de equipo instalado usados como especificación implícita que podría limitar alternativas si no se aceptan equivalentes.
+  competition_dimension: vendor_lock_in
+  risk_type: referencia técnica potencialmente cerrada
+  document_sections:
+    - especificaciones técnicas
+    - ficha técnica
+  textual_signals:
+    - serie específica
+    - serie especifica
+    - código de equipo
+    - codigo de equipo
+    - modelo de equipo existente
+    - equipo instalado
+  semantic_signals:
+    - referencia a código de equipo como requisito técnico
+  possible_indicators:
+    - La especificación remite a una serie o modelo de equipo sin equivalencia clara.
+  mitigating_factors:
+    - o equivalente
+    - compatible con equipos equivalentes
+    - referencial
+  possible_legitimate_justifications:
+    - Compatibilidad con infraestructura existente o continuidad operativa.
+  human_review_questions:
+    - ¿La serie o código se usa solo como referencia técnica?
+    - ¿Se aceptan alternativas compatibles y verificables?
+  recommended_language:
+    - revisar si la referencia admite equivalentes funcionales
+  prohibited_language:
+    - corrupción
+    - fraude
+    - direccionamiento
+    - ilegalidad detectada
+  severity_guidance: priority
+  confidence_guidance: medium
+  related_patterns:
+    - cn-interoperability-lock-in
+    - cn-technical-closed-requirement
+
+- id: cn-consignment-delivery-model
+  name: Modelo de entrega por consignación o uso efectivo
+  description: Identifica condiciones de entrega, stock o pago por uso efectivo que podrían requerir revisión si implican disponibilidad previa en la institución.
+  competition_dimension: barrier_to_entry
+  risk_type: modelo operativo potencialmente limitante
+  document_sections:
+    - especificaciones técnicas
+    - condiciones contractuales
+  textual_signals:
+    - pago por lo efectivamente utilizado
+    - por lo efectivamente utilizado
+    - stock en la institución
+    - stock en la institucion
+    - modalidad de consignación
+    - modalidad de consignacion
+    - implantes en consignación
+  semantic_signals:
+    - exigencia de disponibilidad previa de inventario
+    - pago condicionado al uso efectivo
+  possible_indicators:
+    - El modelo puede favorecer oferentes con stock o logística previa instalada.
+  mitigating_factors:
+    - plazo razonable de entrega
+    - entrega programada
+    - justificado por continuidad operativa
+  possible_legitimate_justifications:
+    - Necesidad clínica, continuidad operativa o reducción de desperdicio.
+  human_review_questions:
+    - ¿El modelo operativo está justificado por necesidades clínicas o logísticas?
+    - ¿El plazo permite participación de oferentes sin stock previo en la institución?
+  recommended_language:
+    - validar proporcionalidad del modelo de entrega y stock
+  prohibited_language:
+    - corrupción
+    - fraude
+    - direccionamiento
+    - ilegalidad detectada
+  severity_guidance: suggested
+  confidence_guidance: medium
+  related_patterns:
+    - cn-local-presence-requirement
+    - cn-limited-execution-delivery-deadline

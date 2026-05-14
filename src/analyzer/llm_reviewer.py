@@ -8,6 +8,8 @@ from typing import Any
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from src.config import APP_MAX_DOCUMENT_CHARS, OPENAI_MODEL
+
 from .taxonomy_loader import taxonomy_context
 
 
@@ -26,9 +28,9 @@ SYSTEM_PROMPT = (
     "No se identifica una señal documental suficiente en el fragmento revisado."
 )
 
-DEFAULT_MODEL = "gpt-5.4-mini"
+DEFAULT_MODEL = OPENAI_MODEL
 UNAVAILABLE = "No disponible"
-MAX_DOCUMENT_CHARS = 12_000
+MAX_DOCUMENT_CHARS = APP_MAX_DOCUMENT_CHARS
 
 DOCUMENT_BRIEF_SCHEMA = {
     "type": "json_schema",

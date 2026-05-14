@@ -15,6 +15,8 @@ from src.analyzer.corpus_loader import (
     validate_corpus_state,
 )
 from src.analyzer.detector import detect_patterns
+from src.analyzer.document_segmenter import segment_document
+from src.analyzer.feedback_store import save_reviewer_feedback
 from src.analyzer.llm_reviewer import (
     explain_priority_with_llm,
     generate_document_brief,
@@ -89,6 +91,7 @@ EXPORT_COLUMNS = [
     "rule_version",
     "timestamp_analisis",
     "engine_version",
+    "taxonomy_sha256",
     "tipo_señal",
     "frecuencia_corpus",
     "categoria",
@@ -709,16 +712,35 @@ def render_signal_inspector(row: pd.Series, corpus_context: dict | None = None) 
 
     st.markdown("**Acción humana**")
     action_cols = st.columns(2)
+    note_key = f"review_note_{signal_id}"
     if action_cols[0].button("Confirmar revisión", key=f"confirm_{signal_id}", width="stretch"):
         st.session_state[f"review_status_{signal_id}"] = "Confirmada"
+        save_reviewer_feedback(
+            signal=row.to_dict(),
+            action="Confirmada",
+            note=st.session_state.get(note_key, ""),
+            document_name=str(row.get("documento origen", "")),
+        )
         st.rerun()
     if action_cols[1].button("Descartar", key=f"dismiss_{signal_id}", width="stretch"):
         st.session_state[f"review_status_{signal_id}"] = "Descartada"
+        save_reviewer_feedback(
+            signal=row.to_dict(),
+            action="Descartada",
+            note=st.session_state.get(note_key, ""),
+            document_name=str(row.get("documento origen", "")),
+        )
         st.rerun()
     if st.button("Marcar seguimiento", key=f"follow_{signal_id}", width="stretch"):
         st.session_state[f"review_status_{signal_id}"] = "Seguimiento"
+        save_reviewer_feedback(
+            signal=row.to_dict(),
+            action="Seguimiento",
+            note=st.session_state.get(note_key, ""),
+            document_name=str(row.get("documento origen", "")),
+        )
         st.rerun()
-    st.text_area("Comentario de revisión", key=f"review_note_{signal_id}", height=90)
+    st.text_area("Comentario de revisión", key=note_key, height=90)
 
     with st.expander("Explicación asistida por IA", expanded=False):
         if st.button("Generar explicación", key=f"workbench_explain_{signal_id}"):
@@ -1293,7 +1315,8 @@ def render_review_flow() -> None:
         except Exception:
             st.error("No se pudo leer el PDF. Verifique que el archivo sea válido y no esté protegido.")
             st.stop()
-        detections = detect_patterns(pages)
+        sections = segment_document(pages)
+        detections = detect_patterns(pages, sections=sections)
         document_text = "\n\n".join(page.text for page in pages)
 
     validate_extracted_pages(pages)

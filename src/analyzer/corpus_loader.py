@@ -9,6 +9,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from src.config import (
+    APP_CORPUS_ESPECIFICACIONES_DIR,
+    APP_CORPUS_METADATA_PATH,
+    APP_CORPUS_PLIEGOS_DIR,
+    APP_CORPUS_PROCESSED_DIR,
+)
+
 from .corpus_validator import (
     DocumentTrace,
     VALIDATION_INCONSISTENT,
@@ -17,13 +24,14 @@ from .corpus_validator import (
     validation_issues,
 )
 from .detector import detect_patterns
+from .document_segmenter import segment_document
 from .pdf_extractor import PageText, extract_text_by_page
 
 
-RAW_METADATA_PATH = Path("data/raw/metadata/procesos.csv")
-RAW_PLIEGOS_DIR = Path("data/raw/pliegos")
-RAW_ESPECIFICACIONES_DIR = Path("data/raw/especificaciones")
-PROCESSED_TEXT_DIR = Path("data/processed/extracted_text")
+RAW_METADATA_PATH = APP_CORPUS_METADATA_PATH
+RAW_PLIEGOS_DIR = APP_CORPUS_PLIEGOS_DIR
+RAW_ESPECIFICACIONES_DIR = APP_CORPUS_ESPECIFICACIONES_DIR
+PROCESSED_TEXT_DIR = APP_CORPUS_PROCESSED_DIR
 
 
 @dataclass(frozen=True)
@@ -178,7 +186,8 @@ def _detect_corpus_findings(documents: list[CorpusDocument]) -> list[dict[str, A
     findings: list[dict[str, Any]] = []
 
     for document in documents:
-        detections = detect_patterns(document.paginas)
+        sections = segment_document(document.paginas)
+        detections = detect_patterns(document.paginas, sections=sections)
         for detection in detections:
             item = detection.to_dict()
             item.update(

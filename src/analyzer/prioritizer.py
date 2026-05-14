@@ -7,6 +7,8 @@ from typing import Any
 
 import pandas as pd
 
+from .taxonomy_loader import taxonomy_sha256
+
 
 ENGINE_VERSION = "0.4.0"
 RULE_VERSION = "neutralidad-competitiva-v1"
@@ -62,6 +64,7 @@ def prioritize_signals(enriched_df: pd.DataFrame) -> pd.DataFrame:
                 "rule_version": RULE_VERSION,
                 "timestamp_analisis": timestamp,
                 "engine_version": ENGINE_VERSION,
+                "taxonomy_sha256": taxonomy_sha256(),
                 "frecuencia_corpus": row.get("frecuencia en corpus", "No disponible"),
                 "categoria": row.get("categoría de revisión", "No disponible"),
                 "criterio_normativo": row.get(
