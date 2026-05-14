@@ -314,21 +314,24 @@ def _review_priority_from_context(row: pd.Series, criteria: list[str], relevance
 
 def _priority_explanation(row: pd.Series, criteria: list[str], relevance: str) -> str:
     if str(row.get("tipo_señal", "señal_revision")) == "requisito_habitual":
-        return (
-            "Requisito habitual identificado: se mantiene como contexto documental y no se "
-            "prioriza salvo combinación con condiciones adicionales."
-        )
+        return "Requisito habitual: no se prioriza salvo combinación con condiciones adicionales."
     if str(row.get("tipo_señal", "señal_revision")) == "mitigante_concurrencia":
-        return (
-            "Elemento favorable a concurrencia: reduce la lectura restrictiva de requisitos "
-            "relacionados si se aplica de forma clara y verificable."
-        )
+        return "Factor favorable a concurrencia: reduce la lectura restrictiva de requisitos relacionados."
 
-    main_criteria = " ".join(criteria[:3])
-    return (
-        f"Relevancia analítica {relevance.lower()}: se prioriza por {main_criteria} "
-        "Conviene revisar proporcionalidad, necesidad técnica y posible impacto sobre concurrencia."
-    )
+    escalation = _list_field(row.get("escalation_factors", []))
+    mitigants = _list_field(row.get("mitigating_factors", []))
+
+    parts = []
+    if escalation:
+        parts.append(escalation[0].rstrip(".") + ".")
+    if mitigants:
+        parts.append(f"Mitigante identificado: {mitigants[0].rstrip('.')}.")
+    if relevance == "Alto":
+        parts.append("Se recomienda revisar proporcionalidad y necesidad técnica.")
+    elif relevance == "Medio":
+        parts.append("Conviene validar el contexto antes de concluir.")
+
+    return " ".join(parts) if parts else "Señal detectada por reglas textuales. Revisar contexto documental."
 
 
 def _signal_id(row: pd.Series) -> str:

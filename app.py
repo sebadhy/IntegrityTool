@@ -38,6 +38,7 @@ from src.ui.export import (
     clean_export_dataframe,
     ordered_export,
 )
+from src.ui.components import safe_text
 from src.ui.findings import render_theme_groups, render_top_priorities
 from src.ui.header import load_css, render_institutional_header, render_pipeline
 from src.analyzer.llm_reviewer import test_llm_connection
@@ -52,6 +53,26 @@ def render_llm_test_button() -> None:
             st.sidebar.success(message)
         else:
             st.sidebar.warning(message)
+
+
+def _render_document_header(filename: str, doc_type: str, contract_object: str) -> None:
+    label = document_type_label(doc_type)
+    obj = contract_object if contract_object and contract_object != "No identificado en las primeras páginas" else "—"
+    st.markdown(
+        f"""
+        <div style="background:#FFFFFF;border:1px solid #D6DEE6;border-left:4px solid #003B70;
+                    border-radius:4px;padding:0.85rem 1.1rem;margin-bottom:1rem;">
+            <div style="font-size:0.8rem;color:#52606D;text-transform:uppercase;font-weight:700;margin-bottom:0.3rem;">
+                Documento analizado
+            </div>
+            <div style="font-size:1.05rem;font-weight:700;color:#003B70;">{safe_text(filename)}</div>
+            <div style="color:#52606D;font-size:0.9rem;margin-top:0.2rem;">
+                {safe_text(label)} &nbsp;·&nbsp; {safe_text(obj)}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_review_flow() -> None:
@@ -114,7 +135,7 @@ def render_review_flow() -> None:
     if not document_text.strip():
         st.stop()
 
-    st.caption(f"Tipo de documento detectado: {document_type_label(doc_type)}")
+    _render_document_header(uploaded_file.name, doc_type, contract_object)
 
     if not detections:
         st.success(

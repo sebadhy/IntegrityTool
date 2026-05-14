@@ -29,7 +29,7 @@ def render_finding_explanation(explanation: dict) -> None:
             "La explicación asistida por IA no se pudo generar. "
             f"Detalle: {explanation.get('llm_error', 'No disponible')}"
         )
-
+        return
     questions = display_list(explanation.get("questions_for_reviewer", []))
     questions_html = "<ul>" + "".join(f"<li>{safe_text(item)}</li>" for item in questions) + "</ul>"
     st.markdown(
@@ -60,39 +60,50 @@ def render_top_priorities(priority_df: pd.DataFrame, corpus_context: dict | None
 
     for position, (_, row) in enumerate(top_df.iterrows(), start=1):
         with st.container(border=True):
-            header_cols = st.columns([0.75, 0.25])
-            with header_cols[0]:
-                st.markdown(f"**{position}. {row['patrón detectado']}**")
-                st.caption(f"{row['tema de revisión']} · página {row['página']}")
-                st.caption(f"{safe_text(row.get('prioridad de revisión', 'revisión sugerida'))} · {safe_text(dimension_label(row.get('competition_dimension', 'No disponible')))}")
-            with header_cols[1]:
+            head_cols = st.columns([0.75, 0.25])
+            with head_cols[0]:
+                st.markdown(f"**{position}. {safe_text(row['patrón detectado'])}**")
+                st.caption(f"{row['tema de revisión']} · Página {row['página']}")
+            with head_cols[1]:
                 st.markdown(attention_badge(row["nivel_atencion"]), unsafe_allow_html=True)
-                st.caption(f"Relevancia {row['relevancia_analitica']}")
+                st.caption(row["frecuencia en corpus"])
 
-            st.markdown(safe_text(row["explicacion_priorizacion"]))
-            detail_cols = st.columns(3)
-            detail_cols[0].markdown(f"**Frecuencia en corpus**  \n{safe_text(row['frecuencia en corpus'])}")
-            detail_cols[1].markdown(
-                f"**Posible efecto sobre concurrencia**  \n{safe_text(row['posible efecto sobre concurrencia'])}"
-            )
-            detail_cols[2].markdown(
-                f"**Validación sugerida**  \n{safe_text(row['validación sugerida'])}"
-            )
-            if row.get("mitigating_factors"):
-                st.markdown(f"**Factores mitigantes identificados**  \n{safe_text(row['mitigating_factors'])}")
-            if row.get("missing_information"):
-                st.markdown(f"**Información faltante para validar**  \n{safe_text(row['missing_information'])}")
-            st.markdown(f"**Posible justificación legítima**  \n{safe_text(row['posible justificación legítima'])}")
-            st.markdown(f"**Evidencia textual breve**  \n> {safe_text(row['fragmento textual'])}")
+            fragment = str(row.get("fragmento textual", "")).strip()
+            if fragment and fragment not in ("No disponible", "nan", "None"):
+                st.markdown(f"> *{safe_text(fragment[:500])}*")
 
-            button_key = f"priority_explain_{row['signal_id']}"
-            if st.button("Generar explicación asistida por IA", key=button_key):
+            st.markdown(f"**¿Qué revisar?** {safe_text(row['validación sugerida'])}")
+
+            render_feedback_buttons(row, context="top")
+
+            with st.expander("Ver análisis completo"):
+                if row.get("explicacion_priorizacion"):
+                    st.caption(safe_text(row["explicacion_priorizacion"]))
+                detail_cols = st.columns(2)
+                detail_cols[0].markdown(
+                    f"**Posible efecto sobre concurrencia**  \n{safe_text(row['posible efecto sobre concurrencia'])}"
+                )
+                detail_cols[1].markdown(
+                    f"**Justificación legítima posible**  \n{safe_text(row['posible justificación legítima'])}"
+                )
+                mitigants = display_joined_list(row.get("mitigating_factors"), fallback="")
+                if mitigants:
+                    st.markdown(f"**Mitigantes identificados:** {safe_text(mitigants)}")
+                missing = display_joined_list(row.get("missing_information"), fallback="")
+                if missing:
+                    st.markdown(f"**Información faltante para validar:** {safe_text(missing)}")
+                dim = dimension_label(row.get("competition_dimension", ""))
+                if dim and dim != "No disponible":
+                    st.markdown(f"**Dimensión competitiva:** {safe_text(dim)}")
+                norm = str(row.get("principio_normativo_relacionado", "")).strip()
+                if norm and norm not in ("No disponible", "nan"):
+                    st.markdown(f"**Principio normativo:** {safe_text(norm)}")
+                st.markdown(f"**Pregunta normativa:** {safe_text(row.get('pregunta_normativa_sugerida', ''))}")
+
+                button_key = f"priority_explain_{row['signal_id']}"
                 if not os.getenv("OPENAI_API_KEY"):
-                    st.warning(
-                        "IA generativa no configurada. Se muestran resultados basados en reglas "
-                        "y comparación documental."
-                    )
-                else:
+                    st.caption("IA no configurada — activa lectura asistida para obtener explicación narrativa.")
+                elif st.button("Generar explicación asistida por IA", key=button_key):
                     explanation = cached_explain_priority_with_llm(
                         row.to_dict(),
                         corpus_context,
@@ -100,77 +111,83 @@ def render_top_priorities(priority_df: pd.DataFrame, corpus_context: dict | None
                         os.getenv("OPENAI_BASE_URL", ""),
                     )
                     render_finding_explanation(explanation)
-            render_feedback_buttons(row, context="top")
 
 
 def render_aspect_card(row: pd.Series, corpus_context: dict | None = None) -> None:
-    st.markdown(
-        f"""
-        <div class="aspect-card">
-            <div class="aspect-card-head">
-                <div>
-                    <div class="aspect-title">{safe_text(row["patrón detectado"])}</div>
-                    <div class="aspect-subtitle">Página {safe_text(row["página"])} · {safe_text(row["categoría de revisión"])}</div>
-                </div>
-                <div>{attention_badge(row["atención sugerida"])} {history_badge(row["clasificación histórica"])}</div>
-            </div>
-            <div class="aspect-grid">
-                <div><strong>Frecuencia histórica</strong><br>{safe_text(row["frecuencia en corpus"])}</div>
-                <div><strong>Dimensión competitiva</strong><br>{safe_text(dimension_label(row.get("competition_dimension", "No disponible")))}</div>
-                <div><strong>Prioridad de revisión</strong><br>{safe_text(row.get("prioridad de revisión", "revisión sugerida"))}</div>
-                <div><strong>Comparación histórica</strong><br>{safe_text(row["comentario contextual"])}</div>
-                <div><strong>Posible efecto sobre concurrencia</strong><br>{safe_text(row["posible efecto sobre concurrencia"])}</div>
-                <div><strong>Sección probable</strong><br>{safe_text(row.get("document_section", "No determinada"))}</div>
-            </div>
-            <div class="aspect-section">
-                <strong>Por qué se sugiere revisar</strong>
-                <p>{safe_text(row["por qué se sugiere revisar"])}</p>
-            </div>
-            <div class="aspect-section">
-                <strong>Posible justificación legítima</strong>
-                <p>{safe_text(row["posible justificación legítima"])}</p>
-            </div>
-            <div class="aspect-section">
-                <strong>Fragmento documental</strong>
-                <p>{safe_text(row["fragmento textual"])}</p>
-                <p><strong>Documento origen:</strong> {safe_text(row.get("documento origen", "Documento cargado"))}</p>
-                <p><strong>Página:</strong> {safe_text(row["página"])}</p>
-            </div>
-            <div class="aspect-section">
-                <strong>Factores mitigantes e información faltante</strong>
-                <p><strong>Mitigantes:</strong> {safe_text(display_joined_list(row.get("mitigating_factors", [])))}</p>
-                <p><strong>Información faltante:</strong> {safe_text(display_joined_list(row.get("missing_information", [])))}</p>
-            </div>
-            <div class="aspect-section">
-                <strong>Revisión sugerida</strong>
-                <p>{safe_text(row["revisión sugerida"])}</p>
-            </div>
-            <div class="aspect-section normative-section">
-                <strong>Criterios de revisión normativa</strong>
-                <p><strong>Principio relacionado:</strong> {safe_text(row["principio_normativo_relacionado"])}</p>
-                <p><strong>Criterio de revisión:</strong> {safe_text(row["criterio_normativo_de_revision"])}</p>
-                <p><strong>Pregunta sugerida:</strong> {safe_text(row["pregunta_normativa_sugerida"])}</p>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    button_key = f"explain_{row.name}_{row['página']}_{row['patrón detectado']}"
-    if st.button("Generar explicación asistida por IA", key=button_key):
-        if not os.getenv("OPENAI_API_KEY"):
-            st.warning(
-                "IA generativa no configurada. Se muestran resultados basados en reglas "
-                "y comparación documental."
+    with st.container(border=True):
+        head_cols = st.columns([0.75, 0.25])
+        with head_cols[0]:
+            st.markdown(f"**{safe_text(row['patrón detectado'])}**")
+            st.caption(f"Página {safe_text(row['página'])} · {safe_text(row['categoría de revisión'])}")
+        with head_cols[1]:
+            st.markdown(
+                attention_badge(row["atención sugerida"]) + "&nbsp;" + history_badge(row["clasificación histórica"]),
+                unsafe_allow_html=True,
             )
-        else:
-            explanation = cached_explain_priority_with_llm(
-                row.to_dict(),
-                corpus_context,
-                os.getenv("OPENAI_MODEL", ""),
-                os.getenv("OPENAI_BASE_URL", ""),
+
+        fragment = str(row.get("fragmento textual", "")).strip()
+        if fragment and fragment not in ("No disponible", "nan", "None"):
+            st.markdown(f"> *{safe_text(fragment[:500])}*")
+
+        st.markdown(f"**¿Qué revisar?** {safe_text(row.get('validación sugerida', row.get('revisión sugerida', '')))}")
+
+        render_feedback_buttons(row, context="card")
+
+        with st.expander("Ver análisis completo"):
+            exp = str(row.get("explicacion_priorizacion", "")).strip()
+            if exp and exp not in ("No disponible", "nan"):
+                st.caption(safe_text(exp))
+
+            detail_cols = st.columns(2)
+            detail_cols[0].markdown(
+                f"**Frecuencia en corpus**  \n{safe_text(row['frecuencia en corpus'])}"
             )
-            render_finding_explanation(explanation)
-    render_feedback_buttons(row, context="card")
+            detail_cols[1].markdown(
+                f"**Posible efecto**  \n{safe_text(row['posible efecto sobre concurrencia'])}"
+            )
+
+            why = str(row.get("por qué se sugiere revisar", "")).strip()
+            if why and why not in ("No disponible", "nan"):
+                st.markdown(f"**Por qué se sugiere revisar**  \n{safe_text(why)}")
+
+            st.markdown(
+                f"**Posible justificación legítima**  \n{safe_text(row['posible justificación legítima'])}"
+            )
+
+            mitigants = display_joined_list(row.get("mitigating_factors"), fallback="")
+            if mitigants:
+                st.markdown(f"**Mitigantes:** {safe_text(mitigants)}")
+            missing = display_joined_list(row.get("missing_information"), fallback="")
+            if missing:
+                st.markdown(f"**Información faltante:** {safe_text(missing)}")
+
+            dim = dimension_label(row.get("competition_dimension", ""))
+            if dim and dim != "No disponible":
+                st.markdown(f"**Dimensión competitiva:** {safe_text(dim)}")
+
+            sec = str(row.get("document_section", row.get("sección documental probable", ""))).strip()
+            if sec and sec not in ("No disponible", "nan", "No determinada"):
+                st.markdown(f"**Sección:** {safe_text(sec)}")
+
+            norm_cols = st.columns(2)
+            norm_cols[0].markdown(
+                f"**Principio normativo**  \n{safe_text(row.get('principio_normativo_relacionado', ''))}"
+            )
+            norm_cols[1].markdown(
+                f"**Pregunta sugerida**  \n{safe_text(row.get('pregunta_normativa_sugerida', ''))}"
+            )
+
+            button_key = f"explain_{row.name}_{row['página']}_{row['patrón detectado']}"
+            if not os.getenv("OPENAI_API_KEY"):
+                st.caption("IA no configurada — activa lectura asistida para obtener explicación narrativa.")
+            elif st.button("Generar explicación asistida por IA", key=button_key):
+                explanation = cached_explain_priority_with_llm(
+                    row.to_dict(),
+                    corpus_context,
+                    os.getenv("OPENAI_MODEL", ""),
+                    os.getenv("OPENAI_BASE_URL", ""),
+                )
+                render_finding_explanation(explanation)
 
 
 def render_theme_groups(enriched_df: pd.DataFrame, corpus_context: dict | None = None) -> None:
@@ -193,9 +210,7 @@ def render_theme_groups(enriched_df: pd.DataFrame, corpus_context: dict | None =
 def render_feedback_buttons(row: pd.Series, context: str = "") -> None:
     signal_id = str(row.get("signal_id", str(row.name)))
     row_idx = str(row.name)
-    # State key is stable per signal (shared across render locations for the same signal).
     fb_state_key = f"fb_state_{signal_id}_{row_idx}"
-    # Widget key must be globally unique — context differentiates top-priorities vs. theme cards.
     widget_prefix = f"fb_{context}_{signal_id}_{row_idx}"
 
     if st.session_state.get(fb_state_key):
