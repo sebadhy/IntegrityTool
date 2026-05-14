@@ -32,6 +32,7 @@ def build_executive_report_markdown(
     priority_df: pd.DataFrame,
     theme_df: pd.DataFrame,
     ai_brief: dict | None,
+    analyst_summary: dict | None = None,
 ) -> str:
     lines = [
         "# Reporte ejecutivo de revisión asistida",
@@ -129,6 +130,23 @@ def build_executive_report_markdown(
                 "",
             ]
         )
+
+    if analyst_summary and analyst_summary.get("llm_available") is not False:
+        lines.extend(["## Síntesis del análisis asistido", ""])
+        lines.append(analyst_summary.get("overall_synthesis", "No disponible"))
+        lines.extend(["", "### Áreas que merecen más atención", ""])
+        for item in analyst_summary.get("focus_areas", []):
+            lines.append(f"- **{item.get('area', '')}**: {item.get('reason', '')}")
+        lines.extend(["", "### Señales que probablemente son ruido (posibles falsos positivos)", ""])
+        for item in analyst_summary.get("likely_false_positives", []):
+            lines.append(f"- **{item.get('signal', '')}**: {item.get('reason', '')}")
+        lines.extend(["", "### Qué buscar manualmente (posibles falsos negativos)", ""])
+        for item in analyst_summary.get("possible_false_negatives", []):
+            lines.append(f"- {item}")
+        lines.extend(["", "### Primeras acciones sugeridas", ""])
+        for item in analyst_summary.get("suggested_first_actions", []):
+            lines.append(f"- {item}")
+        lines.append("")
 
     lines.extend(
         [

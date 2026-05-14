@@ -189,6 +189,68 @@ DOCUMENT_BRIEF_SCHEMA = {
     },
 }
 
+ANALYST_SUMMARY_SCHEMA = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "analyst_summary",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "overall_synthesis": {"type": "string"},
+                "focus_areas": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "area": {"type": "string"},
+                            "reason": {"type": "string"},
+                        },
+                        "required": ["area", "reason"],
+                    },
+                    "minItems": 1,
+                    "maxItems": 5,
+                },
+                "likely_false_positives": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "signal": {"type": "string"},
+                            "reason": {"type": "string"},
+                        },
+                        "required": ["signal", "reason"],
+                    },
+                    "minItems": 1,
+                    "maxItems": 5,
+                },
+                "possible_false_negatives": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 1,
+                    "maxItems": 4,
+                },
+                "suggested_first_actions": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 1,
+                    "maxItems": 3,
+                },
+            },
+            "required": [
+                "overall_synthesis",
+                "focus_areas",
+                "likely_false_positives",
+                "possible_false_negatives",
+                "suggested_first_actions",
+            ],
+        },
+    },
+}
+
 FINDING_EXPLANATION_SCHEMA = {
     "type": "json_schema",
     "json_schema": {
@@ -304,6 +366,40 @@ def review_detection_with_llm(detection: dict) -> dict:
         "possible_legitimate_justification": explanation["possible_legitimate_justification"],
         "recommended_action": explanation["suggested_review_action"],
     }
+
+
+def generate_analyst_summary(
+    all_findings: list[dict],
+    corpus_context: dict | None = None,
+    document_text: str = "",
+    contract_object: str = "No identificado en las primeras páginas",
+) -> dict:
+    """Synthesize all detected signals into a prioritized analyst summary with false positive/negative reasoning."""
+    if not os.getenv("OPENAI_API_KEY"):
+        return _unavailable_analyst_summary("OPENAI_API_KEY no está configurada.")
+
+    try:
+        response = _client().chat.completions.create(
+            model=os.getenv("OPENAI_MODEL", DEFAULT_MODEL),
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": _build_analyst_summary_prompt(
+                        all_findings=all_findings,
+                        corpus_context=corpus_context,
+                        document_text=document_text,
+                        contract_object=contract_object,
+                    ),
+                },
+            ],
+            response_format=ANALYST_SUMMARY_SCHEMA,
+        )
+        content = response.choices[0].message.content or "{}"
+        return _normalize_analyst_summary(json.loads(content))
+    except Exception as exc:
+        LOGGER.warning("Analyst summary LLM failed: %s", exc)
+        return _unavailable_analyst_summary(_friendly_llm_error(exc))
 
 
 def test_llm_connection() -> tuple[bool, str]:
@@ -643,6 +739,86 @@ def _unavailable_finding_explanation(reason: str = UNAVAILABLE) -> dict:
             "¿La señal cuenta con justificación técnica proporcional en el documento?",
             "¿Existen mitigantes o equivalencias aplicables en la práctica?",
         ],
+        "llm_available": False,
+        "llm_error": reason,
+    }
+
+
+def _build_analyst_summary_prompt(
+    all_findings: list[dict],
+    corpus_context: dict | None,
+    document_text: str,
+    contract_object: str,
+) -> str:
+    review_signals = [f for f in all_findings if f.get("tipo_señal", "señal_revision") == "señal_revision"]
+    mitigants = [f for f in all_findings if f.get("tipo_señal") == "mitigante_concurrencia"]
+    habituals = [f for f in all_findings if f.get("tipo_señal") == "requisito_habitual"]
+
+    doc_excerpt = document_text[:4000] if document_text else "No disponible"
+    comparative = _comparative_summary(all_findings, corpus_context)
+
+    return (
+        "Genera una síntesis analítica final para el revisor humano de un documento de contratación pública. "
+        "Tu objetivo es ayudar al revisor a saber DÓNDE PRESTAR MÁS ATENCIÓN en los próximos 30 minutos.\n\n"
+        "Restricciones:\n"
+        "- Usa únicamente la evidencia provista. No inventes señales nuevas.\n"
+        "- No emitas dictámenes legales ni asignes responsabilidad ni intencionalidad.\n"
+        "- Sé crítico y honesto sobre qué señales detectadas probablemente sean ruido (falsos positivos).\n"
+        "- Razona sobre qué podría haber pasado desapercibido por las reglas automáticas (falsos negativos), "
+        "considerando el tipo de contratación, objeto del contrato y patrones documentales observados.\n"
+        "- Para falsos positivos: identifica señales que tienen mitigantes suficientes, son requisitos "
+        "habituales mal clasificados, o cuyo contexto hace improbable que limiten concurrencia.\n"
+        "- Para falsos negativos: considera combinaciones de requisitos, umbrales numéricos arbitrarios, "
+        "restricciones implícitas en plazos, y especificidades técnicas no cubiertas por la taxonomía.\n"
+        "- Usa lenguaje prudente y orientado a decisión.\n\n"
+        f"Objeto de contratación: {contract_object}\n\n"
+        f"Señales sugeridas para revisión ({len(review_signals)}):\n"
+        f"{json.dumps([_compact_finding(f) for f in review_signals[:20]], ensure_ascii=False, indent=2)}\n\n"
+        f"Mitigantes identificados ({len(mitigants)}):\n"
+        f"{json.dumps([_compact_finding(f) for f in mitigants[:10]], ensure_ascii=False, indent=2)}\n\n"
+        f"Requisitos habituales ({len(habituals)}):\n"
+        f"{json.dumps([_compact_finding(f) for f in habituals[:10]], ensure_ascii=False, indent=2)}\n\n"
+        f"Frecuencias comparativas del corpus:\n"
+        f"{json.dumps(comparative, ensure_ascii=False, indent=2)}\n\n"
+        f"Extracto del documento (inicio):\n{doc_excerpt}\n"
+    )
+
+
+def _normalize_analyst_summary(summary: dict) -> dict:
+    focus_areas = summary.get("focus_areas", [])
+    if not isinstance(focus_areas, list):
+        focus_areas = []
+    normalized_focus = [
+        {"area": str(item.get("area", "")), "reason": str(item.get("reason", ""))}
+        for item in focus_areas
+        if isinstance(item, dict)
+    ] or [{"area": UNAVAILABLE, "reason": UNAVAILABLE}]
+
+    likely_fp = summary.get("likely_false_positives", [])
+    if not isinstance(likely_fp, list):
+        likely_fp = []
+    normalized_fp = [
+        {"signal": str(item.get("signal", "")), "reason": str(item.get("reason", ""))}
+        for item in likely_fp
+        if isinstance(item, dict)
+    ] or [{"signal": UNAVAILABLE, "reason": UNAVAILABLE}]
+
+    return {
+        "overall_synthesis": str(summary.get("overall_synthesis") or UNAVAILABLE),
+        "focus_areas": normalized_focus,
+        "likely_false_positives": normalized_fp,
+        "possible_false_negatives": _normalize_list(summary.get("possible_false_negatives")),
+        "suggested_first_actions": _normalize_list(summary.get("suggested_first_actions")),
+    }
+
+
+def _unavailable_analyst_summary(reason: str = UNAVAILABLE) -> dict:
+    return {
+        "overall_synthesis": UNAVAILABLE,
+        "focus_areas": [{"area": UNAVAILABLE, "reason": UNAVAILABLE}],
+        "likely_false_positives": [{"signal": UNAVAILABLE, "reason": UNAVAILABLE}],
+        "possible_false_negatives": [UNAVAILABLE],
+        "suggested_first_actions": [UNAVAILABLE],
         "llm_available": False,
         "llm_error": reason,
     }

@@ -7,7 +7,7 @@ from src.analyzer.corpus_loader import (
     load_corpus_documents,
     validate_corpus_state,
 )
-from src.analyzer.llm_reviewer import explain_priority_with_llm, generate_document_brief
+from src.analyzer.llm_reviewer import explain_priority_with_llm, generate_analyst_summary, generate_document_brief
 from src.analyzer.review_synthesis import build_corpus_context
 
 
@@ -38,6 +38,23 @@ def cached_explain_priority_with_llm(
     base_url: str,
 ) -> dict:
     return explain_priority_with_llm(priority, corpus_context)
+
+
+@st.cache_data(show_spinner=False)
+def cached_generate_analyst_summary(
+    all_findings: list[dict],
+    corpus_context: dict | None,
+    document_text: str,
+    contract_object: str,
+    model_name: str,
+    base_url: str,
+) -> dict:
+    return generate_analyst_summary(
+        all_findings=all_findings,
+        corpus_context=corpus_context,
+        document_text=document_text,
+        contract_object=contract_object,
+    )
 
 
 @st.cache_data(show_spinner=False)

@@ -170,6 +170,46 @@ def render_dimension_summary(enriched_df: pd.DataFrame) -> None:
             )
 
 
+def render_analyst_summary(summary: dict) -> None:
+    st.subheader("Síntesis del análisis asistido")
+    st.markdown(
+        '<div class="ai-disclaimer">Esta síntesis es un insumo orientativo para revisión humana. '
+        "No constituye dictamen técnico, legal ni determinación de responsabilidad.</div>",
+        unsafe_allow_html=True,
+    )
+
+    if summary.get("llm_available") is False:
+        st.warning(
+            f"La síntesis asistida no pudo generarse. Detalle: {summary.get('llm_error', 'No disponible')}"
+        )
+        return
+
+    render_ai_brief_card("Síntesis general", summary["overall_synthesis"])
+
+    st.markdown("**Áreas que merecen más atención**")
+    for item in summary["focus_areas"]:
+        st.markdown(
+            f"""<div class="reading-box" style="margin-bottom:0.5rem">
+            <strong>{safe_text(item['area'])}</strong><br>{safe_text(item['reason'])}
+            </div>""",
+            unsafe_allow_html=True,
+        )
+
+    cols = st.columns(2)
+    with cols[0]:
+        fp_items = [
+            f"**{safe_text(item['signal'])}**: {safe_text(item['reason'])}"
+            for item in summary["likely_false_positives"]
+        ]
+        render_ai_brief_card("Señales que probablemente son ruido (posibles falsos positivos)", fp_items)
+    with cols[1]:
+        render_ai_brief_card(
+            "Qué buscar manualmente (posibles falsos negativos)", summary["possible_false_negatives"]
+        )
+
+    render_ai_brief_card("Primeras acciones sugeridas", summary["suggested_first_actions"])
+
+
 def render_review_questions(enriched_df: pd.DataFrame) -> None:
     questions: list[str] = []
     for column in ("human_review_questions", "suggested_questions", "pregunta_normativa_sugerida"):

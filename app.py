@@ -26,12 +26,13 @@ from src.pipeline.coordinator import (
     validate_extracted_pages,
 )
 from src.ui.briefing import (
+    render_analyst_summary,
     render_briefing,
     render_ai_document_brief,
     render_dimension_summary,
     render_review_questions,
 )
-from src.ui.cache import cached_generate_document_brief
+from src.ui.cache import cached_generate_analyst_summary, cached_generate_document_brief
 from src.ui.export import (
     build_executive_report_markdown,
     clean_export_dataframe,
@@ -132,6 +133,7 @@ def render_review_flow() -> None:
     enriched_df["tipo_documento"] = doc_type
     enriched_df = prioritize_signals(enriched_df)
     ai_brief = None
+    analyst_summary = None
 
     if enable_ai_reading and not os.getenv("OPENAI_API_KEY"):
         st.warning(
@@ -157,23 +159,23 @@ def render_review_flow() -> None:
         else:
             render_ai_document_brief(ai_brief)
 
-    st.subheader("Criterios de lectura")
-    filter_cols = st.columns(3)
-    available_themes = [theme for theme in THEME_ORDER if theme in set(enriched_df["tema de revisión"])]
-    with filter_cols[0]:
-        selected_themes = st.multiselect("Tema", options=available_themes, default=available_themes)
-    with filter_cols[1]:
-        selected_attention = st.multiselect(
-            "Atención sugerida",
-            options=["Alto", "Medio", "Bajo"],
-            default=["Alto", "Medio", "Bajo"],
-        )
-    with filter_cols[2]:
-        selected_history = st.multiselect(
-            "Clasificación histórica",
-            options=sorted(enriched_df["clasificación histórica"].unique()),
-            default=sorted(enriched_df["clasificación histórica"].unique()),
-        )
+    with st.container(border=True):
+        filter_cols = st.columns(3)
+        available_themes = [theme for theme in THEME_ORDER if theme in set(enriched_df["tema de revisión"])]
+        with filter_cols[0]:
+            selected_themes = st.multiselect("Tema", options=available_themes, default=available_themes)
+        with filter_cols[1]:
+            selected_attention = st.multiselect(
+                "Atención sugerida",
+                options=["Alto", "Medio", "Bajo"],
+                default=["Alto", "Medio", "Bajo"],
+            )
+        with filter_cols[2]:
+            selected_history = st.multiselect(
+                "Clasificación histórica",
+                options=sorted(enriched_df["clasificación histórica"].unique()),
+                default=sorted(enriched_df["clasificación histórica"].unique()),
+            )
 
     filtered_df = enriched_df[
         enriched_df["tema de revisión"].isin(selected_themes)
@@ -182,43 +184,65 @@ def render_review_flow() -> None:
     ]
 
     brief = build_executive_brief(filtered_df)
-    render_briefing(brief)
-    render_dimension_summary(filtered_df)
-    render_review_questions(filtered_df)
 
-    if filtered_df.empty:
-        st.warning("No hay señales para los filtros seleccionados.")
-    else:
-        render_top_priorities(filtered_df, corpus_payload["context"])
-        render_theme_groups(filtered_df, corpus_payload["context"])
+    if enable_ai_reading and os.getenv("OPENAI_API_KEY") and not filtered_df.empty:
+        with st.spinner("Generando síntesis analítica asistida..."):
+            analyst_summary = cached_generate_analyst_summary(
+                all_findings=enriched_df.to_dict("records"),
+                corpus_context=corpus_payload["context"],
+                document_text=document_text,
+                contract_object=contract_object,
+                model_name=os.getenv("OPENAI_MODEL", ""),
+                base_url=os.getenv("OPENAI_BASE_URL", ""),
+            )
 
-    with st.expander("Detalle tabular y exportación", expanded=False):
-        st.dataframe(ordered_export(filtered_df), width="stretch", hide_index=True)
+    tab_resumen, tab_señales, tab_exportar = st.tabs(["Resumen", "Señales", "Exportar"])
+
+    with tab_resumen:
+        render_briefing(brief)
+        if filtered_df.empty:
+            st.warning("No hay señales para los filtros seleccionados.")
+        else:
+            render_top_priorities(filtered_df, corpus_payload["context"])
+        if analyst_summary:
+            render_analyst_summary(analyst_summary)
+
+    with tab_señales:
+        if filtered_df.empty:
+            st.warning("No hay señales para los filtros seleccionados.")
+        else:
+            render_dimension_summary(filtered_df)
+            render_review_questions(filtered_df)
+            render_theme_groups(filtered_df, corpus_payload["context"])
+
+    with tab_exportar:
+        st.dataframe(ordered_export(filtered_df), use_container_width=True, hide_index=True)
         csv_data = clean_export_dataframe(ordered_export(enriched_df)).to_csv(index=False).encode("utf-8")
-        st.download_button(
-            "Descargar reporte de revisión asistida",
-            data=csv_data,
-            file_name="reporte_revision_asistida.csv",
-            mime="text/csv",
-        )
         report_markdown = build_executive_report_markdown(
             brief=brief,
             priority_df=filtered_df,
             theme_df=filtered_df,
             ai_brief=ai_brief,
+            analyst_summary=analyst_summary,
         )
-        st.download_button(
-            "Descargar reporte ejecutivo",
+        dl_cols = st.columns(2)
+        dl_cols[0].download_button(
+            "Descargar reporte de revisión (CSV)",
+            data=csv_data,
+            file_name="reporte_revision_asistida.csv",
+            mime="text/csv",
+        )
+        dl_cols[1].download_button(
+            "Descargar reporte ejecutivo (Markdown)",
             data=report_markdown.encode("utf-8"),
             file_name="reporte_ejecutivo_neutralidad.md",
             mime="text/markdown",
         )
-
-    with st.expander("Texto extraído por página", expanded=False):
-        page_options = [page.page_number for page in pages]
-        selected_page = st.selectbox("Seleccionar página", page_options)
-        selected_text = next(page.text for page in pages if page.page_number == selected_page)
-        st.text_area("Texto extraído", value=selected_text, height=320)
+        with st.expander("Texto extraído por página", expanded=False):
+            page_options = [page.page_number for page in pages]
+            selected_page = st.selectbox("Seleccionar página", page_options)
+            selected_text = next(page.text for page in pages if page.page_number == selected_page)
+            st.text_area("Texto extraído", value=selected_text, height=320)
 
 
 st.set_page_config(
