@@ -6,7 +6,7 @@ import os
 from typing import Any
 
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import AzureOpenAI, OpenAI
 
 from .taxonomy_loader import taxonomy_context
 
@@ -225,10 +225,17 @@ def test_llm_connection() -> tuple[bool, str]:
 
 
 def _client() -> OpenAI:
-    return OpenAI(
-        api_key=os.getenv("OPENAI_API_KEY"),
-        base_url=os.getenv("OPENAI_BASE_URL") or None,
-    )
+    api_key = os.getenv("OPENAI_API_KEY")
+    base_url = os.getenv("OPENAI_BASE_URL") or None
+    api_version = os.getenv("OPENAI_API_VERSION") or None
+
+    if api_version and base_url:
+        return AzureOpenAI(
+            api_key=api_key,
+            azure_endpoint=base_url,
+            api_version=api_version,
+        )
+    return OpenAI(api_key=api_key, base_url=base_url)
 
 
 def _friendly_llm_error(exc: Exception) -> str:
