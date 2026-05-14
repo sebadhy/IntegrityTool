@@ -76,11 +76,30 @@ Para agregar un proceso: copia los PDFs en sus carpetas y agrega una fila en `pr
 
 ```
 PDF → extracción por página → segmentación en secciones → detección por taxonomía YAML
-    → comparación con corpus → priorización → síntesis IA (opcional) → UI + exportación
+    → comparación con corpus → priorización → [IA opcional] → UI + exportación
 ```
 
 La taxonomía vive en `src/analyzer/patterns/risk_taxonomy.yaml` — editable sin tocar Python.
 17 patrones: especificaciones cerradas, presencia local, plazos restrictivos, requisitos acumulativos, etc.
+
+---
+
+## Cuándo interviene el LLM
+
+El motor de detección y priorización es 100% determinista — funciona sin LLM ni conexión a internet.
+El LLM es opcional y se activa solo si `OPENAI_API_KEY` está configurada **y** el usuario marca
+"Activar lectura asistida por IA" antes de procesar.
+
+Hay tres momentos en los que se llama al modelo:
+
+| Momento | Cuándo ocurre | Qué hace |
+|---|---|---|
+| **Lectura preliminar** | Al procesar el documento (automático si IA activa) | Resume el documento y los hallazgos principales en lenguaje natural. Llama una vez por sesión. |
+| **Síntesis analítica** | Al terminar de procesar todas las señales (automático si IA activa) | Identifica dónde prestar más atención, señala posibles falsos positivos y qué buscar manualmente. Llama una vez por sesión. |
+| **Explicación de señal** | Solo cuando el usuario presiona "Generar explicación asistida por IA" en una tarjeta | Explica esa señal específica en lenguaje claro con preguntas para el revisor. Llama una vez por señal, bajo demanda. |
+
+Sin API key configurada, la app muestra todos los resultados basados en reglas. La columna
+"Activar lectura asistida por IA" simplemente no genera las narrativas LLM.
 
 ---
 
