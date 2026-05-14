@@ -643,19 +643,25 @@ def render_pdf_viewer(pdf_bytes: bytes, page_number: int) -> None:
 
 def render_document_workspace(row: pd.Series, pages: list, pdf_bytes: bytes) -> None:
     page_number = int(row.get("página", 1) or 1)
-    st.markdown('<div class="workbench-panel-title">Documento</div>', unsafe_allow_html=True)
-    st.caption(f"Página {page_number} · evidencia anclada al documento")
-    render_pdf_viewer(pdf_bytes, page_number)
+    st.markdown('<div class="workbench-panel-title">Evidencia documental</div>', unsafe_allow_html=True)
+    st.caption(f"Página {page_number} · fragmento anclado al documento")
     st.markdown(
         f"""
-        <div class="evidence-snippet">
-            <div class="evidence-label">Fragmento detectado</div>
+        <div class="evidence-snippet evidence-primary">
+            <div class="evidence-label">Fragmento exacto detectado</div>
             <p>{safe_text(row["fragmento textual"])}</p>
+        </div>
+        <div class="document-placeholder">
+            Vista documental simplificada. Highlight exacto disponible en versión PDF.js.
         </div>
         """,
         unsafe_allow_html=True,
     )
-    with st.expander("Ver texto extraído de esta página", expanded=False):
+    if st.button("Ver en documento", key=f"open_pdf_{row['signal_id']}"):
+        st.session_state[f"show_pdf_{row['signal_id']}"] = True
+    if st.session_state.get(f"show_pdf_{row['signal_id']}", False):
+        render_pdf_viewer(pdf_bytes, page_number)
+    with st.expander("Contexto de página", expanded=False):
         selected_text = next(
             (page.text for page in pages if page.page_number == page_number),
             "No se encontró texto extraído para esta página.",
@@ -933,12 +939,23 @@ def render_theme_groups(enriched_df: pd.DataFrame, corpus_context: dict | None =
         st.info("No hay señales de revisión en los filtros actuales. Revise el balance analítico para mitigantes o requisitos habituales.")
 
 
-def render_corpus_status() -> dict:
+def render_corpus_status(compact: bool = False) -> dict:
     with st.spinner("Cargando corpus histórico para comparación..."):
         corpus_payload = cached_corpus_context(corpus_cache_signature())
 
     validation = corpus_payload["validation"]
     summary = validation["summary"]
+
+    if compact:
+        st.markdown(
+            f"Corpus: {corpus_payload['total_processes']} procesos · "
+            f"{summary['encontrados']} de {summary['total_documentos_esperados']} documentos encontrados"
+        )
+        if validation["has_critical_errors"]:
+            st.warning(
+                "El corpus presenta inconsistencias documentales que podrían afectar la trazabilidad."
+            )
+        return corpus_payload
 
     st.subheader("Estado del corpus documental")
     status_cols = st.columns(5)
@@ -1159,69 +1176,134 @@ def render_llm_test_button() -> None:
             st.sidebar.warning(message)
 
 
-def render_review_flow() -> None:
-    st.subheader("Carga del documento")
+
+
+def render_setup_panel() -> tuple[object | None, bool, bool, bool]:
+    st.subheader("Iniciar revisión")
     st.markdown(
-        '<div class="section-note">Seleccione un PDF para obtener una lectura preliminar '
-        "de neutralidad competitiva, priorización temática y comparación histórica integrada.</div>",
+        '<div class="setup-card">',
         unsafe_allow_html=True,
     )
+    uploaded_file = st.file_uploader("Documento PDF", type=["pdf"])
+    options = st.columns([1, 1, 1])
+    with options[0]:
+        use_historical_corpus = st.checkbox("Procesos comparables", value=True)
+    with options[1]:
+        enable_ai_reading = st.checkbox("Síntesis orientativa", value=False)
+    with options[2]:
+        process_document = st.button("Iniciar revisión", type="primary", width="stretch")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    with st.container(border=True):
-        upload_col, options_col = st.columns([1.4, 1])
-        with upload_col:
-            uploaded_file = st.file_uploader("Archivo PDF del pliego", type=["pdf"])
-        with options_col:
-            use_historical_corpus = st.checkbox("Comparar con corpus histórico local", value=True)
-            enable_ai_reading = st.checkbox("Activar lectura asistida por IA", value=False)
-        process_document = st.button("Iniciar revisión asistida", type="primary")
+    with st.expander("Detalles técnicos", expanded=False):
+        st.markdown("Extracción documental · Identificación de señales · Procesos comparables · Detalle del análisis")
+        if use_historical_corpus:
+            render_corpus_status(compact=True)
+    return uploaded_file, use_historical_corpus, enable_ai_reading, process_document
 
-    if uploaded_file is None:
-        st.info("Cargue un archivo PDF para iniciar la revisión de neutralidad competitiva.")
-        return
 
-    uploaded_file_bytes = uploaded_file.getvalue()
-    upload_signature = (uploaded_file.name, len(uploaded_file_bytes))
-    if st.session_state.get("upload_signature") != upload_signature:
-        st.session_state["upload_signature"] = upload_signature
-        st.session_state["document_processed"] = False
+def render_review_top_bar(document_name: str, signal_count: int) -> None:
+    st.markdown(
+        f"""
+        <div class="review-topbar">
+            <div>
+                <div class="review-topbar-label">Documento</div>
+                <div class="review-topbar-title">{safe_text(document_name)}</div>
+            </div>
+            <div>
+                <div class="review-topbar-label">Estado</div>
+                <div class="review-topbar-value">Revisión preliminar</div>
+            </div>
+            <div>
+                <div class="review-topbar-label">Señales priorizadas</div>
+                <div class="review-topbar-value">{signal_count}</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    actions = st.columns([0.68, 0.16, 0.16])
+    with actions[1]:
+        if st.button("Nueva revisión", width="stretch"):
+            for key in ["document_processed", "uploaded_file_bytes", "uploaded_file_name", "selected_signal_id"]:
+                st.session_state.pop(key, None)
+            st.rerun()
+    return actions[2]
 
-    if process_document:
-        st.session_state["document_processed"] = True
 
+def render_technical_details(corpus_payload: dict, validation_messages: list[str]) -> None:
+    with st.expander("Detalles técnicos", expanded=False):
+        st.markdown("**Etapas:** Extracción documental · Identificación de señales · Procesos comparables · Detalle del análisis")
+        if validation_messages:
+            for message in validation_messages:
+                st.info(message)
+        validation = corpus_payload.get("validation", {})
+        summary = validation.get("summary", {})
+        if summary:
+            st.markdown(
+                f"Documentos esperados: {summary.get('total_documentos_esperados', 0)} · "
+                f"Encontrados: {summary.get('encontrados', 0)} · "
+                f"Faltantes: {summary.get('faltantes', 0)} · "
+                f"Inconsistencias: {summary.get('inconsistencias', 0)}"
+            )
+            with st.expander("Tabla de validación documental", expanded=False):
+                validation_df = pd.DataFrame(validation.get("rows", []))
+                st.dataframe(validation_df, width="stretch", hide_index=True)
+
+def render_review_flow() -> None:
     if not st.session_state.get("document_processed", False):
-        st.info("Presione Iniciar revisión asistida para procesar el documento.")
-        return
+        uploaded_file, use_historical_corpus, enable_ai_reading, process_document = render_setup_panel()
+        if uploaded_file is None:
+            st.info("Cargue un PDF para iniciar la revisión documental.")
+            return
+        if not process_document:
+            return
 
-    render_pipeline()
+        uploaded_file_bytes = uploaded_file.getvalue()
+        st.session_state["uploaded_file_bytes"] = uploaded_file_bytes
+        st.session_state["uploaded_file_name"] = uploaded_file.name
+        st.session_state["use_historical_corpus"] = use_historical_corpus
+        st.session_state["enable_ai_reading"] = enable_ai_reading
+        st.session_state["document_processed"] = True
+        st.session_state.pop("selected_signal_id", None)
+        st.rerun()
+
+    uploaded_file_bytes = st.session_state.get("uploaded_file_bytes")
+    uploaded_file_name = st.session_state.get("uploaded_file_name", "Documento cargado")
+    use_historical_corpus = bool(st.session_state.get("use_historical_corpus", True))
+    enable_ai_reading = bool(st.session_state.get("enable_ai_reading", False))
+    if not uploaded_file_bytes:
+        st.session_state["document_processed"] = False
+        st.rerun()
+
+    validation_messages: list[str] = []
     if use_historical_corpus:
-        corpus_payload = render_corpus_status()
+        with st.spinner("Preparando procesos comparables..."):
+            corpus_payload = cached_corpus_context(corpus_cache_signature())
         if corpus_payload["validation"]["has_critical_errors"]:
-            st.stop()
+            validation_messages.append(
+                "El corpus presenta inconsistencias documentales. La comparación histórica puede verse afectada."
+            )
     else:
         corpus_payload = empty_corpus_payload()
-        st.info("Comparación histórica desactivada para esta revisión.")
+        validation_messages.append("Procesos comparables desactivados para esta revisión.")
 
-    with st.spinner("Ejecutando flujo de revisión analítica..."):
+    with st.spinner("Preparando mesa de revisión..."):
         try:
             pages = extract_text_by_page(uploaded_file_bytes)
         except Exception:
-            st.error(
-                "No se pudo leer el PDF. Verifique que el archivo sea válido y no esté protegido."
-            )
+            st.error("No se pudo leer el PDF. Verifique que el archivo sea válido y no esté protegido.")
             st.stop()
-        validate_extracted_pages(pages)
         detections = detect_patterns(pages)
         document_text = "\n\n".join(page.text for page in pages)
 
+    validate_extracted_pages(pages)
     if not document_text.strip():
         st.stop()
 
     if not detections:
-        st.success(
-            "No se identificaron señales sugeridas por las reglas actuales. "
-            "Esto no descarta la necesidad de revisión documental."
-        )
+        render_review_top_bar(uploaded_file_name, 0)
+        st.success("No se identificaron señales prioritarias con las reglas actuales. Puede continuar con revisión manual del documento.")
+        render_technical_details(corpus_payload, validation_messages)
         return
 
     results_df = prepare_results_dataframe(detections)
@@ -1230,17 +1312,42 @@ def render_review_flow() -> None:
         corpus_payload["context"],
         corpus_payload["total_processes"],
     )
-    enriched_df["documento origen"] = uploaded_file.name
+    enriched_df["documento origen"] = uploaded_file_name
     enriched_df = prioritize_signals(enriched_df)
-    ai_brief = None
 
+    signal_count = len(reviewable_signals(enriched_df))
+    export_col = render_review_top_bar(uploaded_file_name, signal_count)
+
+    available_themes = [theme for theme in THEME_ORDER if theme in set(enriched_df["tema de revisión"])]
+    with st.expander("Filtros", expanded=False):
+        filter_cols = st.columns(3)
+        with filter_cols[0]:
+            selected_themes = st.multiselect("Tema", options=available_themes, default=available_themes)
+        with filter_cols[1]:
+            selected_attention = st.multiselect(
+                "Atención sugerida",
+                options=["Alto", "Medio", "Bajo"],
+                default=["Alto", "Medio", "Bajo"],
+            )
+        with filter_cols[2]:
+            selected_history = st.multiselect(
+                "Procesos comparables",
+                options=sorted(enriched_df["clasificación histórica"].unique()),
+                default=sorted(enriched_df["clasificación histórica"].unique()),
+            )
+
+    filtered_df = enriched_df[
+        enriched_df["tema de revisión"].isin(selected_themes)
+        & enriched_df["atención sugerida"].isin(selected_attention)
+        & enriched_df["clasificación histórica"].isin(selected_history)
+    ]
+    brief = build_executive_brief(filtered_df)
+
+    ai_brief = None
     if enable_ai_reading and not os.getenv("OPENAI_API_KEY"):
-        st.warning(
-            "IA generativa no configurada. Se muestran resultados basados en reglas "
-            "y comparación documental."
-        )
+        validation_messages.append("Síntesis orientativa no configurada: falta OPENAI_API_KEY.")
     elif enable_ai_reading:
-        with st.spinner("Generando lectura preliminar asistida por IA..."):
+        with st.spinner("Generando síntesis orientativa..."):
             ai_brief = cached_generate_document_brief(
                 document_text=document_text,
                 prioritized_findings=llm_context_findings(enriched_df),
@@ -1250,39 +1357,7 @@ def render_review_flow() -> None:
                 base_url=os.getenv("OPENAI_BASE_URL", ""),
             )
         if ai_brief["document_summary"] == "No disponible":
-            st.warning(
-                "La lectura asistida por IA no estuvo disponible. "
-                "Se mantiene el análisis basado en reglas y comparación documental."
-            )
-        else:
-            with st.expander("Lectura asistida por IA", expanded=False):
-                render_ai_document_brief(ai_brief)
-
-    st.subheader("Criterios de lectura")
-    filter_cols = st.columns(3)
-    available_themes = [theme for theme in THEME_ORDER if theme in set(enriched_df["tema de revisión"])]
-    with filter_cols[0]:
-        selected_themes = st.multiselect("Tema", options=available_themes, default=available_themes)
-    with filter_cols[1]:
-        selected_attention = st.multiselect(
-            "Atención sugerida",
-            options=["Alto", "Medio", "Bajo"],
-            default=["Alto", "Medio", "Bajo"],
-        )
-    with filter_cols[2]:
-        selected_history = st.multiselect(
-            "Clasificación histórica",
-            options=sorted(enriched_df["clasificación histórica"].unique()),
-            default=sorted(enriched_df["clasificación histórica"].unique()),
-        )
-
-    filtered_df = enriched_df[
-        enriched_df["tema de revisión"].isin(selected_themes)
-        & enriched_df["atención sugerida"].isin(selected_attention)
-        & enriched_df["clasificación histórica"].isin(selected_history)
-    ]
-
-    brief = build_executive_brief(filtered_df)
+            validation_messages.append("Síntesis orientativa no disponible; se mantiene análisis basado en reglas.")
 
     if filtered_df.empty:
         st.warning("No hay señales para los filtros seleccionados.")
@@ -1294,18 +1369,26 @@ def render_review_flow() -> None:
             corpus_context=corpus_payload["context"],
         )
 
-    with st.expander("Resumen, metodología y señales agrupadas", expanded=False):
-        render_briefing(brief)
+    with st.expander("Contexto histórico", expanded=False):
         render_dimension_summary(filtered_df)
         render_review_questions(filtered_df)
+
+    if ai_brief and ai_brief.get("document_summary") != "No disponible":
+        with st.expander("Síntesis orientativa", expanded=False):
+            render_ai_document_brief(ai_brief)
+
+    with st.expander("Metodología y señales agrupadas", expanded=False):
+        render_briefing(brief)
         if not filtered_df.empty:
             render_theme_groups(filtered_df, corpus_payload["context"])
 
-    with st.expander("Detalle tabular y exportación", expanded=False):
+    render_technical_details(corpus_payload, validation_messages)
+
+    with st.expander("Exportación", expanded=False):
         st.dataframe(ordered_export(filtered_df), width="stretch", hide_index=True)
         csv_data = ordered_export(enriched_df).to_csv(index=False).encode("utf-8")
         st.download_button(
-            "Descargar reporte de revisión asistida",
+            "Descargar CSV",
             data=csv_data,
             file_name="reporte_revision_asistida.csv",
             mime="text/csv",
@@ -1322,7 +1405,6 @@ def render_review_flow() -> None:
             file_name="reporte_ejecutivo_neutralidad.md",
             mime="text/markdown",
         )
-
 
 st.set_page_config(
     page_title="Asistente exploratorio de neutralidad competitiva en pliegos",
