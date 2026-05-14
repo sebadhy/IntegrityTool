@@ -444,3 +444,105 @@ textarea {
         flex-direction: column;
     }
 }
+
+/* Document review workbench */
+.workbench-panel-title {
+    color: var(--blue-dark);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+}
+
+.signal-item {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin: 0.55rem 0 0.25rem;
+    padding: 0.7rem 0.75rem;
+}
+
+.signal-item.selected {
+    border-left: 4px solid var(--blue-medium);
+    background: #FBFCFE;
+}
+
+.signal-item-meta {
+    color: #66727F;
+    font-size: 0.76rem;
+    line-height: 1.25;
+    margin-bottom: 0.22rem;
+}
+
+.signal-item-title {
+    color: #1F2D3A;
+    font-size: 0.91rem;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.signal-item-fragment {
+    color: #52606D;
+    font-size: 0.8rem;
+    line-height: 1.35;
+    margin-top: 0.35rem;
+}
+
+.pdf-frame {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    height: 620px;
+    width: 100%;
+}
+
+.evidence-snippet {
+    background: #FFF8E5;
+    border: 1px solid #E5D7A6;
+    border-left: 4px solid #C99A2E;
+    border-radius: 4px;
+    color: #2F2F2F;
+    font-size: 0.9rem;
+    line-height: 1.45;
+    margin-top: 0.75rem;
+    padding: 0.8rem 0.9rem;
+}
+
+.evidence-snippet p {
+    margin: 0.25rem 0 0;
+}
+
+.evidence-label {
+    color: #6B4E00;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.inspector-section {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin: 0.6rem 0;
+    padding: 0.75rem 0.85rem;
+}
+
+.inspector-section.compact p {
+    color: var(--text-gray);
+    font-size: 0.88rem;
+    line-height: 1.42;
+    margin: 0.25rem 0 0;
+}
+
+.inspector-section strong {
+    color: #1F2D3A;
+    font-size: 0.82rem;
+}
+
+@media (max-width: 1100px) {
+    .pdf-frame {
+        height: 520px;
+    }
+}

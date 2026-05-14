@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import base64
 import os
 from html import escape
 from pathlib import Path
@@ -533,6 +534,229 @@ def render_review_questions(enriched_df: pd.DataFrame) -> None:
         st.markdown(f"- {safe_text(question)}")
 
 
+
+
+def priority_rank(row: pd.Series) -> tuple[int, int, int]:
+    review_order = {"priority": 0, "suggested": 1, "general": 2}
+    attention_order = {"Alto": 0, "Medio": 1, "Bajo": 2}
+    history_order = {"Poco frecuente": 0, "Sin histórico": 1, "Intermedio": 2, "Habitual": 3}
+    return (
+        review_order.get(str(row.get("review_priority", "suggested")), 1),
+        attention_order.get(str(row.get("atención sugerida", "Medio")), 1),
+        history_order.get(str(row.get("clasificación histórica", "Intermedio")), 2),
+    )
+
+
+def reviewable_signals(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
+    signal_df = df.copy()
+    if "tipo_señal" in signal_df.columns:
+        signal_df = signal_df[signal_df["tipo_señal"] == "señal_revision"]
+    if signal_df.empty:
+        return signal_df
+    signal_df = signal_df.copy()
+    signal_df["_rank"] = signal_df.apply(priority_rank, axis=1)
+    return signal_df.sort_values(by="_rank").drop(columns=["_rank"])
+
+
+def short_fragment(value: object, limit: int = 220) -> str:
+    text = " ".join(str(value or "").split())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip() + "..."
+
+
+def selected_signal_id(signal_df: pd.DataFrame) -> str | None:
+    if signal_df.empty:
+        return None
+    current = st.session_state.get("selected_signal_id")
+    valid_ids = set(signal_df["signal_id"].astype(str))
+    if current in valid_ids:
+        return current
+    first_id = str(signal_df.iloc[0]["signal_id"])
+    st.session_state["selected_signal_id"] = first_id
+    return first_id
+
+
+def selected_signal_row(signal_df: pd.DataFrame) -> pd.Series | None:
+    signal_id = selected_signal_id(signal_df)
+    if not signal_id:
+        return None
+    selected = signal_df[signal_df["signal_id"].astype(str) == signal_id]
+    if selected.empty:
+        return None
+    return selected.iloc[0]
+
+
+def render_signal_queue(signal_df: pd.DataFrame) -> None:
+    st.markdown('<div class="workbench-panel-title">Señales</div>', unsafe_allow_html=True)
+    st.caption("Top señales para revisar primero")
+    if signal_df.empty:
+        st.info("No hay señales con los filtros actuales.")
+        return
+
+    visible = signal_df.head(5)
+    hidden = signal_df.iloc[5:]
+    for _, row in visible.iterrows():
+        render_signal_queue_item(row)
+
+    if not hidden.empty:
+        with st.expander(f"Ver {len(hidden)} señales adicionales", expanded=False):
+            for _, row in hidden.iterrows():
+                render_signal_queue_item(row)
+
+
+def render_signal_queue_item(row: pd.Series) -> None:
+    signal_id = str(row["signal_id"])
+    status = st.session_state.get(f"review_status_{signal_id}", "Pendiente")
+    selected = st.session_state.get("selected_signal_id") == signal_id
+    css_class = "signal-item selected" if selected else "signal-item"
+    st.markdown(
+        f"""
+        <div class="{css_class}">
+            <div class="signal-item-meta">{safe_text(row.get("prioridad de revisión", "revisión sugerida"))} · pág. {safe_text(row["página"])} · {safe_text(status)}</div>
+            <div class="signal-item-title">{safe_text(row["patrón detectado"])}</div>
+            <div class="signal-item-fragment">{safe_text(short_fragment(row["fragmento textual"], 125))}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if st.button("Abrir señal", key=f"select_{signal_id}", width="stretch"):
+        st.session_state["selected_signal_id"] = signal_id
+        st.rerun()
+
+
+def render_pdf_viewer(pdf_bytes: bytes, page_number: int) -> None:
+    encoded_pdf = base64.b64encode(pdf_bytes).decode("utf-8")
+    st.markdown(
+        f"""
+        <iframe
+            class="pdf-frame"
+            src="data:application/pdf;base64,{encoded_pdf}#page={int(page_number)}&zoom=page-width"
+            title="Documento PDF"
+        ></iframe>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_document_workspace(row: pd.Series, pages: list, pdf_bytes: bytes) -> None:
+    page_number = int(row.get("página", 1) or 1)
+    st.markdown('<div class="workbench-panel-title">Documento</div>', unsafe_allow_html=True)
+    st.caption(f"Página {page_number} · evidencia anclada al documento")
+    render_pdf_viewer(pdf_bytes, page_number)
+    st.markdown(
+        f"""
+        <div class="evidence-snippet">
+            <div class="evidence-label">Fragmento detectado</div>
+            <p>{safe_text(row["fragmento textual"])}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    with st.expander("Ver texto extraído de esta página", expanded=False):
+        selected_text = next(
+            (page.text for page in pages if page.page_number == page_number),
+            "No se encontró texto extraído para esta página.",
+        )
+        st.text_area("Texto de página", value=selected_text, height=260, label_visibility="collapsed")
+
+
+def render_signal_inspector(row: pd.Series, corpus_context: dict | None = None) -> None:
+    signal_id = str(row["signal_id"])
+    st.markdown('<div class="workbench-panel-title">Detalle</div>', unsafe_allow_html=True)
+    st.markdown(f"**{row['patrón detectado']}**")
+    st.caption(
+        f"{row.get('prioridad de revisión', 'revisión sugerida')} · "
+        f"{dimension_label(row.get('competition_dimension', 'No disponible'))}"
+    )
+
+    st.markdown(
+        f"""
+        <div class="inspector-section compact">
+            <strong>Por qué revisar</strong>
+            <p>{safe_text(short_fragment(row["por qué se sugiere revisar"], 360))}</p>
+        </div>
+        <div class="inspector-section compact">
+            <strong>Validación sugerida</strong>
+            <p>{safe_text(row["validación sugerida"])}</p>
+        </div>
+        <div class="inspector-section compact">
+            <strong>Contexto</strong>
+            <p>{safe_text(row["frecuencia en corpus"])} · {safe_text(row["clasificación histórica"])}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    with st.expander("Mitigantes y trazabilidad", expanded=False):
+        st.markdown(f"**Mitigantes:** {display_joined_list(row.get('mitigating_factors', []))}")
+        st.markdown(f"**Información faltante:** {display_joined_list(row.get('missing_information', []))}")
+        st.markdown(f"**Sección probable:** {safe_text(row.get('document_section', 'No determinada'))}")
+        st.markdown(f"**ID señal:** `{safe_text(signal_id)}`")
+
+    with st.expander("Criterio normativo orientativo", expanded=False):
+        st.markdown(f"**Principio:** {safe_text(row['principio_normativo_relacionado'])}")
+        st.markdown(f"**Criterio:** {safe_text(row['criterio_normativo_de_revision'])}")
+        st.markdown(f"**Pregunta:** {safe_text(row['pregunta_normativa_sugerida'])}")
+
+    st.markdown("**Acción humana**")
+    action_cols = st.columns(2)
+    if action_cols[0].button("Confirmar revisión", key=f"confirm_{signal_id}", width="stretch"):
+        st.session_state[f"review_status_{signal_id}"] = "Confirmada"
+        st.rerun()
+    if action_cols[1].button("Descartar", key=f"dismiss_{signal_id}", width="stretch"):
+        st.session_state[f"review_status_{signal_id}"] = "Descartada"
+        st.rerun()
+    if st.button("Marcar seguimiento", key=f"follow_{signal_id}", width="stretch"):
+        st.session_state[f"review_status_{signal_id}"] = "Seguimiento"
+        st.rerun()
+    st.text_area("Comentario de revisión", key=f"review_note_{signal_id}", height=90)
+
+    with st.expander("Explicación asistida por IA", expanded=False):
+        if st.button("Generar explicación", key=f"workbench_explain_{signal_id}"):
+            if not os.getenv("OPENAI_API_KEY"):
+                st.warning(
+                    "IA generativa no configurada. La revisión basada en reglas sigue disponible."
+                )
+            else:
+                explanation = cached_explain_priority_with_llm(
+                    row.to_dict(),
+                    corpus_context,
+                    os.getenv("OPENAI_MODEL", ""),
+                    os.getenv("OPENAI_BASE_URL", ""),
+                )
+                render_finding_explanation(explanation)
+
+
+def render_review_workbench(
+    filtered_df: pd.DataFrame,
+    pages: list,
+    pdf_bytes: bytes,
+    corpus_context: dict | None = None,
+) -> None:
+    signal_df = reviewable_signals(filtered_df)
+    selected_row = selected_signal_row(signal_df)
+    st.subheader("Mesa de revisión documental")
+    st.markdown(
+        '<div class="section-note">Revise señales priorizadas, navegue evidencia y deje trazabilidad humana.</div>',
+        unsafe_allow_html=True,
+    )
+    left, center, right = st.columns([0.28, 0.44, 0.28], gap="medium")
+    with left:
+        render_signal_queue(signal_df)
+    with center:
+        if selected_row is None:
+            st.info("Seleccione una señal para ver evidencia documental.")
+        else:
+            render_document_workspace(selected_row, pages, pdf_bytes)
+    with right:
+        if selected_row is None:
+            st.info("Seleccione una señal para revisar su detalle.")
+        else:
+            render_signal_inspector(selected_row, corpus_context)
+
 def render_finding_explanation(explanation: dict) -> None:
     if explanation.get("llm_available") is False:
         st.warning(
@@ -1031,7 +1255,8 @@ def render_review_flow() -> None:
                 "Se mantiene el análisis basado en reglas y comparación documental."
             )
         else:
-            render_ai_document_brief(ai_brief)
+            with st.expander("Lectura asistida por IA", expanded=False):
+                render_ai_document_brief(ai_brief)
 
     st.subheader("Criterios de lectura")
     filter_cols = st.columns(3)
@@ -1058,15 +1283,23 @@ def render_review_flow() -> None:
     ]
 
     brief = build_executive_brief(filtered_df)
-    render_briefing(brief)
-    render_dimension_summary(filtered_df)
-    render_review_questions(filtered_df)
 
     if filtered_df.empty:
         st.warning("No hay señales para los filtros seleccionados.")
     else:
-        render_top_priorities(filtered_df, corpus_payload["context"])
-        render_theme_groups(filtered_df, corpus_payload["context"])
+        render_review_workbench(
+            filtered_df=filtered_df,
+            pages=pages,
+            pdf_bytes=uploaded_file_bytes,
+            corpus_context=corpus_payload["context"],
+        )
+
+    with st.expander("Resumen, metodología y señales agrupadas", expanded=False):
+        render_briefing(brief)
+        render_dimension_summary(filtered_df)
+        render_review_questions(filtered_df)
+        if not filtered_df.empty:
+            render_theme_groups(filtered_df, corpus_payload["context"])
 
     with st.expander("Detalle tabular y exportación", expanded=False):
         st.dataframe(ordered_export(filtered_df), width="stretch", hide_index=True)
@@ -1089,12 +1322,6 @@ def render_review_flow() -> None:
             file_name="reporte_ejecutivo_neutralidad.md",
             mime="text/markdown",
         )
-
-    with st.expander("Texto extraído por página", expanded=False):
-        page_options = [page.page_number for page in pages]
-        selected_page = st.selectbox("Seleccionar página", page_options)
-        selected_text = next(page.text for page in pages if page.page_number == selected_page)
-        st.text_area("Texto extraído", value=selected_text, height=320)
 
 
 st.set_page_config(
