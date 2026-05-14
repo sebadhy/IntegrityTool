@@ -234,6 +234,37 @@ Fase 1 y Fase 2 son independientes entre sí. Fase 5 depende de Fase 4.
 
 ---
 
+## Fase 6 — Calibración con corpus real
+
+**Objetivo:** reducir falsos positivos derivados de texto legal boilerplate y detectar señales reales de lock-in identificadas en corpus de 24 procesos EMASEO-EP, HCAM y HTMC.
+
+**Condición de salida:** la tasa de SIGNAL_REVIEW sobre pliegos reales cae ≥30% sin perder señales verdaderas; los nuevos patrones (plataforma médica, series de equipo, consignación) disparan en los documentos esperados.
+
+### Tareas
+
+- [x] **6.1** Tightening de `cn-brand-model-provider-reference`: eliminar señales genéricas `marca`, `modelo`, `fabricante` del YAML; agregar `representante autorizado`, `distribuidor exclusivo`, `empresa representante`, `proveedor oficial del fabricante`
+- [x] **6.2** Reglas legacy `marca` y `fabricante` convertidas a `SIGNAL_HABITUAL` en `detector.py` (informativas, no prioridad)
+- [x] **6.3** Nuevas reglas `SIGNAL_HABITUAL` en `detector.py`: `homologación ANT` y `norma INEN` (requisitos regulatorios ecuatorianos, no señales de restricción)
+- [x] **6.4** Ampliar `cn-interoperability-lock-in`: señales de plataforma de energía médica (`plataforma compatible de energía`, `para utilizar con plataforma`, `compatible con el generador`, etc.)
+- [x] **6.5** Ampliar `cn-local-presence-requirement`: señales de distribución local (`representante local`, `distribuidor local`, `empresa distribuidora`, `representantes locales autorizados`)
+- [x] **6.6** Tightening `cn-cumulative-requirements`: eliminar `además deberá`, `adicionalmente`, `conjuntamente` (boilerplate LOSNCP); reemplazar con señales más específicas
+- [x] **6.7** Nuevo patrón `cn-medical-device-platform-lock-in`: consumibles que requieren compatibilidad con plataforma de equipo médico instalada (prioridad alta, confianza alta)
+- [x] **6.8** Nuevo patrón `cn-equipment-series-specific-reference`: referencia a series o códigos de equipo instalado como especificación implícita de marca
+- [x] **6.9** Nuevo patrón `cn-consignment-delivery-model`: modelo de pago por lo efectivamente utilizado con stock en institución (barrera logística implícita)
+- [x] **6.10** Ampliar `SECTION_VOCABULARY` en `document_segmenter.py`: vocabulario de documentos IESS/hospitales (`descripcion general del requerimiento`, `terminos de referencia`, `descripcion tecnica`, `antecedentes`, etc.)
+- [x] **6.11** Ventanas de contexto ampliadas: `cn-medical-device-platform-lock-in` (600 chars), `cn-equipment-series-specific-reference` y `cn-consignment-delivery-model` (500 chars), `cn-interoperability-lock-in` (500 chars)
+
+### Resultados de calibración (corpus EMASEO-EP, HCAM, HTMC — 24 procesos)
+
+| Documento | SIGNAL_REVIEW antes | SIGNAL_REVIEW después | Reducción |
+|---|---|---|---|
+| LICB-EMASEO-EP-2025-001 camiones | 67 | 26 | −61% |
+| SIE-HTMC-2026-040 generador ultras. | 33 | 21 | −36% |
+| SIE-HTMC-2026-033 pinzas cirugía | 36 | 27 | −25% |
+| SIE-HCAM-2026-051 implantes columna | 64 | 36 | −44% |
+
+---
+
 ## Estado del roadmap
 
 | Fase | Estado | Notas |
@@ -244,3 +275,4 @@ Fase 1 y Fase 2 son independientes entre sí. Fase 5 depende de Fase 4.
 | Fase 3 | ✅ Completa | OCR detection, tipo doc, feedback loop, SHA256 taxonomía |
 | Fase 4 | ✅ Completa | 8 módulos nuevos, lru_cache, pyproject.toml, 21 tests pasan |
 | Fase 5 | ✅ Completa | Segmentador, integración en detector, section_id en outputs, 33 tests pasan |
+| Fase 6 | ✅ Completa | Calibración con corpus real; 33 tests pasan; −44% a −61% falsos positivos |

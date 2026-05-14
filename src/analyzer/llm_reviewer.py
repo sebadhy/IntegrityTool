@@ -5,13 +5,11 @@ import logging
 import os
 from typing import Any
 
-from dotenv import load_dotenv
 from openai import AzureOpenAI, OpenAI
 
+from ..config import LLM_DEFAULT_MODEL, LLM_MAX_DOCUMENT_CHARS
 from .taxonomy_loader import load_taxonomy, taxonomy_context
 
-
-load_dotenv()
 
 LOGGER = logging.getLogger(__name__)
 
@@ -31,9 +29,9 @@ SYSTEM_PROMPT = (
     "No se identifica una señal documental suficiente en el fragmento revisado."
 )
 
-DEFAULT_MODEL = "gpt-4o-mini"
+DEFAULT_MODEL = LLM_DEFAULT_MODEL
 UNAVAILABLE = "No disponible"
-MAX_DOCUMENT_CHARS = 12_000
+MAX_DOCUMENT_CHARS = LLM_MAX_DOCUMENT_CHARS
 
 FEWSHOT_MARCA_SIN_EQUIVALENTE = """\
 ### EJEMPLO 1 — Marca sin equivalente → revisión prioritaria

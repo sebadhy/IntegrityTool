@@ -21,6 +21,11 @@ SECTION_VOCABULARY: dict[str, list[str]] = {
         "descripcion del objeto",
         "naturaleza y objeto",
         "objeto de contratacion",
+        "descripcion general del requerimiento",
+        "descripcion del requerimiento",
+        "descripcion general",
+        "antecedentes y justificacion",
+        "justificacion del requerimiento",
     ],
     "requisitos_habilitacion": [
         "requisitos de habilitacion",
@@ -30,6 +35,8 @@ SECTION_VOCABULARY: dict[str, list[str]] = {
         "participantes habilitados",
         "capacidad legal",
         "requisitos minimos del oferente",
+        "requisitos minimos de participacion",
+        "condiciones minimas de participacion",
     ],
     "especificaciones_tecnicas": [
         "especificaciones tecnicas",
@@ -40,6 +47,17 @@ SECTION_VOCABULARY: dict[str, list[str]] = {
         "especificaciones generales y particulares",
         "especificaciones particulares",
         "especificaciones generales",
+        "terminos de referencia",
+        "descripcion tecnica del bien",
+        "descripcion tecnica de los bienes",
+        "descripcion de los bienes",
+        "requerimiento tecnico minimo",
+        "formulario de especificaciones tecnicas",
+        "especificaciones de los bienes",
+        "descripcion del bien",
+        "descripcion tecnica",
+        "caracteristicas minimas requeridas",
+        "condiciones tecnicas",
     ],
     "experiencia_capacidad": [
         "experiencia minima",
@@ -49,6 +67,8 @@ SECTION_VOCABULARY: dict[str, list[str]] = {
         "experiencia especifica",
         "experiencia en trabajos",
         "capacidad financiera",
+        "capacidad del oferente",
+        "experiencia general",
     ],
     "garantias_postventa": [
         "garantia tecnica",
@@ -58,6 +78,8 @@ SECTION_VOCABULARY: dict[str, list[str]] = {
         "garantia del fabricante",
         "garantia de fabricante",
         "servicio de garantia",
+        "garantia y mantenimiento",
+        "soporte tecnico",
     ],
     "criterios_evaluacion": [
         "criterios de evaluacion",
@@ -66,6 +88,8 @@ SECTION_VOCABULARY: dict[str, list[str]] = {
         "parametros de evaluacion",
         "puntaje tecnico",
         "calificacion de ofertas",
+        "metodologia de calificacion",
+        "matriz de evaluacion",
     ],
     "condiciones_generales": [
         "condiciones generales",
@@ -74,6 +98,11 @@ SECTION_VOCABULARY: dict[str, list[str]] = {
         "marco legal",
         "normativa aplicable",
         "base legal",
+        "antecedentes",
+        "regimen juridico",
+        "normativa vigente",
+        "disposiciones legales",
+        "marco normativo",
     ],
     "formularios": [
         "formularios de la oferta",
@@ -81,6 +110,9 @@ SECTION_VOCABULARY: dict[str, list[str]] = {
         "carta de presentacion",
         "oferta economica",
         "formulario de oferta",
+        "anexo de oferta",
+        "declaracion del oferente",
+        "formulario de datos del oferente",
     ],
 }
 

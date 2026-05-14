@@ -5,6 +5,7 @@ import pandas as pd
 from src.analyzer.prioritizer import top_priorities
 from src.analyzer.review_synthesis import theme_summaries
 from src.analyzer.text_cleaner import clean_page_text
+from src.config import UI_REPORT_TOP_PRIORITIES
 from src.ui.components import EXPORT_COLUMNS, LLM_COLUMNS
 
 
@@ -78,7 +79,7 @@ def build_executive_report_markdown(
         )
 
     lines.extend(["## Top 3 aspectos prioritarios sugeridos para revisión", ""])
-    for index, (_, row) in enumerate(top_priorities(priority_df, limit=3).iterrows(), start=1):
+    for index, (_, row) in enumerate(top_priorities(priority_df, limit=UI_REPORT_TOP_PRIORITIES).iterrows(), start=1):
         lines.extend(
             [
                 f"### {index}. {row['patrón detectado']}",

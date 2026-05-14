@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from difflib import SequenceMatcher
 from functools import lru_cache
 
+from ..config import DETECTION_DEFAULT_CONTEXT_CHARS
 from .document_segmenter import DocumentSection, segment_document
 from .finding_model import (
     Finding,
@@ -55,8 +56,12 @@ CONTEXT_CHARS_BY_PATTERN: dict[str, int] = {
     "cn-specific-experience": 380,
     "cn-incomplete-technical-reference": 180,
     "cn-missing-annex-reference": 180,
+    "cn-medical-device-platform-lock-in": 600,
+    "cn-equipment-series-specific-reference": 500,
+    "cn-consignment-delivery-model": 500,
+    "cn-interoperability-lock-in": 500,
 }
-_DEFAULT_CONTEXT_CHARS = 260
+_DEFAULT_CONTEXT_CHARS = DETECTION_DEFAULT_CONTEXT_CHARS
 
 
 def _context_chars_for_pattern(pattern_id: str) -> int:
@@ -200,32 +205,34 @@ RULES = [
     PatternRule(
         pattern="fabricante",
         category="Referencias a marca, origen o fabricante",
-        attention_level="Medio",
+        attention_level="Bajo",
         observation=(
-            "Se detectó una referencia a fabricante; conviene validar si opera como "
-            "referencia técnica abierta o como condición cerrada."
+            "Se detectó una referencia genérica a fabricante; en contexto de especificaciones "
+            "técnicas conviene verificar si opera como condición abierta o cerrada."
         ),
         possible_competition_effect=(
-            "Podría reducir concurrencia si privilegia un origen o fabricante específico."
+            "Por sí sola, la mención al fabricante no es señal de restricción competitiva."
         ),
         suggested_validation=(
-            "Confirmar si se aceptan alternativas equivalentes."
+            "Revisar si la referencia al fabricante incluye cláusula de equivalencia."
         ),
+        signal_type=SIGNAL_HABITUAL,
     ),
     PatternRule(
         pattern="marca",
         category="Referencias a marca, origen o fabricante",
-        attention_level="Medio",
+        attention_level="Bajo",
         observation=(
-            "Se detectó referencia a marca; conviene revisar si la especificación admite "
-            "equivalentes funcionales."
+            "Se detectó referencia genérica a marca; en especificaciones técnicas conviene "
+            "verificar si se admiten marcas equivalentes o es condición cerrada."
         ),
         possible_competition_effect=(
-            "Podría reducir participación si se interpreta como preferencia cerrada."
+            "Por sí sola, la mención a marca no es señal de restricción competitiva."
         ),
         suggested_validation=(
-            "Confirmar si se aceptan alternativas equivalentes."
+            "Verificar si la especificación admite equivalentes funcionales de otras marcas."
         ),
+        signal_type=SIGNAL_HABITUAL,
     ),
     PatternRule(
         pattern="repuestos",
@@ -501,6 +508,34 @@ RULES = [
         ),
         possible_competition_effect="No se aprecia efecto limitante por sí solo.",
         suggested_validation="Verificar que las condiciones para consorcios sean proporcionales.",
+        signal_type=SIGNAL_HABITUAL,
+    ),
+    PatternRule(
+        pattern="homologación ANT",
+        category="Requisitos regulatorios o habituales",
+        attention_level="Bajo",
+        observation=(
+            "La homologación ANT es un requisito regulatorio obligatorio para vehículos en Ecuador "
+            "(Agencia Nacional de Tránsito); por sí sola no constituye señal de restricción competitiva."
+        ),
+        possible_competition_effect="No se aprecia efecto limitante; es exigencia normativa de alcance general.",
+        suggested_validation=(
+            "Verificar únicamente si se combina con requisitos de marca o proveedor que limiten la concurrencia."
+        ),
+        signal_type=SIGNAL_HABITUAL,
+    ),
+    PatternRule(
+        pattern="norma INEN",
+        category="Requisitos regulatorios o habituales",
+        attention_level="Bajo",
+        observation=(
+            "Las normas INEN son estándares técnicos nacionales de Ecuador; su exigencia "
+            "es habitual y no constituye por sí sola una restricción competitiva."
+        ),
+        possible_competition_effect="No se aprecia efecto limitante; aplica a todos los proveedores por igual.",
+        suggested_validation=(
+            "Verificar que la norma INEN referenciada exista y sea aplicable al bien o servicio."
+        ),
         signal_type=SIGNAL_HABITUAL,
     ),
     PatternRule(

@@ -10,6 +10,7 @@ import streamlit as st
 
 from src.analyzer.prioritizer import top_priorities
 from src.analyzer.review_synthesis import THEME_ORDER, theme_summaries
+from src.config import UI_REPORT_TOP_PRIORITIES
 from src.ui.cache import cached_explain_priority_with_llm
 from src.ui.components import (
     FEEDBACK_PATH,
@@ -52,7 +53,7 @@ def render_finding_explanation(explanation: dict) -> None:
 
 def render_top_priorities(priority_df: pd.DataFrame, corpus_context: dict | None = None) -> None:
     st.subheader("Aspectos prioritarios sugeridos para revisión")
-    top_df = top_priorities(priority_df, limit=3)
+    top_df = top_priorities(priority_df, limit=UI_REPORT_TOP_PRIORITIES)
     if top_df.empty:
         st.info("No hay prioridades para mostrar con los filtros actuales.")
         return

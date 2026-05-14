@@ -9,6 +9,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ..config import (
+    CORPUS_ESPECIFICACIONES_DIR,
+    CORPUS_METADATA_PATH,
+    CORPUS_PLIEGOS_DIR,
+    CORPUS_PROCESSED_DIR,
+)
 from .corpus_validator import (
     DocumentTrace,
     VALIDATION_INCONSISTENT,
@@ -20,10 +26,10 @@ from .detector import detect_patterns
 from .pdf_extractor import PageText, extract_text_by_page
 
 
-RAW_METADATA_PATH = Path("data/raw/metadata/procesos.csv")
-RAW_PLIEGOS_DIR = Path("data/raw/pliegos")
-RAW_ESPECIFICACIONES_DIR = Path("data/raw/especificaciones")
-PROCESSED_TEXT_DIR = Path("data/processed/extracted_text")
+RAW_METADATA_PATH = CORPUS_METADATA_PATH
+RAW_PLIEGOS_DIR = CORPUS_PLIEGOS_DIR
+RAW_ESPECIFICACIONES_DIR = CORPUS_ESPECIFICACIONES_DIR
+PROCESSED_TEXT_DIR = CORPUS_PROCESSED_DIR
 
 
 @dataclass(frozen=True)

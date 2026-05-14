@@ -8,9 +8,6 @@
     - requisitos técnicos
     - ficha técnica
   textual_signals:
-    - marca
-    - modelo
-    - fabricante
     - proveedor específico
     - tecnología propietaria
     - marca específica
@@ -18,6 +15,11 @@
     - comercializador autorizado
     - concesionario
     - fabricante autorizado
+    - representante autorizado
+    - distribuidor exclusivo
+    - proveedor de marca
+    - empresa representante
+    - proveedor oficial del fabricante
   semantic_signals:
     - referencia a una solución comercial particular
     - dependencia de fabricante o proveedor
@@ -371,6 +373,14 @@
     - sucursal en
     - domicilio en
     - taller autorizado local
+    - representante local
+    - distribuidor local
+    - proveedor local autorizado
+    - taller autorizado
+    - empresa distribuidora
+    - representantes locales autorizados
+    - distribuidores locales
+    - instalaciones en la ciudad
   semantic_signals:
     - obligación de infraestructura local previa
     - soporte condicionado a ubicación territorial
@@ -409,11 +419,15 @@
     - especificaciones técnicas
     - evaluación
   textual_signals:
-    - además deberá
-    - adicionalmente
-    - conjuntamente
     - deberá cumplir todos
     - requisitos acumulativos
+    - deberá cumplir con todos los
+    - cumplir con todos los siguientes requisitos
+    - los siguientes requisitos habilitantes
+    - requisitos habilitantes y de experiencia y
+    - deberán cumplirse simultáneamente
+    - distribuidor autorizado y certificación
+    - certificación y experiencia específica
   semantic_signals:
     - acumulación de condiciones habilitantes
     - requisitos técnicos y comerciales simultáneos
@@ -499,6 +513,14 @@
     - integración con
     - infraestructura existente
     - sistema existente
+    - plataforma compatible de energía
+    - para utilizar con plataforma
+    - energía existente en la institución
+    - compatible con el generador
+    - compatible con la plataforma
+    - plataforma de energía existente
+    - equipo existente en la institución
+    - compatible con la plataforma de energía
   semantic_signals:
     - dependencia de sistema instalado
     - compatibilidad como condición de admisibilidad
@@ -654,3 +676,153 @@
   related_patterns:
     - cn-brand-model-provider-reference
     - cn-weak-equivalence-clause
+
+- id: cn-medical-device-platform-lock-in
+  name: Consumibles compatibles con plataforma de equipo médico existente
+  description: Identifica especificaciones que exigen compatibilidad exclusiva con plataformas o generadores médicos ya instalados en la institución (energía ultrasónica, selladores vasculares, etc.), lo que puede restringir la participación a proveedores de la marca del equipo instalado.
+  competition_dimension: interoperability_lock_in
+  risk_type: lock-in de plataforma de dispositivo médico
+  document_sections:
+    - especificaciones técnicas
+  textual_signals:
+    - para utilizar con plataforma compatible de energía
+    - plataforma compatible de energía existente
+    - compatible con plataforma de energía existente
+    - para utilizar con generador existente
+    - compatible con la plataforma de energía
+    - plataforma de energía de la institución
+    - para uso con equipo existente de la institución
+    - consumibles para equipo existente
+    - compatible con el equipo existente en la institución
+    - accesorios para la plataforma existente
+  semantic_signals:
+    - consumibles que solo funcionan con un equipo de marca determinada
+    - dependencia de plataforma de fabricante específico
+  possible_indicators:
+    - Se exige compatibilidad con equipos instalados sin especificar estándares técnicos abiertos.
+    - Los consumibles descritos son fabricados exclusivamente por la marca del equipo instalado.
+  mitigating_factors:
+    - o equivalente
+    - compatibles con múltiples marcas
+    - estándar abierto
+    - o similar
+    - equivalente funcional
+  possible_legitimate_justifications:
+    - Seguridad del paciente, compatibilidad clínica documentada o continuidad operativa hospitalaria.
+  human_review_questions:
+    - ¿Existen consumibles de otras marcas con las mismas especificaciones técnicas funcionales?
+    - ¿La compatibilidad con el equipo instalado está justificada por seguridad clínica documentada?
+    - ¿Se permite ofrecer instrumentos de otras marcas si cumplen los parámetros técnicos?
+  recommended_language:
+    - revisar si la exigencia de compatibilidad cierra la participación a una sola marca
+    - validar alternativas funcionalmente equivalentes disponibles en el mercado
+  prohibited_language:
+    - corrupción
+    - fraude
+    - direccionamiento
+    - ilegalidad detectada
+  severity_guidance: priority
+  confidence_guidance: high
+  related_patterns:
+    - cn-interoperability-lock-in
+    - cn-brand-model-provider-reference
+
+- id: cn-equipment-series-specific-reference
+  name: Referencia a series o códigos de equipo instalado como especificación
+  description: Identifica menciones a series, códigos o modelos específicos de equipos ya existentes en la institución que operan implícitamente como referencia cerrada de marca.
+  competition_dimension: vendor_lock_in
+  risk_type: especificación por referencia a equipo instalado
+  document_sections:
+    - especificaciones técnicas
+  textual_signals:
+    - series de los equipos existentes
+    - modelos existentes en la institución
+    - series existentes en la institución
+    - equipos existentes en la institución son
+    - series de equipos de la institución
+    - códigos de los equipos instalados
+    - modelos de equipos de la institución
+    - series instaladas en la institución
+  semantic_signals:
+    - los números de serie identifican implícitamente una marca instalada
+    - la especificación técnica se define por los equipos ya adquiridos
+  possible_indicators:
+    - Se listan códigos alfanuméricos o series que solo corresponden a un fabricante.
+    - La especificación no expresa requisitos funcionales, sino identificadores de productos específicos.
+  mitigating_factors:
+    - o equivalente
+    - equivalente funcional
+    - o similar
+    - con características equivalentes
+  possible_legitimate_justifications:
+    - Compatibilidad operativa con equipamiento instalado cuya sustitución es inviable a corto plazo.
+  human_review_questions:
+    - ¿Las series o códigos listados corresponden a un único fabricante?
+    - ¿Se aceptan instrumentos de otras marcas con las mismas capacidades técnicas?
+    - ¿La institución justificó la necesidad de compatibilidad con equipos específicos?
+  recommended_language:
+    - expresar las especificaciones como requisitos funcionales, no como referencias de producto
+    - revisar si los códigos listados corresponden a una marca y si se admiten equivalentes
+  prohibited_language:
+    - corrupción
+    - fraude
+    - direccionamiento
+    - ilegalidad detectada
+  severity_guidance: priority
+  confidence_guidance: high
+  related_patterns:
+    - cn-brand-model-provider-reference
+    - cn-technical-closed-requirement
+    - cn-medical-device-platform-lock-in
+
+- id: cn-consignment-delivery-model
+  name: Modelo de consignación o pago por lo efectivamente utilizado
+  description: Identifica modelos de suministro tipo consignación en que el proveedor mantiene stock en la institución y se paga solo lo utilizado, lo que implica un requisito implícito de presencia logística local que puede favorecer proveedores con depósito preexistente.
+  competition_dimension: geographic_restriction
+  risk_type: modelo de entrega con presencia logística implícita
+  document_sections:
+    - condiciones contractuales
+    - plazo de entrega
+    - especificaciones técnicas
+  textual_signals:
+    - pagará lo efectivamente utilizado
+    - se pagará lo utilizado
+    - pago por lo efectivamente utilizado
+    - suministro en consignación
+    - entrega en consignación
+    - stock en consignación
+    - en consignación en la institución
+    - previo a la cirugía
+    - disponibilidad previa a la cirugía
+    - lo efectivamente consumido
+    - pago por consumo real
+  semantic_signals:
+    - proveedor mantiene inventario físico en la institución
+    - pago solo por consumo real implica stock previo
+  possible_indicators:
+    - Se combina pago por uso con plazos muy cortos de entrega o disponibilidad previa a procedimientos.
+    - Se exige disponibilidad física antes de cirugías sin especificar cómo surtir el stock.
+  mitigating_factors:
+    - entrega programada
+    - logística centralizada
+    - bodega institucional
+    - sistema de pedido
+  possible_legitimate_justifications:
+    - Optimización presupuestaria hospitalaria, reducción de inventario o gestión de implantes de alto costo.
+  human_review_questions:
+    - ¿El modelo de consignación exige al proveedor mantener stock permanente en la institución?
+    - ¿Pueden competir oferentes sin bodega o presencia local previa?
+    - ¿El requisito logístico está técnicamente justificado por la naturaleza del bien?
+  recommended_language:
+    - revisar si el modelo de entrega implica barrera logística que favorece proveedores preexistentes
+    - validar acceso equitativo para oferentes sin infraestructura local instalada
+  prohibited_language:
+    - corrupción
+    - fraude
+    - direccionamiento
+    - ilegalidad detectada
+  severity_guidance: suggested
+  confidence_guidance: medium
+  related_patterns:
+    - cn-local-presence-requirement
+    - cn-limited-execution-delivery-deadline

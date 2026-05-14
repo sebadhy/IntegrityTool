@@ -11,6 +11,7 @@ from src.analyzer.corpus_loader import (
 from src.analyzer.normative_reference import NORMATIVE_SOURCES
 from src.analyzer.prioritizer import top_priorities
 from src.analyzer.review_synthesis import build_corpus_context
+from src.config import UI_LLM_BALANCE_ROWS, UI_LLM_TOP_FINDINGS
 from src.ui.cache import cached_corpus_context
 from src.ui.components import LLM_COLUMNS
 
@@ -67,12 +68,12 @@ def build_normative_context() -> dict:
 
 
 def llm_context_findings(enriched_df: pd.DataFrame) -> list[dict]:
-    priority_rows = top_priorities(enriched_df, limit=5)
+    priority_rows = top_priorities(enriched_df, limit=UI_LLM_TOP_FINDINGS)
     balance_rows = pd.DataFrame()
     if "tipo_señal" in enriched_df.columns:
         balance_rows = enriched_df[
             enriched_df["tipo_señal"].isin(["mitigante_concurrencia", "requisito_habitual"])
-        ].drop_duplicates("patrón detectado").head(8)
+        ].drop_duplicates("patrón detectado").head(UI_LLM_BALANCE_ROWS)
     return pd.concat([priority_rows, balance_rows], ignore_index=True).to_dict("records")
 
 
