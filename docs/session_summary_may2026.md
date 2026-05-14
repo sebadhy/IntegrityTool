@@ -16,6 +16,130 @@ la concurrencia de oferentes, las prioriza y las presenta con evidencia textual 
 
 ---
 
+## Diagrama del sistema — paso a paso
+
+```mermaid
+flowchart TD
+    U(["👤 Revisor institucional"])
+    U -->|"sube PDF del pliego"| UI
+
+    subgraph UI["Interfaz — app.py + src/ui/"]
+        UI1["Carga del documento\n(tipo de proceso, opciones)"]
+        UI2["Filtros de lectura\n(tema · atención · histórico)"]
+        UI3["Resultados:\nresumen · Top N · temas · export"]
+        UI1 --> UI2 --> UI3
+    end
+
+    UI1 -->|"PDF bytes"| EXT
+
+    subgraph EXT["Paso 1 — Extracción\npdf_extractor.py"]
+        E1["PyMuPDF extrae texto\npágina por página"]
+        E2{"¿página sin texto\npero con imágenes?"}
+        E3["OCR opcional\npytesseract · source='ocr'"]
+        E4["source='empty'\naviso en UI"]
+        E5["detect_document_type()\npliego · especificaciones\ntérminos · contrato · desconocido"]
+        E6["extract_contract_object()\nobjeto del contrato\n(primeras 3 páginas)"]
+        E1 --> E2
+        E2 -- "pytesseract instalado" --> E3
+        E2 -- "no disponible" --> E4
+        E3 --> E5
+        E4 --> E5
+        E5 --> E6
+    end
+
+    E6 -->|"list[PageText]"| SEG
+
+    subgraph SEG["Paso 2 — Segmentación\ndocument_segmenter.py"]
+        S1{"Estrategia B\nvocabulario SERCOP+IESS"}
+        S2["Secciones detectadas\npor frases clave"]
+        S3{"Estrategia A\ntítulos ALL-CAPS / numerados"}
+        S4["Secciones detectadas\npor formato"]
+        S5["Fallback: sección única\n'desconocido' · full · ×1.0"]
+        S6["DocumentSection[]\nsection_id · detection_profile\ncontext_multiplier"]
+        S1 -- "encontradas" --> S2 --> S6
+        S1 -- "sin vocabulario" --> S3
+        S3 -- "encontrados" --> S4 --> S6
+        S3 -- "sin títulos" --> S5 --> S6
+    end
+
+    SEG -->|"sections"| DET
+
+    subgraph DET["Paso 3 — Detección\ndetector.py"]
+        D0{"perfil de sección"}
+        D1["skip — formularios\nCERO detecciones"]
+        D2["restricted — condiciones generales\nsolo SIGNAL_REVIEW de RULES"]
+        D3["full — especificaciones técnicas\nREGLAS legacy + taxonomía YAML\ncontext_mult hasta 1.8×"]
+        D4["Taxonomía YAML\n17 patrones · textual_signals\nmitigating_factors en ventana"]
+        D5["RULES deterministas\nSIGNAL_REVIEW · MITIGANT · HABITUAL"]
+        D6["Finding[]\npattern_id · evidence · page\nsection_id · section_label\nmitigating_factors"]
+        D0 -- "skip" --> D1
+        D0 -- "restricted" --> D2 --> D6
+        D0 -- "full" --> D3
+        D3 --> D4 --> D6
+        D3 --> D5 --> D6
+    end
+
+    DET -->|"findings"| ENR
+
+    subgraph ENR["Paso 4 — Enriquecimiento\nreview_synthesis.py"]
+        EN1["prepare_results_dataframe()\nDataFrame estructurado"]
+        EN2["enrich_review_dataframe()\ncruce con corpus histórico"]
+        EN3["frecuencia_corpus\nclasificación_histórica\nprocesos_con_patron"]
+        EN1 --> EN2 --> EN3
+    end
+
+    subgraph COR["Corpus histórico\ncorpus_loader.py"]
+        C1[("data/raw/\nprocesos.csv\npliegos/ · especificaciones/")]
+        C2["Ingesta incremental\nSHA256 por PDF\ncache en data/processed/"]
+        C3["build_corpus_context()\nfrecuencias por patrón"]
+        C1 --> C2 --> C3
+    end
+
+    C3 -->|"corpus_context"| ENR
+
+    ENR -->|"enriched_df"| PRI
+
+    subgraph PRI["Paso 5 — Priorización\nprioritizer.py"]
+        P1["nivel_atencion: Alto · Medio · Bajo"]
+        P2["review_priority: priority · suggested · general"]
+        P3["relevancia_analitica"]
+        P4["criterios_de_priorizacion\nexplicacion_priorizacion"]
+        P5["signal_id · taxonomy_sha256\nengine_version · timestamp"]
+        P1 --> P2 --> P3 --> P4 --> P5
+    end
+
+    PRI -->|"prioritized_df"| LLM
+
+    subgraph LLM["Paso 6 — Narrativa IA (opcional)\nllm_reviewer.py"]
+        L0{"¿OPENAI_API_KEY\nconfigurada?"}
+        L1["Top N findings\n+ mitigantes como balance\n+ contract_object"]
+        L2["few-shots dinámicos\npor tipo_señal + sección"]
+        L3["taxonomía filtrada\n~300 tokens por señal"]
+        L4["brief ejecutivo:\nresumen · temas · efectos\npreguntas · nota metodológica"]
+        L5["sin IA:\nsolo reglas + corpus"]
+        L0 -- "sí" --> L1 --> L2 --> L3 --> L4
+        L0 -- "no" --> L5
+    end
+
+    LLM -->|"resultados + brief"| UI3
+
+    UI3 -->|"feedback del revisor"| FB[("data/feedback/\ncases.jsonl\n(gitignored)")]
+    UI3 -->|"descarga"| EXP["CSV trazable\n+ Reporte Markdown"]
+
+    style UI fill:#1a3a5c,color:#fff,stroke:#4a7ab5
+    style EXT fill:#1a5c3a,color:#fff,stroke:#4ab57a
+    style SEG fill:#1a5c3a,color:#fff,stroke:#4ab57a
+    style DET fill:#1a5c3a,color:#fff,stroke:#4ab57a
+    style ENR fill:#1a5c3a,color:#fff,stroke:#4ab57a
+    style PRI fill:#1a5c3a,color:#fff,stroke:#4ab57a
+    style LLM fill:#5c3a1a,color:#fff,stroke:#b57a4a
+    style COR fill:#3a3a5c,color:#fff,stroke:#7a7ab5
+    style FB fill:#3a2a00,color:#fff,stroke:#a08000
+    style D1 fill:#555,color:#ccc,stroke:#888
+```
+
+---
+
 ## Cambios realizados en esta sesión
 
 ### 1. Calibración con corpus real (Fase 6)
@@ -287,15 +411,15 @@ Cobertura:
 
 ---
 
-## Contexto del equipo (14/5/2026)
+## Decisión de arquitectura (14/5/2026)
 
-Del intercambio del equipo:
+Se evaluaron dos enfoques alternativos propuestos por el equipo:
 
-- **Enrique** propuso un diagrama de pipeline estructurado (válido — describe el estado actual).
-- **Andrés** propuso un agente LLM orquestador con tools (`extract_section`, `search_corpus`, `flag_finding`, `get_freq`). Las tools son buenas ideas; el agente orquestador es prematuro para la PoC.
-- **Seba** (responsable) recomendó enfocarse en asistencia a revisión humana, no en autonomía del agente. Acuerdo del comité: mantener el pipeline determinista + agregar síntesis cruzada como llamada única al final, no como loop de agente.
+- **Enfoque A — Pipeline estructurado**: detección determinista por reglas/taxonomía → LLM solo para narrativa. Describe el estado actual del sistema.
+- **Enfoque B — Agente LLM orquestador**: el modelo decide qué herramientas invocar (`extract_section`, `search_corpus`, `flag_finding`, `get_freq`). Las herramientas son buenas ideas; el loop de agente es prematuro para la PoC por riesgo de no-determinismo, costo variable y falta de benchmark de calidad.
 
-**Decisión de arquitectura para esta iteración:**
+**Decisión adoptada para esta iteración:**
 - Pipeline determinista como base (reglas → enriquecimiento → priorización) ✅
 - LLM solo para narrativa y síntesis, no para orquestar ✅
-- Agente orquestador: evaluación futura con benchmark de calidad
+- Las herramientas del Enfoque B pueden integrarse al pipeline como funciones Python sin necesidad de un agente
+- Agente orquestador: evaluación futura cuando exista benchmark de calidad sobre corpus anotado
