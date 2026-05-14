@@ -55,24 +55,67 @@ def render_llm_test_button() -> None:
             st.sidebar.warning(message)
 
 
-def _render_document_header(filename: str, doc_type: str, contract_object: str) -> None:
+def _extract_entity(filename: str) -> str:
+    """Best-effort entity extraction from standard filename pattern: TYPE-ENTITY-YEAR-NUM_DOC.pdf"""
+    import re
+    name = filename.replace(".pdf", "").replace(".PDF", "")
+    parts = re.split(r"[-_]", name)
+    # Pattern: SIE-HCAM-2026-045 or LICB-EMASEO-EP-2025-001
+    # Entity is parts[1] or parts[1]+parts[2] if parts[2] is not a year
+    if len(parts) >= 2:
+        candidate = parts[1]
+        if len(parts) >= 3 and not re.match(r"^\d{4}$", parts[2]):
+            candidate = f"{parts[1]}-{parts[2]}"
+        return candidate
+    return ""
+
+
+def _render_document_header(
+    filename: str,
+    doc_type: str,
+    contract_object: str,
+    enriched_df: pd.DataFrame,
+) -> None:
     label = document_type_label(doc_type)
-    obj = contract_object if contract_object and contract_object != "No identificado en las primeras páginas" else "—"
-    st.markdown(
-        f"""
-        <div style="background:#FFFFFF;border:1px solid #D6DEE6;border-left:4px solid #003B70;
-                    border-radius:4px;padding:0.85rem 1.1rem;margin-bottom:1rem;">
-            <div style="font-size:0.8rem;color:#52606D;text-transform:uppercase;font-weight:700;margin-bottom:0.3rem;">
-                Documento analizado
-            </div>
-            <div style="font-size:1.05rem;font-weight:700;color:#003B70;">{safe_text(filename)}</div>
-            <div style="color:#52606D;font-size:0.9rem;margin-top:0.2rem;">
-                {safe_text(label)} &nbsp;·&nbsp; {safe_text(obj)}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    obj = contract_object if contract_object and contract_object != "No identificado en las primeras páginas" else None
+    entity = _extract_entity(filename)
+
+    review_df = (
+        enriched_df[enriched_df["tipo_señal"] == "señal_revision"]
+        if "tipo_señal" in enriched_df.columns
+        else enriched_df
     )
+    total = len(review_df)
+    alto = int((review_df.get("nivel_atencion", pd.Series()) == "Alto").sum()) if not review_df.empty else 0
+    medio = int((review_df.get("nivel_atencion", pd.Series()) == "Medio").sum()) if not review_df.empty else 0
+    bajo = int((review_df.get("nivel_atencion", pd.Series()) == "Bajo").sum()) if not review_df.empty else 0
+    top_themes = (
+        review_df["tema de revisión"].value_counts().head(3).index.tolist()
+        if "tema de revisión" in review_df.columns and not review_df.empty
+        else []
+    )
+
+    with st.container(border=True):
+        top_row = st.columns([0.6, 0.4])
+        with top_row[0]:
+            st.markdown(
+                f"**{safe_text(filename)}**  \n"
+                f"<span style='color:#52606D;font-size:0.9rem'>"
+                f"{safe_text(label)}"
+                f"{(' &nbsp;·&nbsp; ' + safe_text(entity)) if entity else ''}"
+                f"</span>",
+                unsafe_allow_html=True,
+            )
+            if obj:
+                st.caption(f"Objeto: {obj}")
+        with top_row[1]:
+            signal_cols = st.columns(3)
+            signal_cols[0].metric("🔴 Alto", alto)
+            signal_cols[1].metric("🟡 Medio", medio)
+            signal_cols[2].metric("🟢 Bajo", bajo)
+
+        if top_themes:
+            st.caption("Temas principales: " + " · ".join(top_themes))
 
 
 def render_review_flow() -> None:
@@ -135,7 +178,7 @@ def render_review_flow() -> None:
     if not document_text.strip():
         st.stop()
 
-    _render_document_header(uploaded_file.name, doc_type, contract_object)
+    # header rendered after enrichment so we can show signal counts and themes
 
     if not detections:
         st.success(
@@ -153,6 +196,9 @@ def render_review_flow() -> None:
     enriched_df["documento origen"] = uploaded_file.name
     enriched_df["tipo_documento"] = doc_type
     enriched_df = prioritize_signals(enriched_df)
+
+    _render_document_header(uploaded_file.name, doc_type, contract_object, enriched_df)
+
     ai_brief = None
     analyst_summary = None
 
