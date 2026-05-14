@@ -150,8 +150,27 @@ def cached_explain_priority_with_llm(
     return explain_priority_with_llm(priority, corpus_context)
 
 
+def corpus_cache_signature() -> tuple[tuple[str, int, int], ...]:
+    paths = [APP_DIR / "data" / "raw" / "metadata" / "procesos.csv"]
+    for folder in (
+        APP_DIR / "data" / "raw" / "pliegos",
+        APP_DIR / "data" / "raw" / "especificaciones",
+    ):
+        if folder.exists():
+            paths.extend(sorted(path for path in folder.iterdir() if path.is_file() and path.suffix.lower() == ".pdf"))
+
+    signature = []
+    for path in paths:
+        if not path.exists():
+            signature.append((str(path.relative_to(APP_DIR)), 0, 0))
+            continue
+        stat = path.stat()
+        signature.append((str(path.relative_to(APP_DIR)), int(stat.st_mtime_ns), int(stat.st_size)))
+    return tuple(signature)
+
+
 @st.cache_data(show_spinner=False)
-def cached_corpus_context() -> dict:
+def cached_corpus_context(signature: tuple[tuple[str, int, int], ...]) -> dict:
     validation = validate_corpus_state()
     documents, issues = load_corpus_documents(force=False)
     analysis = analyze_corpus_documents(documents)
@@ -692,7 +711,7 @@ def render_theme_groups(enriched_df: pd.DataFrame, corpus_context: dict | None =
 
 def render_corpus_status() -> dict:
     with st.spinner("Cargando corpus histórico para comparación..."):
-        corpus_payload = cached_corpus_context()
+        corpus_payload = cached_corpus_context(corpus_cache_signature())
 
     validation = corpus_payload["validation"]
     summary = validation["summary"]
