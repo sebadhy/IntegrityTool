@@ -100,7 +100,7 @@ def render_top_priorities(priority_df: pd.DataFrame, corpus_context: dict | None
                         os.getenv("OPENAI_BASE_URL", ""),
                     )
                     render_finding_explanation(explanation)
-            render_feedback_buttons(row)
+            render_feedback_buttons(row, context="top")
 
 
 def render_aspect_card(row: pd.Series, corpus_context: dict | None = None) -> None:
@@ -170,7 +170,7 @@ def render_aspect_card(row: pd.Series, corpus_context: dict | None = None) -> No
                 os.getenv("OPENAI_BASE_URL", ""),
             )
             render_finding_explanation(explanation)
-    render_feedback_buttons(row)
+    render_feedback_buttons(row, context="card")
 
 
 def render_theme_groups(enriched_df: pd.DataFrame, corpus_context: dict | None = None) -> None:
@@ -190,10 +190,13 @@ def render_theme_groups(enriched_df: pd.DataFrame, corpus_context: dict | None =
         st.info("No hay señales sugeridas para los filtros seleccionados.")
 
 
-def render_feedback_buttons(row: pd.Series) -> None:
+def render_feedback_buttons(row: pd.Series, context: str = "") -> None:
     signal_id = str(row.get("signal_id", str(row.name)))
     row_idx = str(row.name)
-    fb_state_key = f"fb_{signal_id}_{row_idx}"
+    # State key is stable per signal (shared across render locations for the same signal).
+    fb_state_key = f"fb_state_{signal_id}_{row_idx}"
+    # Widget key must be globally unique — context differentiates top-priorities vs. theme cards.
+    widget_prefix = f"fb_{context}_{signal_id}_{row_idx}"
 
     if st.session_state.get(fb_state_key):
         st.caption(f"Feedback registrado: {st.session_state[fb_state_key]}")
@@ -207,7 +210,7 @@ def render_feedback_buttons(row: pd.Series) -> None:
         (fb_cols[2], "Más contexto", "needs_context", "No puedo decidir con la información disponible"),
     ]
     for col, label, verdict, help_text in options:
-        if col.button(label, key=f"fb_{signal_id}_{row_idx}_{verdict}", help=help_text):
+        if col.button(label, key=f"{widget_prefix}_{verdict}", help=help_text):
             _save_feedback_case(row, verdict)
             st.session_state[fb_state_key] = label
 
