@@ -18,9 +18,12 @@ start-claude.sh
 # DATOS LOCALES — NO PERTENECEN AL REPOSITORIO
 # =============================================================
 
-# Corpus documental histórico: PDFs y metadata de procesos reales.
-# Pueden contener información institucional sensible.
-data/
+# PDFs del corpus y textos procesados: pueden contener información
+# institucional sensible. Solo se trackea la estructura de carpetas
+# (via .gitkeep) y el CSV de muestra con datos ficticios.
+data/raw/pliegos/*.pdf
+data/raw/especificaciones/*.pdf
+data/processed/
 
 # Exports y reportes generados por la app.
 exports/

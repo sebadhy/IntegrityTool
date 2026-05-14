@@ -26,7 +26,7 @@ SYSTEM_PROMPT = (
     "No se identifica una señal documental suficiente en el fragmento revisado."
 )
 
-DEFAULT_MODEL = "gpt-5.4-mini"
+DEFAULT_MODEL = "gpt-4o-mini"
 UNAVAILABLE = "No disponible"
 MAX_DOCUMENT_CHARS = 12_000
 
@@ -215,8 +215,10 @@ def test_llm_connection() -> tuple[bool, str]:
             ],
         )
         content = (response.choices[0].message.content or "").strip()
-        if content:
+        if content.upper() == "OK":
             return True, "Conexión LLM OK"
+        if content:
+            return False, f"El modelo respondió pero no siguió la instrucción. Respuesta: '{content[:60]}'"
         return False, "La conexión respondió, pero no devolvió contenido."
     except Exception as exc:
         return False, _friendly_llm_error(exc)
