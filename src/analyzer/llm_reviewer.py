@@ -114,6 +114,88 @@ FINDING_EXPLANATION_SCHEMA = {
 }
 
 
+PLIEGO_METADATA_SCHEMA = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "pliego_metadata_assisted",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "entidad_contratante": {"$ref": "#/$defs/metadata_field"},
+                "objeto_contratacion": {"$ref": "#/$defs/metadata_field"},
+                "tipo_procedimiento": {"$ref": "#/$defs/metadata_field"},
+                "presupuesto_referencial": {"$ref": "#/$defs/metadata_field"},
+                "fecha": {"$ref": "#/$defs/metadata_field"},
+                "resumen_pliego": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 1,
+                    "maxItems": 4,
+                },
+            },
+            "required": [
+                "entidad_contratante",
+                "objeto_contratacion",
+                "tipo_procedimiento",
+                "presupuesto_referencial",
+                "fecha",
+                "resumen_pliego",
+            ],
+            "$defs": {
+                "metadata_field": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "value": {"type": "string"},
+                        "confidence": {"type": "string", "enum": ["alta", "media", "baja"]},
+                        "source": {"type": "string"},
+                        "evidence": {"type": "string"},
+                    },
+                    "required": ["value", "confidence", "source", "evidence"],
+                }
+            },
+        },
+    },
+}
+
+
+def extract_pliego_metadata_assisted(
+    document_text: str,
+    heuristic_candidates: dict,
+    first_pages: str,
+) -> dict:
+    """Validate and complete pliego metadata using optional assisted processing."""
+    if not os.getenv("OPENAI_API_KEY"):
+        return _unavailable_pliego_metadata("OPENAI_API_KEY no está configurada.")
+
+    try:
+        response = _client().chat.completions.create(
+            model=os.getenv("OPENAI_MODEL", DEFAULT_MODEL),
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Eres un asistente técnico para extracción preliminar de metadata de pliegos "
+                        "de contratación pública de Ecuador. Debes validar campos con evidencia textual, "
+                        "corregir truncamientos obvios y no inventar datos. Si un campo no está sustentado, "
+                        "usa 'No identificado'. Responde solo JSON estricto."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": _build_pliego_metadata_prompt(document_text, heuristic_candidates, first_pages),
+                },
+            ],
+            response_format=PLIEGO_METADATA_SCHEMA,
+        )
+        content = response.choices[0].message.content or "{}"
+        return _normalize_pliego_metadata(json.loads(content))
+    except Exception as exc:
+        LOGGER.warning("Pliego metadata assisted extraction failed: %s", exc)
+        return _unavailable_pliego_metadata(_friendly_llm_error(exc))
+
 def generate_document_brief(
     document_text: str,
     prioritized_findings: list[dict],
@@ -243,6 +325,64 @@ def _friendly_llm_error(exc: Exception) -> str:
     if "model" in lower_message and ("not found" in lower_message or "does not exist" in lower_message):
         return "El modelo configurado no está disponible. Revise OPENAI_MODEL."
     return f"No se pudo verificar la conexión LLM: {message[:240]}"
+
+
+
+def _build_pliego_metadata_prompt(document_text: str, heuristic_candidates: dict, first_pages: str) -> str:
+    return (
+        "Extrae y valida metadata administrativa del pliego. Prioriza valores completos y verificables.\n\n"
+        "Reglas:\n"
+        "- Entidad contratante debe ser nombre institucional, no una cláusula.\n"
+        "- No aceptes entidad si contiene verbos como será, deberá, podrá o corresponde.\n"
+        "- Objeto de contratación debe conservarse completo, sin truncarlo.\n"
+        "- Normaliza tipo de procedimiento, por ejemplo: Subasta Inversa Electrónica.\n"
+        "- Presupuesto solo si hay valor monetario claro; si no existe, usa No identificado.\n"
+        "- Resumen del pliego: máximo 4 bullets, lenguaje administrativo, sin metodología.\n"
+        "- No emitas conclusiones legales.\n\n"
+        f"Candidatos heurísticos actuales:\n{json.dumps(heuristic_candidates, ensure_ascii=False, indent=2)}\n\n"
+        f"Primeras páginas / encabezado:\n{first_pages[:8000]}\n\n"
+        f"Texto adicional del documento:\n{document_text[:MAX_DOCUMENT_CHARS]}\n"
+    )
+
+
+def _normalize_pliego_metadata(payload: dict[str, Any]) -> dict:
+    return {
+        "entidad_contratante": _normalize_metadata_field(payload.get("entidad_contratante")),
+        "objeto_contratacion": _normalize_metadata_field(payload.get("objeto_contratacion")),
+        "tipo_procedimiento": _normalize_metadata_field(payload.get("tipo_procedimiento")),
+        "presupuesto_referencial": _normalize_metadata_field(payload.get("presupuesto_referencial")),
+        "fecha": _normalize_metadata_field(payload.get("fecha")),
+        "resumen_pliego": _normalize_list(payload.get("resumen_pliego"))[:4],
+        "llm_available": True,
+    }
+
+
+def _normalize_metadata_field(value: Any) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {"value": "No identificado", "confidence": "baja", "source": UNAVAILABLE, "evidence": UNAVAILABLE}
+    confidence = str(value.get("confidence") or "baja").lower()
+    if confidence not in {"alta", "media", "baja"}:
+        confidence = "baja"
+    return {
+        "value": str(value.get("value") or "No identificado").strip() or "No identificado",
+        "confidence": confidence,
+        "source": str(value.get("source") or UNAVAILABLE),
+        "evidence": str(value.get("evidence") or UNAVAILABLE),
+    }
+
+
+def _unavailable_pliego_metadata(reason: str = UNAVAILABLE) -> dict:
+    field = {"value": "No identificado", "confidence": "baja", "source": UNAVAILABLE, "evidence": UNAVAILABLE}
+    return {
+        "entidad_contratante": dict(field),
+        "objeto_contratacion": dict(field),
+        "tipo_procedimiento": dict(field),
+        "presupuesto_referencial": dict(field),
+        "fecha": dict(field),
+        "resumen_pliego": [UNAVAILABLE],
+        "llm_available": False,
+        "llm_error": reason,
+    }
 
 
 def _build_document_brief_prompt(

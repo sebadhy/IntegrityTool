@@ -1,8 +1,8 @@
 - id: cn-brand-model-provider-reference
-  name: Referencia a marca, modelo, tecnología o proveedor específico
-  description: Identifica menciones a marcas, modelos, tecnologías propietarias, fabricantes o proveedores específicos que podrían requerir validación de equivalencias funcionales.
+  name: Requisito de autorización comercial o técnica
+  description: Identifica requisitos de autorización, acreditación de origen o respaldo técnico/comercial del bien que podrían requerir validación solo si operan de forma exclusiva o sin equivalencias.
   competition_dimension: vendor_lock_in
-  risk_type: criterio potencialmente limitante
+  risk_type: requisito de autorización o acreditación sujeto a contexto
   document_sections:
     - especificaciones técnicas
     - requisitos técnicos
@@ -19,28 +19,41 @@
     - distribuidor exclusivo
     - empresa representante
     - proveedor oficial del fabricante
+    - certificado de distribuidor autorizado
+    - garantía del fabricante
+    - garantia del fabricante
+    - garantía del distribuidor autorizado
+    - garantia del distribuidor autorizado
   semantic_signals:
     - referencia a una solución comercial particular
     - dependencia de fabricante o proveedor
     - denominación técnica que podría cerrar alternativas
   possible_indicators:
-    - Se menciona marca, modelo o fabricante sin aclarar equivalencia.
-    - La referencia aparece en especificaciones técnicas o requisitos de cumplimiento.
+    - Se exige autorización o respaldo comercial/técnico sin aclarar equivalencia.
+    - El requisito aparece como condición obligatoria y no solo como acreditación de calidad, garantía o trazabilidad.
   mitigating_factors:
     - o equivalente
     - equivalente funcional
     - referencial
     - marcas equivalentes
     - se aceptarán equivalentes
+    - o superior
+    - garantía técnica
+    - trazabilidad
+    - calidad del bien
+    - soporte técnico
+    - mantenimiento
+    - cumplimiento de normativa aplicable
   possible_legitimate_justifications:
+    - Garantía, trazabilidad, soporte técnico o control de calidad del bien.
     - Compatibilidad técnica con infraestructura existente.
     - Continuidad operativa o estandarización técnicamente justificada.
   human_review_questions:
-    - ¿La referencia admite alternativas funcionalmente equivalentes?
-    - ¿La mención es referencial o constituye una condición obligatoria?
+    - ¿El requisito de autorización, acreditación o respaldo admite alternativas equivalentes?
+    - ¿La exigencia se justifica por garantía, trazabilidad, soporte, regulación o calidad del bien?
   recommended_language:
-    - revisión sugerida por posible impacto sobre concurrencia
-    - validar equivalencia funcional y necesidad técnica
+    - revisión general si se trata de acreditación habitual del bien
+    - validar proporcionalidad, equivalencias y necesidad técnica
   prohibited_language:
     - corrupción
     - fraude
@@ -66,6 +79,12 @@
     - características exactas
     - medidas exactas
     - sin equivalente
+    - sin equivalentes
+    - solo se aceptará
+    - sólo se aceptará
+    - solo se aceptan
+    - marca X
+    - marca específica
     - no se aceptan equivalentes
   semantic_signals:
     - falta de alternativa funcional
@@ -187,10 +206,10 @@
     - cn-cumulative-requirements
 
 - id: cn-specific-certification
-  name: Certificación específica o no justificada
-  description: Identifica certificaciones específicas que podrían requerir revisión de proporcionalidad, equivalencia y relación con el objeto contractual.
+  name: Requisito de certificación, trazabilidad o garantía del bien
+  description: Identifica requisitos de certificación, registro, trazabilidad o garantía del bien que pueden ser habituales en bienes regulados y solo deben escalar cuando no admiten equivalencias o no se relacionan claramente con el objeto contractual.
   competition_dimension: qualification_restriction
-  risk_type: certificación potencialmente limitante
+  risk_type: requisito de certificación o trazabilidad sujeto a contexto
   document_sections:
     - certificaciones
     - requisitos técnicos
@@ -201,26 +220,38 @@
     - ISO 14001
     - certificación específica
     - certificado del fabricante
+    - certificado
     - acreditación
+    - registro sanitario
+    - BPM
+    - buenas prácticas de manufactura
+    - trazabilidad
     - certificación ISO
   semantic_signals:
     - certificación como requisito habilitante
     - estándar específico sin equivalentes
   possible_indicators:
     - La certificación se exige sin justificar relación con el objeto.
-    - No se aceptan certificaciones equivalentes.
+    - No se aceptan certificaciones, registros o estándares equivalentes.
   mitigating_factors:
     - equivalente
+    - certificación equivalente
+    - registro sanitario o equivalente
     - estándares equivalentes
     - debidamente justificado
     - según normativa aplicable
+    - cumplimiento de normativa aplicable
+    - calidad del bien
+    - seguridad
+    - trazabilidad
   possible_legitimate_justifications:
-    - Seguridad, calidad, trazabilidad o cumplimiento normativo aplicable al bien.
+    - Seguridad, calidad, trazabilidad, garantía o cumplimiento normativo aplicable al bien.
   human_review_questions:
     - ¿La certificación es necesaria y proporcional al objeto contractual?
     - ¿Se aceptan certificaciones o estándares equivalentes?
   recommended_language:
-    - revisar justificación técnica y equivalencias aceptables
+    - revisión general cuando el requisito responde a calidad, trazabilidad o regulación del bien
+    - validar proporcionalidad y equivalencias aceptables
   prohibited_language:
     - corrupción
     - fraude

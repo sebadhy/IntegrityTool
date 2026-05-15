@@ -17,7 +17,7 @@ REVIEW_SUGGESTED = "suggested"
 REVIEW_PRIORITY = "priority"
 
 PROHIBITED_INTERPRETATION = (
-    "No debe interpretarse como evidencia de corrupción, fraude, ilegalidad ni direccionamiento."
+    "No debe interpretarse como conclusión legal, técnica o administrativa definitiva."
 )
 
 
@@ -56,6 +56,11 @@ class Finding:
     confidence: str = CONFIDENCE_MEDIUM
     review_priority: str = REVIEW_SUGGESTED
     contextual_notes: list[str] = field(default_factory=list)
+    analytical_signal_type: str = "contextual_review_signal"
+    is_common_in_goods_procurement: bool = False
+    legitimate_procurement_rationale: str = ""
+    escalation_reason: str = ""
+    why_not_automatically_restrictive: str = ""
     prohibited_interpretation: str = PROHIBITED_INTERPRETATION
 
     def __post_init__(self) -> None:
@@ -112,6 +117,11 @@ class Finding:
             "prohibited_interpretation": self.prohibited_interpretation,
             "requires_human_review": self.requires_human_review,
             "output_label": self.output_label,
+            "signal_type": self.analytical_signal_type,
+            "is_common_in_goods_procurement": self.is_common_in_goods_procurement,
+            "legitimate_procurement_rationale": self.legitimate_procurement_rationale,
+            "escalation_reason": self.escalation_reason,
+            "why_not_automatically_restrictive": self.why_not_automatically_restrictive,
             "tipo_señal": self.signal_type,
             "página": self.page,
             "categoría": self.category,

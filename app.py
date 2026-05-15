@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import base64
 import os
+from datetime import datetime
 from html import escape
 from pathlib import Path
 
@@ -14,22 +15,24 @@ from src.analyzer.corpus_loader import (
     load_corpus_documents,
     validate_corpus_state,
 )
-from src.analyzer.detector import detect_patterns
-from src.analyzer.document_segmenter import segment_document
+from src.analyzer.exporter import ordered_export
 from src.analyzer.feedback_store import save_reviewer_feedback
 from src.analyzer.llm_reviewer import (
+    extract_pliego_metadata_assisted,
     explain_priority_with_llm,
-    generate_document_brief,
     test_llm_connection,
 )
-from src.analyzer.normative_reference import NORMATIVE_SOURCES
-from src.analyzer.pdf_extractor import extract_text_by_page
-from src.analyzer.prioritizer import prioritize_signals, top_priorities
+from src.analyzer.metadata_extractor import (
+    apply_assisted_metadata,
+    extract_pliego_metadata,
+    first_pages_text,
+)
+from src.analyzer.prioritizer import top_priorities
+from src.analyzer.review_pipeline import analyze_document_bytes
 from src.analyzer.review_synthesis import (
     THEME_ORDER,
     build_corpus_context,
     build_executive_brief,
-    enrich_review_dataframe,
     theme_summaries,
 )
 
@@ -51,98 +54,6 @@ DIMENSION_LABELS = {
     "technical_restriction": "Restricción técnica",
     "low_competitive_neutrality": "Baja neutralidad competitiva",
 }
-
-LLM_COLUMNS = [
-    "llm_explanation",
-    "human_review_questions",
-    "possible_legitimate_justification",
-    "recommended_action",
-    "questions_for_reviewer",
-]
-
-EXPORT_COLUMNS = [
-    "finding_id",
-    "title",
-    "pattern_id",
-    "pattern_name",
-    "competition_dimension",
-    "dimensión competitiva",
-    "document_section",
-    "sección documental probable",
-    "clause_excerpt",
-    "reason_for_review",
-    "confidence",
-    "review_priority",
-    "prioridad de revisión",
-    "severity",
-    "mitigating_factors",
-    "escalation_factors",
-    "suggested_questions",
-    "human_review_questions",
-    "possible_legitimate_justifications",
-    "missing_information",
-    "suggested_neutral_wording",
-    "contextual_notes",
-    "prohibited_interpretation",
-    "requires_human_review",
-    "output_label",
-    "signal_id",
-    "rule_id",
-    "rule_version",
-    "timestamp_analisis",
-    "engine_version",
-    "taxonomy_sha256",
-    "tipo_señal",
-    "frecuencia_corpus",
-    "categoria",
-    "criterio_normativo",
-    "tema de revisión",
-    "documento origen",
-    "página",
-    "categoría de revisión",
-    "patrón detectado",
-    "atención sugerida",
-    "nivel_atencion",
-    "relevancia_analitica",
-    "criterios_de_priorizacion",
-    "explicacion_priorizacion",
-    "elementos que favorecen concurrencia",
-    "nivel de atención",
-    "clasificación histórica",
-    "frecuencia en corpus",
-    "procesos_con_patron",
-    "interpretación_comparativa",
-    "número de coincidencias",
-    "posible efecto sobre concurrencia",
-    "validación sugerida",
-    "principio_normativo_relacionado",
-    "criterio_normativo_de_revision",
-    "pregunta_normativa_sugerida",
-    "por qué se sugiere revisar",
-    "posible justificación legítima",
-    "revisión sugerida",
-    "comentario contextual",
-    "fragmento textual",
-    "observación prudente",
-] + LLM_COLUMNS
-
-
-@st.cache_data(show_spinner=False)
-def cached_generate_document_brief(
-    document_text: str,
-    prioritized_findings: list[dict],
-    corpus_context: dict | None,
-    normative_context: dict | None,
-    model_name: str,
-    base_url: str,
-) -> dict:
-    return generate_document_brief(
-        document_text,
-        prioritized_findings,
-        corpus_context,
-        normative_context,
-    )
-
 
 @st.cache_data(show_spinner=False)
 def cached_explain_priority_with_llm(
@@ -189,23 +100,6 @@ def cached_corpus_context(signature: tuple[tuple[str, int, int], ...]) -> dict:
     }
 
 
-def load_css() -> None:
-    if STYLE_PATH.exists():
-        st.markdown(
-            f"<style>{STYLE_PATH.read_text(encoding='utf-8')}</style>",
-            unsafe_allow_html=True,
-        )
-
-
-def prepare_results_dataframe(detections: list) -> pd.DataFrame:
-    results_df = pd.DataFrame([detection.to_dict() for detection in detections])
-    results_df = results_df.rename(columns={"categoría": "categoría de revisión"})
-    for column in LLM_COLUMNS:
-        if column not in results_df.columns:
-            results_df[column] = "No disponible"
-    return results_df
-
-
 def empty_corpus_payload() -> dict:
     return {
         "total_processes": 0,
@@ -230,22 +124,12 @@ def empty_corpus_payload() -> dict:
     }
 
 
-def ordered_export(df: pd.DataFrame) -> pd.DataFrame:
-    export_df = df.loc[:, ~df.columns.duplicated()].copy()
-    export_order = _unique_columns(EXPORT_COLUMNS)
-    existing_columns = [column for column in export_order if column in export_df.columns]
-    remaining_columns = [column for column in export_df.columns if column not in existing_columns]
-    return export_df[existing_columns + remaining_columns]
-
-
-def _unique_columns(columns: list[str]) -> list[str]:
-    seen: set[str] = set()
-    unique: list[str] = []
-    for column in columns:
-        if column not in seen:
-            unique.append(column)
-            seen.add(column)
-    return unique
+def load_css() -> None:
+    if STYLE_PATH.exists():
+        st.markdown(
+            f"<style>{STYLE_PATH.read_text(encoding='utf-8')}</style>",
+            unsafe_allow_html=True,
+        )
 
 
 def attention_badge(level: str) -> str:
@@ -312,22 +196,7 @@ def _is_useful_text(value: object) -> bool:
 def render_institutional_header() -> None:
     st.markdown(
         """
-        <div class="institutional-shell">
-            <div class="top-strip">
-                Sistema de análisis preliminar de neutralidad competitiva
-            </div>
-            <div class="institutional-header">
-                <h1>Asistente exploratorio de neutralidad competitiva en pliegos</h1>
-                <div class="institutional-subtitle">
-                    Identificación preliminar de requisitos potencialmente limitantes en documentos de contratación pública
-                </div>
-                <div class="method-box">
-                    Las señales identificadas son insumos preliminares para revisión humana
-                    de neutralidad competitiva. No constituyen dictamen técnico, legal ni
-                    determinación de responsabilidad.
-                </div>
-            </div>
-        </div>
+        <div class="top-strip app-strip">Integrity Tool · revisión preliminar de pliegos</div>
         """,
         unsafe_allow_html=True,
     )
@@ -338,8 +207,8 @@ def render_pipeline() -> None:
         "Extracción documental",
         "Identificación de cláusulas",
         "Comparación histórica",
-        "Consolidación analítica",
-        "Lectura asistida por IA",
+        "Observaciones consolidadas",
+        "Resumen preliminar",
     ]
     html_steps = "".join(f'<div class="pipeline-step">{step}</div>' for step in steps)
     st.markdown(f'<div class="pipeline">{html_steps}</div>', unsafe_allow_html=True)
@@ -374,45 +243,12 @@ def render_ai_brief_card(title: str, content: object) -> None:
     )
 
 
-def render_ai_document_brief(brief: dict) -> None:
-    st.subheader("Lectura preliminar asistida por IA")
-    st.markdown(
-        '<div class="ai-disclaimer">Los resultados asistidos por IA son insumos preliminares '
-        "para revisión humana de neutralidad competitiva. No constituyen dictamen técnico, "
-        "legal ni determinación de responsabilidad.</div>",
-        unsafe_allow_html=True,
-    )
-    top_row = st.columns(2)
-    with top_row[0]:
-        render_ai_brief_card("Resumen del documento", brief["document_summary"])
-    with top_row[1]:
-        render_ai_brief_card("Nivel general de atención", brief["overall_attention_level"])
-
-    middle_row = st.columns(2)
-    with middle_row[0]:
-        render_ai_brief_card(
-            "Principales temas para revisión",
-            brief["main_review_topics"],
-        )
-    with middle_row[1]:
-        render_ai_brief_card("Contexto comparativo", brief["comparative_context"])
-
-    bottom_row = st.columns(2)
-    with bottom_row[0]:
-        render_ai_brief_card("Preguntas sugeridas", brief["suggested_human_review_questions"])
-    with bottom_row[1]:
-        render_ai_brief_card("Nota metodológica", brief["methodological_note"])
-
-    render_ai_brief_card("Posibles efectos sobre concurrencia", brief["possible_competition_effects"])
-    render_ai_brief_card("Criterios de priorización destacados", brief["top_priorities_rationale"])
-
-
 def render_briefing(brief: dict) -> None:
     st.subheader("Resumen ejecutivo")
     first_row = st.columns(3)
     with first_row[0]:
         render_executive_card(
-            "Señales sugeridas para revisión",
+            "Observaciones preliminares para revisión",
             str(brief["total_aspects"]),
             "Señales consolidadas y priorizadas",
         )
@@ -494,7 +330,7 @@ def render_analytical_balance(brief: dict) -> None:
 
 
 def render_dimension_summary(enriched_df: pd.DataFrame) -> None:
-    st.subheader("Señales por dimensión de competencia")
+    st.subheader("Observaciones por dimensión de revisión")
     if "competition_dimension" not in enriched_df.columns or enriched_df.empty:
         st.info("No hay dimensiones competitivas disponibles para los filtros actuales.")
         return
@@ -509,7 +345,7 @@ def render_dimension_summary(enriched_df: pd.DataFrame) -> None:
             render_executive_card(
                 dimension_label(dimension),
                 str(count),
-                "Señales consolidadas asociadas",
+                "Observaciones asociadas",
             )
 
 
@@ -537,6 +373,365 @@ def render_review_questions(enriched_df: pd.DataFrame) -> None:
         st.markdown(f"- {safe_text(question)}")
 
 
+
+
+def review_timeline_key() -> str:
+    return "review_timeline"
+
+
+def append_review_event(action: str, detail: str = "") -> None:
+    events = st.session_state.setdefault(review_timeline_key(), [])
+    events.append(
+        {
+            "time": datetime.now().strftime("%H:%M"),
+            "action": action,
+            "detail": detail,
+        }
+    )
+
+
+def render_review_timeline() -> None:
+    st.subheader("Historial de revisión")
+    events = st.session_state.get(review_timeline_key(), [])
+    if not events:
+        st.markdown(
+            '<div class="timeline-empty">Aún no hay acciones registradas en esta revisión.</div>',
+            unsafe_allow_html=True,
+        )
+        return
+    items = "".join(
+        f"<li><strong>{safe_text(event['time'])}</strong> — {safe_text(event['action'])} <span>{safe_text(event.get('detail', ''))}</span></li>"
+        for event in events[-8:]
+    )
+    st.markdown(f'<ul class="review-timeline">{items}</ul>', unsafe_allow_html=True)
+
+
+def set_review_status(row: pd.Series, status: str, note: str = "") -> None:
+    signal_id = str(row["signal_id"])
+    st.session_state[f"review_status_{signal_id}"] = status
+    append_review_event(f"Observación {status.lower()}", str(row.get("patrón detectado", "")))
+    save_reviewer_feedback(
+        signal=row.to_dict(),
+        action=status,
+        note=note,
+        document_name=str(row.get("documento origen", "")),
+    )
+
+
+def is_ai_action(action_name: str) -> bool:
+    ai_terms = ("ia", "asistido", "síntesis", "sintesis", "explicación", "explicacion", "semántica", "semantica")
+    return any(term in action_name.lower() for term in ai_terms)
+
+
+def render_action_badge(label: str, uses_ai: bool) -> None:
+    if not uses_ai:
+        return
+    st.markdown(
+        f'<span class="ai-token-badge">Procesamiento asistido</span> <span class="action-help">{safe_text(label)}</span>',
+        unsafe_allow_html=True,
+    )
+
+
+def confirm_ai_token_use(action_label: str, key: str) -> bool:
+    pending_key = f"ai_confirm_pending_{key}"
+    if st.session_state.get(pending_key):
+        st.warning("Esta acción utilizará procesamiento asistido para generar contenido adicional. ¿Desea continuar?")
+        cols = st.columns(2)
+        if cols[0].button("Continuar", key=f"ai_continue_{key}", width="stretch"):
+            st.session_state[pending_key] = False
+            return True
+        if cols[1].button("Cancelar", key=f"ai_cancel_{key}", width="stretch"):
+            st.session_state[pending_key] = False
+            st.rerun()
+        return False
+    if st.button(action_label, key=f"ai_start_{key}", width="stretch"):
+        st.session_state[pending_key] = True
+        st.rerun()
+    return False
+
+
+def render_ai_action_button(action_label: str, key: str) -> bool:
+    render_action_badge(action_label, uses_ai=True)
+    st.caption("Procesamiento asistido.")
+    return confirm_ai_token_use(action_label, key)
+
+
+def render_document_header(document_name: str, metadata: dict[str, str], signal_count: int) -> object:
+    st.markdown(
+        f"""
+        <div class="document-header-simple">
+            <div>
+                <div class="doc-label">Documento</div>
+                <div class="doc-title">{safe_text(document_name)}</div>
+            </div>
+            <div>
+                <div class="doc-label">Entidad contratante</div>
+                <div class="doc-value">{safe_text(metadata.get('entidad', 'No disponible'))}</div>
+            </div>
+            <div class="doc-object-full">
+                <div class="doc-label">Objeto de contratación</div>
+                <div class="doc-value">{safe_text(metadata.get('objeto', 'No disponible'))}</div>
+            </div>
+            <div>
+                <div class="doc-label">Procedimiento</div>
+                <div class="doc-value">{safe_text(metadata.get('tipo_procedimiento', 'No disponible'))}</div>
+            </div>
+            <div>
+                <div class="doc-label">Presupuesto / fecha</div>
+                <div class="doc-value">{safe_text(metadata.get('presupuesto', 'No disponible'))} · {safe_text(metadata.get('fecha', 'No disponible'))}</div>
+            </div>
+            <div>
+                <div class="doc-label">Estado</div>
+                <div class="doc-value">Revisión preliminar · {signal_count} observaciones</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    actions = st.columns([0.78, 0.12, 0.10])
+    with actions[1]:
+        if st.button("Nueva revisión", width="stretch"):
+            for key in ["document_processed", "uploaded_file_bytes", "uploaded_file_name", "selected_signal_id", "review_workspace_open", review_timeline_key()]:
+                st.session_state.pop(key, None)
+            st.rerun()
+    return actions[2]
+
+def render_pliego_summary(
+    metadata: dict[str, str],
+    brief: dict,
+    filtered_df: pd.DataFrame,
+    document_text: str,
+    ai_brief: dict | None = None,
+    assisted_summary: list[str] | None = None,
+) -> None:
+    st.subheader("Resumen del pliego")
+    st.caption("Resumen preliminar del contenido y principales dimensiones identificadas para revisión.")
+    object_text = metadata.get("objeto", "No identificado automáticamente")
+    entity = metadata.get("entidad", "No identificado automáticamente")
+    top_themes = brief.get("top_themes", [])[:3]
+    theme_text = ", ".join(top_themes) if top_themes else "condiciones del proceso"
+    condition_count = len(reviewable_signals(filtered_df))
+    facts = [
+        ("Entidad contratante", entity),
+        ("Objeto", object_text),
+        ("Tipo de procedimiento", metadata.get("tipo_procedimiento", "No disponible")),
+        ("Presupuesto referencial", metadata.get("presupuesto", "No disponible")),
+        ("Fecha", metadata.get("fecha", "No disponible")),
+    ]
+    fact_html = "".join(
+        f"<div><strong>{safe_text(label)}</strong><span>{safe_text(value)}</span></div>"
+        for label, value in facts
+        if _is_useful_text(value) and value != "No disponible"
+    )
+    if assisted_summary:
+        bullets = assisted_summary[:4]
+    elif ai_brief and ai_brief.get("document_summary") != "No disponible":
+        ai_topics = display_list(ai_brief.get("main_review_topics", []))[:2]
+        bullets = [
+            f"El proceso corresponde a {object_text}.",
+            f"La revisión preliminar identificó observaciones relacionadas con {', '.join(ai_topics) if ai_topics else theme_text}.",
+            short_fragment(ai_brief.get("possible_competition_effects", "Algunas condiciones podrían requerir validación de proporcionalidad y necesidad técnica."), 180),
+            "Estas observaciones son insumos preliminares para revisión humana.",
+        ]
+    else:
+        bullets = [
+            f"El proceso corresponde a {object_text}.",
+            f"La entidad contratante es {entity}.",
+            f"La revisión preliminar identificó {condition_count} observaciones relacionadas principalmente con {theme_text}.",
+            "Estas observaciones son insumos preliminares para revisión humana.",
+        ]
+    html = "".join(f"<li>{safe_text(item)}</li>" for item in bullets[:4] if _is_useful_text(item))
+    st.markdown(
+        f'<div class="pliego-summary"><div class="document-facts">{fact_html}</div><div class="summary-label">Resumen preliminar</div><ul>{html}</ul></div>',
+        unsafe_allow_html=True,
+    )
+
+def render_explanation_tooltip(text: str) -> None:
+    st.caption(text)
+
+
+def observation_attention(row: pd.Series) -> str:
+    return str(row.get("nivel_atencion") or row.get("atención sugerida") or "Media")
+
+
+def render_human_actions(row: pd.Series, key_prefix: str = "detail") -> None:
+    signal_id = str(row["signal_id"])
+    note_key = f"review_note_{signal_id}"
+    cols = st.columns([0.22, 0.18, 0.22, 0.38])
+    if cols[0].button("Confirmar revisión", key=f"{key_prefix}_confirm_{signal_id}", width="stretch"):
+        set_review_status(row, "Confirmada", st.session_state.get(note_key, ""))
+        st.rerun()
+    if cols[1].button("Descartar", key=f"{key_prefix}_dismiss_{signal_id}", width="stretch"):
+        set_review_status(row, "Descartada", st.session_state.get(note_key, ""))
+        st.rerun()
+    if cols[2].button("Marcar seguimiento", key=f"{key_prefix}_follow_{signal_id}", width="stretch"):
+        set_review_status(row, "Seguimiento", st.session_state.get(note_key, ""))
+        st.rerun()
+    with st.expander("Agregar comentario", expanded=False):
+        st.text_area("Comentario de revisión", key=note_key, height=90, label_visibility="collapsed")
+
+
+def render_evidence_panel(row: pd.Series, pages: list | None = None, pdf_bytes: bytes | None = None) -> None:
+    page_number = int(row.get("página", 1) or 1)
+    st.markdown("**Evidencia documental**")
+    st.markdown(
+        f"""
+        <div class="evidence-detail-box">
+            <div><strong>Página</strong><span>{safe_text(page_number)}</span></div>
+            <div class="evidence-detail-fragment"><strong>Fragmento exacto</strong><p>{safe_text(row['fragmento textual'])}</p></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if pages:
+        selected_text = next((page.text for page in pages if page.page_number == page_number), "")
+        if selected_text:
+            with st.expander("Contexto inmediato", expanded=False):
+                st.text_area("Contexto inmediato", value=selected_text, height=180, label_visibility="collapsed")
+    if pdf_bytes:
+        with st.expander("Ver página en PDF", expanded=False):
+            render_pdf_viewer(pdf_bytes, page_number)
+
+
+def render_observation_detail(
+    row: pd.Series,
+    pages: list | None = None,
+    pdf_bytes: bytes | None = None,
+    corpus_context: dict | None = None,
+) -> None:
+    st.markdown('<div class="observation-detail-panel">', unsafe_allow_html=True)
+    render_evidence_panel(row, pages, pdf_bytes)
+    st.markdown("**Por qué podría requerir revisión**")
+    st.write(short_fragment(row.get("por qué se sugiere revisar", "Requiere validación humana."), 220))
+    st.markdown("**Validación sugerida**")
+    st.write(row.get("validación sugerida", "Validar proporcionalidad y necesidad técnica."))
+    st.markdown("**Cómo se identificó**")
+    technical_note = row.get("interpretación_comparativa") or row.get("comentario contextual") or "Se revisó el texto extraído y se relacionó con patrones documentales definidos para apoyo a revisión."
+    st.write(short_fragment(technical_note, 220))
+    st.markdown("**Acciones humanas**")
+    render_human_actions(row, key_prefix="obs")
+    with st.expander("Acciones adicionales", expanded=False):
+        if render_ai_action_button("Ampliar explicación", key=f"obs_explain_{row['signal_id']}"):
+            if not os.getenv("OPENAI_API_KEY"):
+                st.warning("Procesamiento asistido no configurado. La revisión basada en reglas sigue disponible.")
+            else:
+                explanation = cached_explain_priority_with_llm(
+                    row.to_dict(),
+                    corpus_context,
+                    os.getenv("OPENAI_MODEL", ""),
+                    os.getenv("OPENAI_BASE_URL", ""),
+                )
+                render_finding_explanation(explanation)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+def render_observations_table(
+    priority_df: pd.DataFrame,
+    pages: list | None = None,
+    pdf_bytes: bytes | None = None,
+    corpus_context: dict | None = None,
+) -> None:
+    st.subheader("Principales observaciones")
+    render_explanation_tooltip("Observaciones preliminares que podrían requerir validación adicional por parte del revisor.")
+    top_df = top_priorities(priority_df, limit=3)
+    if top_df.empty:
+        st.info("No hay observaciones priorizadas con los filtros actuales.")
+        return
+    st.markdown(
+        '<div class="observations-table-header"><div>Página</div><div>Observación</div><div>Qué se encontró</div><div>Atención sugerida</div><div>Acción</div></div>',
+        unsafe_allow_html=True,
+    )
+    for position, (_, row) in enumerate(top_df.iterrows(), start=1):
+        signal_id = str(row["signal_id"])
+        row_key = f"{position}_{signal_id}"
+        is_open = st.session_state.get("expanded_observation_id") == signal_id
+        row_cols = st.columns([0.08, 0.30, 0.34, 0.13, 0.15], vertical_alignment="center")
+        row_cols[0].write(str(row["página"]))
+        row_cols[1].write(str(row["patrón detectado"]))
+        row_cols[2].write(short_fragment(row["fragmento textual"], 120))
+        row_cols[3].write(observation_attention(row))
+        with row_cols[4]:
+            st.caption("Abre el fragmento documental asociado a esta observación.")
+            if st.button("Ver evidencia", key=f"top_view_{row_key}", width="stretch"):
+                st.session_state["expanded_observation_id"] = None if is_open else signal_id
+                st.session_state["selected_signal_id"] = signal_id
+                append_review_event("Evidencia abierta", row["patrón detectado"])
+                st.rerun()
+        if is_open:
+            render_observation_detail(row, pages=pages, pdf_bytes=pdf_bytes, corpus_context=corpus_context)
+
+# Backward-compatible name used by older flow sections.
+def render_top_findings(priority_df: pd.DataFrame) -> None:
+    render_observations_table(priority_df)
+
+def render_executive_actions(priority_df: pd.DataFrame, brief: dict, ai_brief: dict | None) -> None:
+    st.subheader("Acción sugerida")
+    cols = st.columns([0.20, 0.14, 0.66])
+    with cols[0]:
+        first_signal_id = str(top_priorities(priority_df, limit=1).iloc[0]["signal_id"]) if not top_priorities(priority_df, limit=1).empty else None
+        if st.button("Ver evidencia", key="exec_review_evidence", type="primary", width="stretch"):
+            if first_signal_id:
+                st.session_state["expanded_observation_id"] = first_signal_id
+                st.session_state["selected_signal_id"] = first_signal_id
+            append_review_event("Evidencia abierta", "Revisión documental")
+            st.rerun()
+    with cols[1]:
+        csv_data = ordered_export(priority_df).to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "Exportar",
+            data=csv_data,
+            file_name="observaciones_preliminares.csv",
+            mime="text/csv",
+            key="exec_export_summary",
+            width="stretch",
+        )
+
+def render_executive_overview(
+    *,
+    document_name: str,
+    metadata: dict[str, str],
+    signal_count: int,
+    brief: dict,
+    priority_df: pd.DataFrame,
+    document_text: str,
+    ai_brief: dict | None,
+    pages: list | None = None,
+    pdf_bytes: bytes | None = None,
+    corpus_context: dict | None = None,
+    assisted_summary: list[str] | None = None,
+) -> None:
+    render_document_header(document_name, metadata, signal_count)
+    render_pliego_summary(metadata, brief, priority_df, document_text, ai_brief=ai_brief, assisted_summary=assisted_summary)
+    render_observations_table(priority_df, pages=pages, pdf_bytes=pdf_bytes, corpus_context=corpus_context)
+
+
+def render_review_filters(enriched_df: pd.DataFrame) -> pd.DataFrame:
+    st.markdown("**Filtrar observaciones**")
+    available_themes = [theme for theme in THEME_ORDER if theme in set(enriched_df["tema de revisión"])]
+    page_options = sorted(pd.to_numeric(enriched_df["página"], errors="coerce").dropna().astype(int).unique().tolist())
+    status_options = ["Pendiente", "Confirmada", "Descartada", "Seguimiento"]
+    with st.expander("Filtrar observaciones", expanded=False):
+        filter_cols = st.columns(4)
+        with filter_cols[0]:
+            selected_attention = st.multiselect("Atención sugerida", options=["Alto", "Medio", "Bajo"], default=["Alto", "Medio", "Bajo"])
+        with filter_cols[1]:
+            selected_themes = st.multiselect("Tema", options=available_themes, default=available_themes)
+        with filter_cols[2]:
+            selected_status = st.multiselect("Estado de revisión", options=status_options, default=status_options)
+        with filter_cols[3]:
+            selected_pages = st.multiselect("Página", options=page_options, default=page_options)
+    filtered = enriched_df[
+        enriched_df["tema de revisión"].isin(selected_themes)
+        & enriched_df["atención sugerida"].isin(selected_attention)
+    ].copy()
+    if selected_pages:
+        filtered = filtered[pd.to_numeric(filtered["página"], errors="coerce").astype("Int64").isin(selected_pages)]
+    if not filtered.empty:
+        filtered["_human_status"] = filtered["signal_id"].astype(str).map(
+            lambda signal_id: st.session_state.get(f"review_status_{signal_id}", "Pendiente")
+        )
+        filtered = filtered[filtered["_human_status"].isin(selected_status)].drop(columns=["_human_status"])
+    return filtered
 
 
 def priority_rank(row: pd.Series) -> tuple[int, int, int]:
@@ -593,19 +788,19 @@ def selected_signal_row(signal_df: pd.DataFrame) -> pd.Series | None:
 
 
 def render_signal_queue(signal_df: pd.DataFrame) -> None:
-    st.markdown('<div class="workbench-panel-title">Señales</div>', unsafe_allow_html=True)
-    st.caption("Top señales para revisar primero")
+    st.markdown('<div class="workbench-panel-title">Observaciones</div>', unsafe_allow_html=True)
+    st.caption("Observaciones priorizadas para revisión documental.")
     if signal_df.empty:
-        st.info("No hay señales con los filtros actuales.")
+        st.info("No hay observaciones con los filtros actuales.")
         return
 
-    visible = signal_df.head(5)
-    hidden = signal_df.iloc[5:]
+    visible = signal_df.head(3)
+    hidden = signal_df.iloc[3:]
     for _, row in visible.iterrows():
         render_signal_queue_item(row)
 
     if not hidden.empty:
-        with st.expander(f"Ver {len(hidden)} señales adicionales", expanded=False):
+        with st.expander(f"Ver {len(hidden)} observaciones adicionales", expanded=False):
             for _, row in hidden.iterrows():
                 render_signal_queue_item(row)
 
@@ -625,7 +820,7 @@ def render_signal_queue_item(row: pd.Series) -> None:
         """,
         unsafe_allow_html=True,
     )
-    if st.button("Abrir señal", key=f"select_{signal_id}", width="stretch"):
+    if st.button("Abrir observación", key=f"select_{signal_id}", width="stretch"):
         st.session_state["selected_signal_id"] = signal_id
         st.rerun()
 
@@ -647,30 +842,23 @@ def render_pdf_viewer(pdf_bytes: bytes, page_number: int) -> None:
 def render_document_workspace(row: pd.Series, pages: list, pdf_bytes: bytes) -> None:
     page_number = int(row.get("página", 1) or 1)
     st.markdown('<div class="workbench-panel-title">Evidencia documental</div>', unsafe_allow_html=True)
-    st.caption(f"Página {page_number} · fragmento anclado al documento")
+    st.caption(f"Página {page_number}")
+    render_pdf_viewer(pdf_bytes, page_number)
     st.markdown(
         f"""
         <div class="evidence-snippet evidence-primary">
-            <div class="evidence-label">Fragmento exacto detectado</div>
+            <div class="evidence-label">Fragmento relacionado</div>
             <p>{safe_text(row["fragmento textual"])}</p>
-        </div>
-        <div class="document-placeholder">
-            Vista documental simplificada. Highlight exacto disponible en versión PDF.js.
         </div>
         """,
         unsafe_allow_html=True,
     )
-    if st.button("Ver en documento", key=f"open_pdf_{row['signal_id']}"):
-        st.session_state[f"show_pdf_{row['signal_id']}"] = True
-    if st.session_state.get(f"show_pdf_{row['signal_id']}", False):
-        render_pdf_viewer(pdf_bytes, page_number)
-    with st.expander("Contexto de página", expanded=False):
+    with st.expander("Ver texto extraído de la página", expanded=False):
         selected_text = next(
             (page.text for page in pages if page.page_number == page_number),
             "No se encontró texto extraído para esta página.",
         )
-        st.text_area("Texto de página", value=selected_text, height=260, label_visibility="collapsed")
-
+        st.text_area("Texto de página", value=selected_text, height=220, label_visibility="collapsed")
 
 def render_signal_inspector(row: pd.Series, corpus_context: dict | None = None) -> None:
     signal_id = str(row["signal_id"])
@@ -710,40 +898,25 @@ def render_signal_inspector(row: pd.Series, corpus_context: dict | None = None) 
         st.markdown(f"**Criterio:** {safe_text(row['criterio_normativo_de_revision'])}")
         st.markdown(f"**Pregunta:** {safe_text(row['pregunta_normativa_sugerida'])}")
 
-    st.markdown("**Acción humana**")
-    action_cols = st.columns(2)
+    st.markdown("**Acciones humanas**")
     note_key = f"review_note_{signal_id}"
-    if action_cols[0].button("Confirmar revisión", key=f"confirm_{signal_id}", width="stretch"):
-        st.session_state[f"review_status_{signal_id}"] = "Confirmada"
-        save_reviewer_feedback(
-            signal=row.to_dict(),
-            action="Confirmada",
-            note=st.session_state.get(note_key, ""),
-            document_name=str(row.get("documento origen", "")),
-        )
+    current_status = st.session_state.get(f"review_status_{signal_id}", "Pendiente")
+    st.caption(f"Estado actual: {current_status}")
+    if st.button("Confirmar revisión", key=f"confirm_{signal_id}", width="stretch"):
+        set_review_status(row, "Confirmada", st.session_state.get(note_key, ""))
         st.rerun()
-    if action_cols[1].button("Descartar", key=f"dismiss_{signal_id}", width="stretch"):
-        st.session_state[f"review_status_{signal_id}"] = "Descartada"
-        save_reviewer_feedback(
-            signal=row.to_dict(),
-            action="Descartada",
-            note=st.session_state.get(note_key, ""),
-            document_name=str(row.get("documento origen", "")),
-        )
+    cols = st.columns(2)
+    if cols[0].button("Descartar", key=f"dismiss_{signal_id}", width="stretch"):
+        set_review_status(row, "Descartada", st.session_state.get(note_key, ""))
         st.rerun()
-    if st.button("Marcar seguimiento", key=f"follow_{signal_id}", width="stretch"):
-        st.session_state[f"review_status_{signal_id}"] = "Seguimiento"
-        save_reviewer_feedback(
-            signal=row.to_dict(),
-            action="Seguimiento",
-            note=st.session_state.get(note_key, ""),
-            document_name=str(row.get("documento origen", "")),
-        )
+    if cols[1].button("Marcar seguimiento", key=f"follow_{signal_id}", width="stretch"):
+        set_review_status(row, "Seguimiento", st.session_state.get(note_key, ""))
         st.rerun()
-    st.text_area("Comentario de revisión", key=note_key, height=90)
+    with st.expander("Agregar comentario", expanded=False):
+        st.text_area("Comentario de revisión", key=note_key, height=90, label_visibility="collapsed")
 
-    with st.expander("Explicación asistida por IA", expanded=False):
-        if st.button("Generar explicación", key=f"workbench_explain_{signal_id}"):
+    with st.expander("Acciones adicionales", expanded=False):
+        if render_ai_action_button("Ampliar explicación", key=f"workbench_explain_{signal_id}"):
             if not os.getenv("OPENAI_API_KEY"):
                 st.warning(
                     "IA generativa no configurada. La revisión basada en reglas sigue disponible."
@@ -768,20 +941,20 @@ def render_review_workbench(
     selected_row = selected_signal_row(signal_df)
     st.subheader("Mesa de revisión documental")
     st.markdown(
-        '<div class="section-note">Revise señales priorizadas, navegue evidencia y deje trazabilidad humana.</div>',
+        '<div class="section-note">Revise el documento y registre una decisión de revisión.</div>',
         unsafe_allow_html=True,
     )
-    left, center, right = st.columns([0.28, 0.44, 0.28], gap="medium")
+    left, center, right = st.columns([0.18, 0.58, 0.24], gap="medium")
     with left:
         render_signal_queue(signal_df)
     with center:
         if selected_row is None:
-            st.info("Seleccione una señal para ver evidencia documental.")
+            st.info("Seleccione una observación para ver evidencia documental.")
         else:
             render_document_workspace(selected_row, pages, pdf_bytes)
     with right:
         if selected_row is None:
-            st.info("Seleccione una señal para revisar su detalle.")
+            st.info("Seleccione una observación para revisar su detalle.")
         else:
             render_signal_inspector(selected_row, corpus_context)
 
@@ -848,7 +1021,7 @@ def render_top_priorities(priority_df: pd.DataFrame, corpus_context: dict | None
             st.markdown(f"**Evidencia textual breve**  \n> {safe_text(row['fragmento textual'])}")
 
             button_key = f"priority_explain_{row['signal_id']}"
-            if st.button("Generar explicación asistida por IA", key=button_key):
+            if render_ai_action_button("Ampliar explicación", key=button_key):
                 if not os.getenv("OPENAI_API_KEY"):
                     st.warning(
                         "IA generativa no configurada. Se muestran resultados basados en reglas "
@@ -917,7 +1090,7 @@ def render_aspect_card(row: pd.Series, corpus_context: dict | None = None) -> No
         unsafe_allow_html=True,
     )
     button_key = f"explain_{row.name}_{row['página']}_{row['patrón detectado']}"
-    if st.button("Generar explicación asistida por IA", key=button_key):
+    if render_ai_action_button("Ampliar explicación", key=button_key):
         if not os.getenv("OPENAI_API_KEY"):
             st.warning(
                 "IA generativa no configurada. Se muestran resultados basados en reglas "
@@ -934,7 +1107,7 @@ def render_aspect_card(row: pd.Series, corpus_context: dict | None = None) -> No
 
 
 def render_theme_groups(enriched_df: pd.DataFrame, corpus_context: dict | None = None) -> None:
-    st.subheader("Señales sugeridas para revisión")
+    st.subheader("Observaciones preliminares para revisión")
     has_groups = False
     for summary in theme_summaries(enriched_df):
         has_groups = True
@@ -1036,161 +1209,10 @@ def validate_extracted_pages(pages: list) -> None:
         )
 
 
-def build_normative_context() -> dict:
-    return {
-        "principios": [
-            "concurrencia",
-            "igualdad y no discriminación",
-            "trato justo",
-            "transparencia",
-            "mejor valor por dinero",
-            "claridad de especificaciones",
-            "proporcionalidad",
-            "justificación técnica",
-            "consistencia documental",
-            "uso adecuado de CPC",
-        ],
-        "fuentes_orientativas": NORMATIVE_SOURCES,
-    }
-
-
-def llm_context_findings(enriched_df: pd.DataFrame) -> list[dict]:
-    priority_rows = top_priorities(enriched_df, limit=5)
-    balance_rows = pd.DataFrame()
-    if "tipo_señal" in enriched_df.columns:
-        balance_rows = enriched_df[
-            enriched_df["tipo_señal"].isin(["mitigante_concurrencia", "requisito_habitual"])
-        ].drop_duplicates("patrón detectado").head(8)
-    return pd.concat([priority_rows, balance_rows], ignore_index=True).to_dict("records")
-
-
-def build_executive_report_markdown(
-    brief: dict,
-    priority_df: pd.DataFrame,
-    theme_df: pd.DataFrame,
-    ai_brief: dict | None,
-) -> str:
-    lines = [
-        "# Reporte ejecutivo de revisión asistida",
-        "",
-        "## Advertencia institucional",
-        (
-            "Las señales identificadas son insumos preliminares para revisión humana de "
-            "neutralidad competitiva. No constituyen dictamen técnico, legal ni determinación "
-            "de responsabilidad."
-        ),
-        "",
-    ]
-
-    if ai_brief and ai_brief.get("document_summary") != "No disponible":
-        lines.extend(
-            [
-                "## Lectura preliminar asistida por IA",
-                ai_brief["document_summary"],
-                "",
-                f"**Nivel general de atención:** {ai_brief['overall_attention_level']}",
-                "",
-                "**Temas principales:**",
-                *_markdown_list(ai_brief.get("main_review_topics", [])),
-                "",
-                "**Posibles efectos sobre concurrencia:**",
-                ai_brief.get("possible_competition_effects", "No disponible"),
-                "",
-                "**Contexto comparativo:**",
-                ai_brief.get("comparative_context", "No disponible"),
-                "",
-                "**Preguntas sugeridas:**",
-                *_markdown_list(ai_brief.get("suggested_human_review_questions", [])),
-                "",
-            ]
-        )
-    else:
-        lines.extend(
-            [
-                "## Resumen ejecutivo",
-                brief["general_reading"],
-                "",
-                f"**Nivel general de atención:** {brief['general_attention']}",
-                "",
-            ]
-        )
-
-    lines.extend(["## Top 3 aspectos prioritarios sugeridos para revisión", ""])
-    for index, (_, row) in enumerate(top_priorities(priority_df, limit=3).iterrows(), start=1):
-        lines.extend(
-            [
-                f"### {index}. {row['patrón detectado']}",
-                f"- Tema: {row['tema de revisión']}",
-                f"- Página: {row['página']}",
-                f"- Frecuencia en corpus: {row['frecuencia en corpus']}",
-                f"- Por qué se prioriza: {row['explicacion_priorizacion']}",
-                f"- Posible efecto sobre concurrencia: {row['posible efecto sobre concurrencia']}",
-                f"- Validación sugerida: {row['validación sugerida']}",
-                f"- Posible justificación legítima: {row['posible justificación legítima']}",
-                f"- Principio normativo relacionado: {row['principio_normativo_relacionado']}",
-                f"- Evidencia textual: {row['fragmento textual']}",
-                "",
-            ]
-        )
-
-    lines.extend(["## Balance analítico", ""])
-    lines.extend(["### Factores que favorecen apertura competitiva"])
-    mitigants = brief.get("mitigants", [])
-    if mitigants:
-        for item in mitigants:
-            lines.append(
-                f"- {item['patrón detectado']} (página {item['página']}): {item['observación prudente']}"
-            )
-    else:
-        lines.append("- No se identificaron mitigantes explícitos con las reglas actuales.")
-
-    lines.extend(["", "### Factores neutros o habituales"])
-    habituals = brief.get("habituals", [])
-    if habituals:
-        for item in habituals:
-            lines.append(
-                f"- {item['patrón detectado']} (página {item['página']}): {item['observación prudente']}"
-            )
-    else:
-        lines.append("- No se identificaron requisitos habituales con las reglas actuales.")
-    lines.append("")
-
-    lines.extend(["## Señales agrupadas", ""])
-    for summary in theme_summaries(theme_df):
-        lines.extend(
-            [
-                f"### {summary['theme']}",
-                f"- Señales: {summary['count']}",
-                f"- Nivel general de atención: {summary['attention']}",
-                f"- Resumen: {summary['priority_comment']}",
-                "",
-            ]
-        )
-
-    lines.extend(
-        [
-            "## Nota metodológica",
-            (
-                "El análisis combina reglas textuales, consolidación de coincidencias, comparación "
-                "con corpus histórico local, criterios normativos orientativos y, cuando está activada, "
-                "lectura asistida por IA subordinada a las señales ya detectadas."
-            ),
-            "",
-            "La referencia normativa es orientativa y no constituye interpretación legal oficial ni "
-            "reemplaza análisis jurídico o técnico.",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def _markdown_list(items: list[str]) -> list[str]:
-    return [f"- {item}" for item in items if str(item).strip()]
-
-
 def render_llm_test_button() -> None:
     st.sidebar.title("Configuración técnica")
-    st.sidebar.subheader("Prueba LLM")
-    if st.sidebar.button("Test LLM"):
+    st.sidebar.subheader("Prueba de conexión asistida")
+    if st.sidebar.button("Probar conexión"):
         ok, message = test_llm_connection()
         if ok:
             st.sidebar.success(message)
@@ -1201,27 +1223,21 @@ def render_llm_test_button() -> None:
 
 
 def render_setup_panel() -> tuple[object | None, bool, bool, bool]:
-    st.subheader("Iniciar revisión")
     st.markdown(
-        '<div class="setup-card">',
+        """
+        <div class="start-panel compact-start">
+            <h1>Revisar pliego</h1>
+            <p>Suba un PDF para iniciar revisión documental preliminar.</p>
+        </div>
+        """,
         unsafe_allow_html=True,
     )
-    uploaded_file = st.file_uploader("Documento PDF", type=["pdf"])
-    options = st.columns([1, 1, 1])
-    with options[0]:
-        use_historical_corpus = st.checkbox("Procesos comparables", value=True)
-    with options[1]:
-        enable_ai_reading = st.checkbox("Síntesis orientativa", value=False)
-    with options[2]:
-        process_document = st.button("Iniciar revisión", type="primary", width="stretch")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    with st.expander("Detalles técnicos", expanded=False):
-        st.markdown("Extracción documental · Identificación de señales · Procesos comparables · Detalle del análisis")
-        if use_historical_corpus:
-            render_corpus_status(compact=True)
-    return uploaded_file, use_historical_corpus, enable_ai_reading, process_document
-
+    uploaded_file = st.file_uploader("Documento PDF", type=["pdf"], label_visibility="collapsed")
+    enable_assisted_analysis = st.checkbox("Agregar análisis asistido", value=False)
+    st.caption("Genera resumen preliminar y comparación con procesos similares.")
+    process_document = st.button("Iniciar revisión", type="primary", width="stretch")
+    st.markdown('<div class="setup-footer">Insumo preliminar para revisión humana.</div>', unsafe_allow_html=True)
+    return uploaded_file, enable_assisted_analysis, enable_assisted_analysis, process_document
 
 def render_review_top_bar(document_name: str, signal_count: int) -> None:
     st.markdown(
@@ -1236,7 +1252,7 @@ def render_review_top_bar(document_name: str, signal_count: int) -> None:
                 <div class="review-topbar-value">Revisión preliminar</div>
             </div>
             <div>
-                <div class="review-topbar-label">Señales priorizadas</div>
+                <div class="review-topbar-label">Observaciones priorizadas</div>
                 <div class="review-topbar-value">{signal_count}</div>
             </div>
         </div>
@@ -1246,7 +1262,7 @@ def render_review_top_bar(document_name: str, signal_count: int) -> None:
     actions = st.columns([0.68, 0.16, 0.16])
     with actions[1]:
         if st.button("Nueva revisión", width="stretch"):
-            for key in ["document_processed", "uploaded_file_bytes", "uploaded_file_name", "selected_signal_id"]:
+            for key in ["document_processed", "uploaded_file_bytes", "uploaded_file_name", "selected_signal_id", "review_workspace_open", review_timeline_key()]:
                 st.session_state.pop(key, None)
             st.rerun()
     return actions[2]
@@ -1254,7 +1270,7 @@ def render_review_top_bar(document_name: str, signal_count: int) -> None:
 
 def render_technical_details(corpus_payload: dict, validation_messages: list[str]) -> None:
     with st.expander("Detalles técnicos", expanded=False):
-        st.markdown("**Etapas:** Extracción documental · Identificación de señales · Procesos comparables · Detalle del análisis")
+        st.markdown("**Etapas:** Lectura del documento · Observaciones preliminares · Detalle técnico")
         if validation_messages:
             for message in validation_messages:
                 st.info(message)
@@ -1286,6 +1302,10 @@ def render_review_flow() -> None:
         st.session_state["use_historical_corpus"] = use_historical_corpus
         st.session_state["enable_ai_reading"] = enable_ai_reading
         st.session_state["document_processed"] = True
+        st.session_state["review_workspace_open"] = False
+        st.session_state[review_timeline_key()] = [
+            {"time": datetime.now().strftime("%H:%M"), "action": "Revisión preliminar iniciada", "detail": uploaded_file.name}
+        ]
         st.session_state.pop("selected_signal_id", None)
         st.rerun()
 
@@ -1307,130 +1327,96 @@ def render_review_flow() -> None:
             )
     else:
         corpus_payload = empty_corpus_payload()
-        validation_messages.append("Procesos comparables desactivados para esta revisión.")
+        validation_messages.append("Comparación con procesos anteriores desactivada para esta revisión.")
 
     with st.spinner("Preparando mesa de revisión..."):
         try:
-            pages = extract_text_by_page(uploaded_file_bytes)
+            review_result = analyze_document_bytes(
+                uploaded_file_bytes,
+                corpus_context=corpus_payload["context"],
+                total_processes=corpus_payload["total_processes"],
+                document_name=uploaded_file_name,
+            )
         except Exception:
             st.error("No se pudo leer el PDF. Verifique que el archivo sea válido y no esté protegido.")
             st.stop()
-        sections = segment_document(pages)
-        detections = detect_patterns(pages, sections=sections)
-        document_text = "\n\n".join(page.text for page in pages)
+
+    pages = review_result.pages
+    document_text = review_result.document_text
+    enriched_df = review_result.enriched_df
 
     validate_extracted_pages(pages)
     if not document_text.strip():
         st.stop()
 
-    if not detections:
-        render_review_top_bar(uploaded_file_name, 0)
-        st.success("No se identificaron señales prioritarias con las reglas actuales. Puede continuar con revisión manual del documento.")
+    metadata = extract_pliego_metadata(uploaded_file_name, document_text, APP_DIR)
+
+    if review_result.results_df.empty:
+        render_document_header(uploaded_file_name, metadata, 0)
+        render_pliego_summary(metadata, {"top_themes": []}, pd.DataFrame(), document_text)
+        st.success("No se identificaron observaciones preliminares priorizadas con las reglas actuales. Puede continuar con revisión manual del documento.")
         render_technical_details(corpus_payload, validation_messages)
         return
 
-    results_df = prepare_results_dataframe(detections)
-    enriched_df = enrich_review_dataframe(
-        results_df,
-        corpus_payload["context"],
-        corpus_payload["total_processes"],
-    )
-    enriched_df["documento origen"] = uploaded_file_name
-    enriched_df = prioritize_signals(enriched_df)
-
     signal_count = len(reviewable_signals(enriched_df))
-    export_col = render_review_top_bar(uploaded_file_name, signal_count)
-
-    available_themes = [theme for theme in THEME_ORDER if theme in set(enriched_df["tema de revisión"])]
-    with st.expander("Filtros", expanded=False):
-        filter_cols = st.columns(3)
-        with filter_cols[0]:
-            selected_themes = st.multiselect("Tema", options=available_themes, default=available_themes)
-        with filter_cols[1]:
-            selected_attention = st.multiselect(
-                "Atención sugerida",
-                options=["Alto", "Medio", "Bajo"],
-                default=["Alto", "Medio", "Bajo"],
-            )
-        with filter_cols[2]:
-            selected_history = st.multiselect(
-                "Procesos comparables",
-                options=sorted(enriched_df["clasificación histórica"].unique()),
-                default=sorted(enriched_df["clasificación histórica"].unique()),
-            )
-
-    filtered_df = enriched_df[
-        enriched_df["tema de revisión"].isin(selected_themes)
-        & enriched_df["atención sugerida"].isin(selected_attention)
-        & enriched_df["clasificación histórica"].isin(selected_history)
-    ]
-    brief = build_executive_brief(filtered_df)
+    assisted_summary: list[str] = []
+    if enable_ai_reading:
+        if not os.getenv("OPENAI_API_KEY"):
+            validation_messages.append("Análisis asistido no configurado en este entorno.")
+        else:
+            with st.spinner("Validando metadata y resumen preliminar..."):
+                assisted_metadata = extract_pliego_metadata_assisted(
+                    document_text=document_text,
+                    heuristic_candidates=metadata,
+                    first_pages=first_pages_text(pages),
+                )
+            metadata, assisted_summary = apply_assisted_metadata(metadata, assisted_metadata)
 
     ai_brief = None
-    if enable_ai_reading and not os.getenv("OPENAI_API_KEY"):
-        validation_messages.append("Síntesis orientativa no configurada: falta OPENAI_API_KEY.")
-    elif enable_ai_reading:
-        with st.spinner("Generando síntesis orientativa..."):
-            ai_brief = cached_generate_document_brief(
-                document_text=document_text,
-                prioritized_findings=llm_context_findings(enriched_df),
-                corpus_context=corpus_payload["context"],
-                normative_context=build_normative_context(),
-                model_name=os.getenv("OPENAI_MODEL", ""),
-                base_url=os.getenv("OPENAI_BASE_URL", ""),
-            )
-        if ai_brief["document_summary"] == "No disponible":
-            validation_messages.append("Síntesis orientativa no disponible; se mantiene análisis basado en reglas.")
 
-    if filtered_df.empty:
-        st.warning("No hay señales para los filtros seleccionados.")
-    else:
-        render_review_workbench(
-            filtered_df=filtered_df,
-            pages=pages,
-            pdf_bytes=uploaded_file_bytes,
-            corpus_context=corpus_payload["context"],
-        )
+    overview_brief = build_executive_brief(enriched_df)
+    render_executive_overview(
+        document_name=uploaded_file_name,
+        metadata=metadata,
+        signal_count=signal_count,
+        brief=overview_brief,
+        priority_df=enriched_df,
+        document_text=document_text,
+        ai_brief=ai_brief,
+        pages=pages,
+        pdf_bytes=uploaded_file_bytes,
+        corpus_context=corpus_payload["context"],
+        assisted_summary=assisted_summary,
+    )
 
-    with st.expander("Contexto histórico", expanded=False):
+    filtered_df = enriched_df
+
+    with st.expander("Detalles avanzados", expanded=False):
+        st.markdown("**Comparación con procesos anteriores**")
         render_dimension_summary(filtered_df)
         render_review_questions(filtered_df)
-
-    if ai_brief and ai_brief.get("document_summary") != "No disponible":
-        with st.expander("Síntesis orientativa", expanded=False):
-            render_ai_document_brief(ai_brief)
-
-    with st.expander("Metodología y señales agrupadas", expanded=False):
-        render_briefing(brief)
+        st.markdown("---")
+        st.markdown("**Metodología y observaciones consolidadas**")
+        technical_brief = build_executive_brief(filtered_df)
+        render_briefing(technical_brief)
         if not filtered_df.empty:
             render_theme_groups(filtered_df, corpus_payload["context"])
 
     render_technical_details(corpus_payload, validation_messages)
 
     with st.expander("Exportación", expanded=False):
+        st.caption("Exporta las observaciones preliminares en formato tabular.")
         st.dataframe(ordered_export(filtered_df), width="stretch", hide_index=True)
         csv_data = ordered_export(enriched_df).to_csv(index=False).encode("utf-8")
         st.download_button(
             "Descargar CSV",
             data=csv_data,
-            file_name="reporte_revision_asistida.csv",
+            file_name="observaciones_preliminares.csv",
             mime="text/csv",
-        )
-        report_markdown = build_executive_report_markdown(
-            brief=brief,
-            priority_df=filtered_df,
-            theme_df=filtered_df,
-            ai_brief=ai_brief,
-        )
-        st.download_button(
-            "Descargar reporte ejecutivo",
-            data=report_markdown.encode("utf-8"),
-            file_name="reporte_ejecutivo_neutralidad.md",
-            mime="text/markdown",
         )
 
 st.set_page_config(
-    page_title="Asistente exploratorio de neutralidad competitiva en pliegos",
+    page_title="Integrity Tool - revisión de pliegos",
     layout="wide",
 )
 load_css()
