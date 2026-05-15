@@ -118,6 +118,16 @@ def test_regression_same_input_same_visible_output():
     assert first == second
 
 
+
+def test_review_item_dataframe_contains_legacy_summary_columns():
+    _, _, _, _, items = _run_text_pipeline([
+        "ESPECIFICACIONES TÉCNICAS. Debe ser distribuidor autorizado exclusivo del fabricante X."
+    ])
+    df = review_items_to_dataframe(items, "doc.pdf")
+    assert "combinación relevante" in df.columns
+    assert "atención sugerida" in df.columns
+    assert "clasificación histórica" in df.columns
+
 def test_streamlit_app_does_not_import_internal_detection_pipeline_modules():
     app_source = Path("app.py").read_text(encoding="utf-8")
     forbidden = [

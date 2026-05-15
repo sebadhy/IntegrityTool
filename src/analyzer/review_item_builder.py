@@ -123,6 +123,7 @@ def _item_to_row(item: ReviewItem, document_name: str) -> dict[str, Any]:
         "relevancia_analitica": attention,
         "criterios_de_priorizacion": item.metadata.get("ranking_factors", []),
         "explicacion_priorizacion": item.why_it_matters,
+        "combinación relevante": _combination_note(item),
         "elementos que favorecen concurrencia": item.mitigants_summary,
         "nivel de atención": attention,
         "clasificación histórica": rarity,
@@ -148,6 +149,14 @@ def _item_to_row(item: ReviewItem, document_name: str) -> dict[str, Any]:
         "questions_for_reviewer": questions,
     }
 
+
+
+def _combination_note(item: ReviewItem) -> str:
+    factors = [str(factor) for factor in item.metadata.get("ranking_factors", [])]
+    combined = [factor for factor in factors if "múltiples" in factor.lower() or "acumul" in factor.lower()]
+    if combined:
+        return combined[0]
+    return "No se observa combinación prioritaria con las reglas actuales."
 
 def _why_it_matters(finding: ConsolidatedFinding) -> str:
     if finding.duplicate_count > 1:
