@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 
+from .domain_models import Clause, Signal
 from .finding_model import (
     Finding,
     REVIEW_GENERAL,
@@ -1226,3 +1227,44 @@ def _unique(values: list[str]) -> list[str]:
             result.append(clean_value)
             seen.add(clean_value)
     return result
+
+# --- Clause-centric signal extraction -------------------------------------------------
+# This deterministic API is the preferred pipeline entry point. The legacy detect_patterns
+# function above remains for backward compatibility with older tests/corpus utilities.
+
+def detect_signals(clauses: list[Clause]) -> list[Signal]:
+    """Extract textual Signals from active clauses using the editable taxonomy.
+
+    This function only observes textual evidence. It does not prioritize, consolidate,
+    produce user-visible language, or decide legal/technical conclusions.
+    """
+    patterns = load_taxonomy().patterns
+    signals: list[Signal] = []
+    for clause in clauses:
+        if clause.exclude_from_detection:
+            continue
+        for pattern in patterns:
+            matches = find_terms(clause.text, pattern.textual_signals)
+            if not matches:
+                continue
+            term, start, end = sorted(matches, key=lambda item: (item[1], -len(item[0])))[0]
+            evidence = extract_context_window(clause.text, start, end, context_chars=APP_DEFAULT_CONTEXT_CHARS)
+            signal_id = _finding_id(f"signal-{pattern.id}-{clause.clause_id}", clause.page, evidence)
+            signals.append(
+                Signal(
+                    signal_id=signal_id,
+                    clause_id=clause.clause_id,
+                    pattern_id=pattern.id,
+                    family=pattern.risk_type,
+                    competition_dimension=pattern.competition_dimension,
+                    signal_type="textual_signal",
+                    matched_text=term,
+                    evidence_text=evidence,
+                    page=clause.page,
+                    section_title=clause.section_title,
+                    detector_name="taxonomy_textual_detector_v1",
+                    confidence=pattern.confidence_guidance,
+                    metadata={"pattern_name": pattern.name, "taxonomy_pattern": pattern.to_dict()},
+                )
+            )
+    return signals

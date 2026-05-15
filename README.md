@@ -71,6 +71,15 @@ Luego abre:
 http://localhost:8501
 ```
 
+
+## Arquitectura del pipeline
+
+El pipeline técnico actual se documenta en:
+
+- `docs/architecture.md`
+
+La arquitectura es clause-centric, taxonomy-driven y deterministic-first. La interfaz Streamlit renderiza `ReviewItem[]`; la detección, mitigantes, consolidación, priorización y filtrado de relevancia viven en módulos separados de `src/analyzer/`.
+
 ## Enfoque analítico
 
 La interfaz se presenta como:

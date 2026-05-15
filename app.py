@@ -27,8 +27,6 @@ from src.analyzer.metadata_extractor import (
     extract_pliego_metadata,
     first_pages_text,
 )
-from src.analyzer.observation_filter import prepare_visible_review_items
-from src.analyzer.prioritizer import top_priorities
 from src.analyzer.review_pipeline import analyze_document_bytes
 from src.analyzer.review_synthesis import (
     THEME_ORDER,
@@ -737,28 +735,6 @@ def _render_aspect_rows(
 def render_top_findings(priority_df: pd.DataFrame) -> None:
     render_suggested_aspects(priority_df)
 
-def render_executive_actions(priority_df: pd.DataFrame, brief: dict, ai_brief: dict | None) -> None:
-    st.subheader("Acción sugerida")
-    cols = st.columns([0.20, 0.14, 0.66])
-    with cols[0]:
-        first_signal_id = str(top_priorities(priority_df, limit=1).iloc[0]["signal_id"]) if not top_priorities(priority_df, limit=1).empty else None
-        if st.button("Ver evidencia", key="exec_review_evidence", type="primary", width="stretch"):
-            if first_signal_id:
-                st.session_state["expanded_observation_id"] = first_signal_id
-                st.session_state["selected_signal_id"] = first_signal_id
-            append_review_event("Evidencia abierta", "Revisión documental")
-            st.rerun()
-    with cols[1]:
-        csv_data = ordered_export(priority_df).to_csv(index=False).encode("utf-8")
-        st.download_button(
-            "Exportar",
-            data=csv_data,
-            file_name="observaciones_preliminares.csv",
-            mime="text/csv",
-            key="exec_export_summary",
-            width="stretch",
-        )
-
 def render_executive_overview(
     *,
     document_name: str,
@@ -1058,57 +1034,6 @@ def render_finding_explanation(explanation: dict) -> None:
         """,
         unsafe_allow_html=True,
     )
-
-
-def render_top_priorities(priority_df: pd.DataFrame, corpus_context: dict | None = None) -> None:
-    st.subheader("Aspectos prioritarios sugeridos para revisión")
-    top_df = top_priorities(priority_df, limit=3)
-    if top_df.empty:
-        st.info("No hay prioridades para mostrar con los filtros actuales.")
-        return
-
-    for position, (_, row) in enumerate(top_df.iterrows(), start=1):
-        with st.container(border=True):
-            header_cols = st.columns([0.75, 0.25])
-            with header_cols[0]:
-                st.markdown(f"**{position}. {row['patrón detectado']}**")
-                st.caption(f"{row['tema de revisión']} · página {row['página']}")
-                st.caption(f"{safe_text(row.get('prioridad de revisión', 'revisión sugerida'))} · {safe_text(dimension_label(row.get('competition_dimension', 'No disponible')))}")
-            with header_cols[1]:
-                st.markdown(attention_badge(row["nivel_atencion"]), unsafe_allow_html=True)
-                st.caption(f"Relevancia {row['relevancia_analitica']}")
-
-            st.markdown(safe_text(row["explicacion_priorizacion"]))
-            detail_cols = st.columns(3)
-            detail_cols[0].markdown(f"**Frecuencia en corpus**  \n{safe_text(row['frecuencia en corpus'])}")
-            detail_cols[1].markdown(
-                f"**Posible efecto sobre concurrencia**  \n{safe_text(row['posible efecto sobre concurrencia'])}"
-            )
-            detail_cols[2].markdown(
-                f"**Validación sugerida**  \n{safe_text(row['validación sugerida'])}"
-            )
-            if row.get("mitigating_factors"):
-                st.markdown(f"**Factores mitigantes identificados**  \n{safe_text(row['mitigating_factors'])}")
-            if row.get("missing_information"):
-                st.markdown(f"**Información faltante para validar**  \n{safe_text(row['missing_information'])}")
-            st.markdown(f"**Posible justificación legítima**  \n{safe_text(row['posible justificación legítima'])}")
-            st.markdown(f"**Evidencia textual breve**  \n> {safe_text(row['fragmento textual'])}")
-
-            button_key = f"priority_explain_{row['signal_id']}"
-            if render_ai_action_button("Ampliar explicación", key=button_key):
-                if not os.getenv("OPENAI_API_KEY"):
-                    st.warning(
-                        "IA generativa no configurada. Se muestran resultados basados en reglas "
-                        "y comparación documental."
-                    )
-                else:
-                    explanation = cached_explain_priority_with_llm(
-                        row.to_dict(),
-                        corpus_context,
-                        os.getenv("OPENAI_MODEL", ""),
-                        os.getenv("OPENAI_BASE_URL", ""),
-                    )
-                    render_finding_explanation(explanation)
 
 
 def render_aspect_card(row: pd.Series, corpus_context: dict | None = None) -> None:
@@ -1467,7 +1392,7 @@ def render_review_flow() -> None:
     pages = review_result.pages
     document_text = review_result.document_text
     enriched_df = review_result.enriched_df
-    visible_df = prepare_visible_review_items(enriched_df)
+    visible_df = enriched_df
 
     validate_extracted_pages(pages)
     if not document_text.strip():

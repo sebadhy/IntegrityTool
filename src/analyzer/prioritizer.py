@@ -405,3 +405,23 @@ def _unique(values: list[str]) -> list[str]:
             unique_values.append(normalized)
             seen.add(normalized)
     return unique_values
+
+
+def prioritize_consolidated_findings(findings: list) -> list:
+    """Order ConsolidatedFinding objects and keep internal ranking hidden from UI."""
+    return sorted(
+        findings,
+        key=lambda finding: (
+            -int(getattr(finding, "internal_ranking_score", 0)),
+            -int(getattr(finding, "duplicate_count", 1)),
+            str(getattr(finding, "title", "")),
+        ),
+    )
+
+
+def review_priority_from_score(score: int) -> str:
+    if score >= 6:
+        return "alta"
+    if score >= 3:
+        return "media"
+    return "baja"
