@@ -22,6 +22,7 @@ REVIEW_PRIORITY_LABEL = {
     "priority": "revisión prioritaria",
 }
 RARE_LABELS = {"Poco frecuente", "Sin histórico"}
+COMMON_LABELS = {"Habitual"}
 STRUCTURED_SEVERITY_SCORE = {"low": 0, "medium": 1, "contextual": 2}
 CRITICAL_SECTION_TERMS = (
     "requisito",
@@ -175,6 +176,9 @@ def _criteria_for_row(row: pd.Series, related_count: int) -> list[str]:
     for factor in mitigating_factors:
         criteria.append(f"Factor mitigante identificado: {factor}.")
 
+    if str(row.get("clasificación histórica")) in COMMON_LABELS and mitigating_factors and not escalation_factors:
+        criteria.append("Patrón frecuente en corpus con mitigantes; su presencia aislada no eleva la prioridad de revisión.")
+
     dimension = str(row.get("competition_dimension") or row.get("dimensión competitiva", "")).strip()
     if dimension:
         criteria.append(f"Dimensión competitiva asociada: {dimension}.")
@@ -235,6 +239,9 @@ def _relevance_from_criteria(row: pd.Series, criteria: list[str]) -> str:
     }:
         return "Bajo"
 
+    if str(row.get("clasificación histórica")) in COMMON_LABELS and _list_field(row.get("mitigating_factors", [])) and not _list_field(row.get("escalation_factors", [])):
+        return "Bajo"
+
     score = 0
     score += STRUCTURED_SEVERITY_SCORE.get(str(row.get("severity", "")).lower(), 0)
     score += ATTENTION_SCORE.get(str(row.get("atención sugerida") or row.get("nivel de atención")), 1)
@@ -268,6 +275,9 @@ def _attention_from_relevance(row: pd.Series, relevance: str, criteria: list[str
     }:
         return "Bajo"
 
+    if str(row.get("clasificación histórica")) in COMMON_LABELS and _list_field(row.get("mitigating_factors", [])) and not _list_field(row.get("escalation_factors", [])):
+        return "Bajo"
+
     score = ATTENTION_SCORE.get(str(row.get("nivel de atención")), 1)
     score = max(score, RELEVANCE_SCORE.get(relevance, 1))
     score += min(len(_list_field(row.get("escalation_factors", []))), 2)
@@ -292,6 +302,9 @@ def _review_priority_from_context(row: pd.Series, criteria: list[str], relevance
         "mitigante_concurrencia",
     }:
         return "general"
+    if str(row.get("clasificación histórica")) in COMMON_LABELS and _list_field(row.get("mitigating_factors", [])) and not _list_field(row.get("escalation_factors", [])):
+        return "general"
+
     existing = str(row.get("review_priority", "")).strip()
     if existing in REVIEW_PRIORITY_SCORE:
         base = REVIEW_PRIORITY_SCORE[existing]
