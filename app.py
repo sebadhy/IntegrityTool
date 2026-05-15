@@ -27,6 +27,7 @@ from src.analyzer.metadata_extractor import (
     extract_pliego_metadata,
     first_pages_text,
 )
+from src.analyzer.observation_filter import prepare_visible_review_items
 from src.analyzer.prioritizer import top_priorities
 from src.analyzer.review_pipeline import analyze_document_bytes
 from src.analyzer.review_synthesis import (
@@ -614,7 +615,7 @@ def render_evidence_panel(row: pd.Series, pages: list | None = None, pdf_bytes: 
     st.markdown(
         f"""
         <div class="evidence-detail-box">
-            <div><strong>Página</strong><span>{safe_text(page_number)}</span></div>
+            <div><strong>Páginas relacionadas</strong><span>{safe_text(row.get('páginas relacionadas', page_number))}</span></div>
             <div class="evidence-detail-fragment"><strong>Fragmento exacto</strong><p>{safe_text(row['fragmento textual'])}</p></div>
         </div>
         """,
@@ -706,7 +707,8 @@ def _render_aspect_rows(
             with header_cols[0]:
                 st.markdown(f"**{safe_text(str(row['patrón detectado']))}**")
                 st.caption(
-                    f"Página {safe_text(row['página'])} · "
+                    f"Páginas {safe_text(row.get('páginas relacionadas', row['página']))} · "
+                    f"{safe_text(row.get('occurrence_count', row.get('número de coincidencias', 1)))} ocurrencia(s) · "
                     f"{safe_text(observation_priority(row))} · "
                     f"{safe_text(dimension_label(row.get('competition_dimension', row.get('dimensión competitiva', 'No disponible'))))}"
                 )
@@ -720,7 +722,7 @@ def _render_aspect_rows(
                     append_review_event("Evidencia abierta", row["patrón detectado"])
                     st.rerun()
 
-            st.markdown(f"**Fragmento:** {safe_text(short_fragment(row['fragmento textual'], 260))}")
+            st.markdown(f"**Fragmento representativo:** {safe_text(short_fragment(row.get('representative_excerpt', row['fragmento textual']), 300))}")
             st.markdown(f"**Por qué conviene revisar:** {safe_text(short_fragment(row.get('por qué se sugiere revisar', row.get('observación prudente', 'Requiere validación humana.')), 320))}")
 
             mitigants = display_list(row.get("mitigating_factors", []))
@@ -1465,6 +1467,7 @@ def render_review_flow() -> None:
     pages = review_result.pages
     document_text = review_result.document_text
     enriched_df = review_result.enriched_df
+    visible_df = prepare_visible_review_items(enriched_df)
 
     validate_extracted_pages(pages)
     if not document_text.strip():
@@ -1472,14 +1475,14 @@ def render_review_flow() -> None:
 
     metadata = extract_pliego_metadata(uploaded_file_name, document_text, APP_DIR)
 
-    if review_result.results_df.empty:
+    if review_result.results_df.empty or visible_df.empty:
         render_document_header(uploaded_file_name, metadata, 0)
         render_pliego_summary(metadata, {"top_themes": []}, pd.DataFrame(), document_text)
         st.success("No se identificaron observaciones preliminares priorizadas con las reglas actuales. Puede continuar con revisión manual del documento.")
         render_technical_details(corpus_payload, validation_messages)
         return
 
-    signal_count = len(reviewable_signals(enriched_df))
+    signal_count = len(reviewable_signals(visible_df))
     assisted_summary: list[str] = []
     if enable_ai_reading:
         if not os.getenv("OPENAI_API_KEY"):
@@ -1495,13 +1498,13 @@ def render_review_flow() -> None:
 
     ai_brief = None
 
-    overview_brief = build_executive_brief(enriched_df)
+    overview_brief = build_executive_brief(visible_df)
     render_executive_overview(
         document_name=uploaded_file_name,
         metadata=metadata,
         signal_count=signal_count,
         brief=overview_brief,
-        priority_df=enriched_df,
+        priority_df=visible_df,
         document_text=document_text,
         ai_brief=ai_brief,
         pages=pages,
@@ -1510,7 +1513,7 @@ def render_review_flow() -> None:
         assisted_summary=assisted_summary,
     )
 
-    filtered_df = enriched_df
+    filtered_df = visible_df
 
     render_mitigating_factors_section(filtered_df)
     render_corpus_context_section(filtered_df)
@@ -1526,7 +1529,7 @@ def render_review_flow() -> None:
     with st.expander("Exportar resultados", expanded=False):
         st.caption("Exporta los aspectos sugeridos para revisión en formato tabular.")
         st.dataframe(ordered_export(filtered_df), width="stretch", hide_index=True)
-        csv_data = ordered_export(enriched_df).to_csv(index=False).encode("utf-8")
+        csv_data = ordered_export(filtered_df).to_csv(index=False).encode("utf-8")
         st.download_button(
             "Descargar CSV",
             data=csv_data,

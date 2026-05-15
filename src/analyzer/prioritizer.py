@@ -176,8 +176,8 @@ def _criteria_for_row(row: pd.Series, related_count: int) -> list[str]:
     for factor in mitigating_factors:
         criteria.append(f"Factor mitigante identificado: {factor}.")
 
-    if str(row.get("clasificación histórica")) in COMMON_LABELS and mitigating_factors and not escalation_factors:
-        criteria.append("Patrón frecuente en corpus con mitigantes; su presencia aislada no eleva la prioridad de revisión.")
+    if str(row.get("clasificación histórica")) in COMMON_LABELS and not escalation_factors:
+        criteria.append("Patrón frecuente en corpus; su presencia aislada no eleva la prioridad de revisión.")
 
     dimension = str(row.get("competition_dimension") or row.get("dimensión competitiva", "")).strip()
     if dimension:
@@ -239,7 +239,7 @@ def _relevance_from_criteria(row: pd.Series, criteria: list[str]) -> str:
     }:
         return "Bajo"
 
-    if str(row.get("clasificación histórica")) in COMMON_LABELS and _list_field(row.get("mitigating_factors", [])) and not _list_field(row.get("escalation_factors", [])):
+    if str(row.get("clasificación histórica")) in COMMON_LABELS and not _list_field(row.get("escalation_factors", [])):
         return "Bajo"
 
     score = 0
@@ -275,7 +275,7 @@ def _attention_from_relevance(row: pd.Series, relevance: str, criteria: list[str
     }:
         return "Bajo"
 
-    if str(row.get("clasificación histórica")) in COMMON_LABELS and _list_field(row.get("mitigating_factors", [])) and not _list_field(row.get("escalation_factors", [])):
+    if str(row.get("clasificación histórica")) in COMMON_LABELS and not _list_field(row.get("escalation_factors", [])):
         return "Bajo"
 
     score = ATTENTION_SCORE.get(str(row.get("nivel de atención")), 1)
@@ -302,7 +302,7 @@ def _review_priority_from_context(row: pd.Series, criteria: list[str], relevance
         "mitigante_concurrencia",
     }:
         return "general"
-    if str(row.get("clasificación histórica")) in COMMON_LABELS and _list_field(row.get("mitigating_factors", [])) and not _list_field(row.get("escalation_factors", [])):
+    if str(row.get("clasificación histórica")) in COMMON_LABELS and not _list_field(row.get("escalation_factors", [])):
         return "general"
 
     existing = str(row.get("review_priority", "")).strip()
