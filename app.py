@@ -468,33 +468,80 @@ def render_pliego_summary(
 ) -> None:
     st.subheader("Resumen del pliego")
     st.caption("Lectura breve para orientar la revisión; los datos formales del procedimiento se muestran solo en el encabezado.")
-    object_text = metadata.get("objeto", "el objeto identificado en el documento")
     top_themes = brief.get("top_themes", [])[:3]
     theme_text = ", ".join(top_themes) if top_themes else "condiciones documentales del proceso"
     condition_count = len(reviewable_signals(filtered_df))
     mitigant_count = sum(1 for _, row in filtered_df.iterrows() if display_list(row.get("mitigating_factors", []))) if not filtered_df.empty else 0
     if assisted_summary:
-        bullets = assisted_summary[:4]
+        bullets = contextual_summary_bullets(assisted_summary, metadata, brief, filtered_df)
     elif ai_brief and ai_brief.get("document_summary") != "No disponible":
         ai_topics = display_list(ai_brief.get("main_review_topics", []))[:2]
         bullets = [
-            f"El documento revisado corresponde a {object_text}.",
             f"La lectura preliminar concentra la revisión en {', '.join(ai_topics) if ai_topics else theme_text}.",
             short_fragment(ai_brief.get("possible_competition_effects", "Algunas condiciones podrían requerir validación de proporcionalidad y necesidad técnica."), 180),
+            f"Se identificaron mitigantes textuales en {mitigant_count} aspecto(s), cuando el documento incluye equivalencias, justificaciones o condiciones de apertura.",
             "Las observaciones son insumos preliminares y deben confirmarse con revisión humana.",
         ]
     else:
         bullets = [
-            f"El documento revisado corresponde a {object_text}.",
             f"Se consolidaron {condition_count} aspectos sugeridos para revisión, principalmente vinculados con {theme_text}.",
+            f"La lectura preliminar orienta una revisión contextual de proporcionalidad, equivalencias y posible impacto sobre concurrencia.",
             f"Se identificaron mitigantes textuales en {mitigant_count} aspecto(s), cuando el documento incluye equivalencias, justificaciones o condiciones de apertura.",
-            "La lectura es preliminar: orienta qué revisar primero, sin emitir conclusiones técnicas o legales definitivas.",
+            "Esta síntesis prioriza el tipo de revisión sugerida, sin repetir datos formales ya visibles en el encabezado.",
         ]
     html = "".join(f"<li>{safe_text(item)}</li>" for item in bullets[:4] if _is_useful_text(item))
     st.markdown(
         f'<div class="pliego-summary"><div class="summary-label">Lectura preliminar</div><ul>{html}</ul></div>',
         unsafe_allow_html=True,
     )
+
+
+def contextual_summary_bullets(
+    assisted_summary: list[str],
+    metadata: dict[str, str],
+    brief: dict,
+    filtered_df: pd.DataFrame,
+) -> list[str]:
+    filtered = [
+        item
+        for item in assisted_summary
+        if _is_contextual_summary_item(item, metadata)
+    ]
+    if len(filtered) >= 2:
+        return filtered[:4]
+    top_themes = brief.get("top_themes", [])[:3]
+    theme_text = ", ".join(top_themes) if top_themes else "condiciones documentales del proceso"
+    condition_count = len(reviewable_signals(filtered_df))
+    mitigant_count = sum(1 for _, row in filtered_df.iterrows() if display_list(row.get("mitigating_factors", []))) if not filtered_df.empty else 0
+    return [
+        f"Se consolidaron {condition_count} aspectos sugeridos para revisión, principalmente vinculados con {theme_text}.",
+        "La lectura preliminar se enfoca en proporcionalidad, equivalencias, mitigantes y posible impacto sobre concurrencia.",
+        f"Se identificaron mitigantes textuales en {mitigant_count} aspecto(s), cuando existen referencias a equivalencias, justificaciones o condiciones de apertura.",
+        "La síntesis evita repetir metadata administrativa y se concentra en el tipo de revisión documental sugerida.",
+    ]
+
+
+def _is_contextual_summary_item(item: object, metadata: dict[str, str]) -> bool:
+    text = " ".join(str(item or "").split())
+    if not _is_useful_text(text):
+        return False
+    lower = text.lower()
+    metadata_markers = [
+        "entidad contratante",
+        "objeto",
+        "procedimiento",
+        "presupuesto",
+        "modalidad",
+        "fecha",
+        "corresponde a",
+    ]
+    if any(marker in lower for marker in metadata_markers):
+        return False
+    for value in metadata.values():
+        clean = " ".join(str(value or "").split()).lower()
+        if len(clean) > 18 and clean in lower:
+            return False
+    return True
 
 def render_explanation_tooltip(text: str) -> None:
     st.caption(text)
