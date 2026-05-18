@@ -950,12 +950,6 @@ textarea {
     margin-bottom: 0;
 }
 
-.setup-footer {
-    color: #66727F;
-    font-size: 0.76rem;
-    margin-top: 0.55rem;
-}
-
 [data-testid="stFileUploader"] {
     margin-top: 0.35rem;
 }

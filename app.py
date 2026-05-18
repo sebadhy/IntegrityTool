@@ -1352,7 +1352,6 @@ Las observaciones generadas son insumos preliminares para revisión humana. La h
         )
     uploaded_file = st.file_uploader("Documento PDF", type=["pdf"], label_visibility="collapsed")
     process_document = st.button("Iniciar revisión", type="primary", width="stretch")
-    st.markdown('<div class="setup-footer">Insumo preliminar para revisión humana.</div>', unsafe_allow_html=True)
     return uploaded_file, True, bool(os.getenv("OPENAI_API_KEY")), process_document
 
 def render_review_top_bar(document_name: str, signal_count: int) -> None:
@@ -1407,7 +1406,6 @@ def render_review_flow() -> None:
     if not st.session_state.get("document_processed", False):
         uploaded_file, use_historical_corpus, enable_ai_reading, process_document = render_setup_panel()
         if uploaded_file is None:
-            st.info("Cargue un PDF para iniciar la revisión documental.")
             return
         if not process_document:
             return
