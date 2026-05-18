@@ -774,15 +774,64 @@ def _expanded_clip(rect: fitz.Rect, page_rect: fitz.Rect) -> fitz.Rect:
 def render_visual_fragment(row: pd.Series, pdf_bytes: bytes | None) -> None:
     if not pdf_bytes:
         return
-    page_number = int(row.get("página", 1) or 1)
-    search_text = str(row.get("visual_search_text") or row.get("matched_text") or "")
-    fallback_text = str(row.get("fragmento textual") or row.get("representative_excerpt") or "")
+    visual_items = visual_fragment_items(row)
     with st.expander("Ver fragmento visual asociado", expanded=False):
-        image_bytes = render_pdf_fragment_bytes(pdf_bytes, page_number, search_text, fallback_text)
-        if image_bytes:
-            st.image(image_bytes, use_container_width=True)
-        else:
-            st.caption("No se pudo ubicar automáticamente el fragmento dentro de la página PDF; se conserva la evidencia textual como referencia principal.")
+        rendered = 0
+        for index, item in enumerate(visual_items, start=1):
+            page_number = int(item.get("page", 1) or 1)
+            label = "Fragmento representativo" if index == 1 else f"Ocurrencia relacionada {index - 1}"
+            st.markdown(f"**{label} · página {safe_text(page_number)}**")
+            image_bytes = render_pdf_fragment_bytes(
+                pdf_bytes,
+                page_number,
+                str(item.get("search_text") or ""),
+                str(item.get("text") or ""),
+            )
+            if image_bytes:
+                st.image(image_bytes, use_container_width=True)
+                rendered += 1
+            else:
+                st.caption("No se pudo ubicar visualmente este fragmento; se conserva la evidencia textual asociada.")
+                st.caption(short_fragment(item.get("text", ""), 260))
+        if rendered == 0:
+            st.caption("No se pudo ubicar automáticamente ningún fragmento dentro del PDF; se conserva la evidencia textual como referencia principal.")
+
+
+def visual_fragment_items(row: pd.Series) -> list[dict[str, object]]:
+    items: list[dict[str, object]] = []
+    seen: set[tuple[str, str]] = set()
+
+    def add_item(page: object, text: object, search_text: object = "") -> None:
+        clean_text = " ".join(str(text or "").split())
+        clean_search = " ".join(str(search_text or "").split())
+        if not clean_text and not clean_search:
+            return
+        key = (str(page or ""), clean_text[:220] or clean_search[:220])
+        if key in seen:
+            return
+        seen.add(key)
+        items.append({"page": page or 1, "text": clean_text, "search_text": clean_search})
+
+    add_item(
+        row.get("página", 1),
+        row.get("fragmento textual") or row.get("representative_excerpt"),
+        row.get("visual_search_text") or row.get("matched_text"),
+    )
+
+    raw_items = row.get("additional_excerpts", row.get("fragmentos adicionales", []))
+    if isinstance(raw_items, str):
+        try:
+            raw_items = ast.literal_eval(raw_items)
+        except (ValueError, SyntaxError):
+            raw_items = display_list(raw_items)
+    if isinstance(raw_items, list):
+        for item in raw_items:
+            if isinstance(item, dict):
+                add_item(item.get("page", row.get("página", 1)), item.get("text", ""), item.get("matched_text", ""))
+            else:
+                add_item(row.get("página", 1), item, "")
+
+    return items[:6]
 
 
 def render_reasoning_expander(row: pd.Series) -> None:
