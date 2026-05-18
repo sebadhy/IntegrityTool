@@ -22,7 +22,6 @@ from src.analyzer.feedback_store import save_reviewer_feedback
 from src.analyzer.llm_reviewer import (
     extract_pliego_metadata_assisted,
     explain_priority_with_llm,
-    test_llm_connection,
 )
 from src.analyzer.metadata_extractor import (
     apply_assisted_metadata,
@@ -192,17 +191,6 @@ def render_institutional_header() -> None:
         unsafe_allow_html=True,
     )
 
-
-def render_pipeline() -> None:
-    steps = [
-        "Extracción documental",
-        "Identificación de cláusulas",
-        "Contexto documental",
-        "Observaciones consolidadas",
-        "Resumen preliminar",
-    ]
-    html_steps = "".join(f'<div class="pipeline-step">{step}</div>' for step in steps)
-    st.markdown(f'<div class="pipeline">{html_steps}</div>', unsafe_allow_html=True)
 
 
 def render_executive_card(title: str, value: str, detail: str = "") -> None:
@@ -428,19 +416,6 @@ def set_review_status(row: pd.Series, status: str, note: str = "") -> None:
         document_name=str(row.get("documento origen", "")),
     )
 
-
-def is_ai_action(action_name: str) -> bool:
-    ai_terms = ("ia", "asistido", "síntesis", "sintesis", "explicación", "explicacion", "semántica", "semantica")
-    return any(term in action_name.lower() for term in ai_terms)
-
-
-def render_action_badge(label: str, uses_ai: bool) -> None:
-    if not uses_ai:
-        return
-    st.markdown(
-        f'<span class="ai-token-badge">Procesamiento asistido</span> <span class="action-help">{safe_text(label)}</span>',
-        unsafe_allow_html=True,
-    )
 
 
 def render_document_header(document_name: str, metadata: dict[str, str], signal_count: int) -> object:
@@ -690,12 +665,52 @@ def render_visual_fragment(row: pd.Series, pdf_bytes: bytes | None) -> None:
     page_number = int(row.get("página", 1) or 1)
     search_text = str(row.get("visual_search_text") or row.get("matched_text") or "")
     fallback_text = str(row.get("fragmento textual") or row.get("representative_excerpt") or "")
-    image_bytes = render_pdf_fragment_bytes(pdf_bytes, page_number, search_text, fallback_text)
-    if image_bytes:
-        st.markdown("**Fragmento visual asociado**")
-        st.image(image_bytes, use_container_width=True)
+    with st.expander("Ver fragmento visual asociado", expanded=False):
+        image_bytes = render_pdf_fragment_bytes(pdf_bytes, page_number, search_text, fallback_text)
+        if image_bytes:
+            st.image(image_bytes, use_container_width=True)
+        else:
+            st.caption("No se pudo ubicar automáticamente el fragmento dentro de la página PDF; se conserva la evidencia textual como referencia principal.")
+
+
+def render_reasoning_expander(row: pd.Series) -> None:
+    with st.expander("Ver razonamiento", expanded=False):
+        reasoning_items = _reasoning_items(row)
+        st.markdown("<ul>" + "".join(f"<li>{safe_text(item)}</li>" for item in reasoning_items) + "</ul>", unsafe_allow_html=True)
+        st.caption(
+            "Esta observación constituye una lectura preliminar asistida y no debe interpretarse "
+            "como evidencia de corrupción, fraude, ilegalidad ni direccionamiento."
+        )
+
+
+def _reasoning_items(row: pd.Series) -> list[str]:
+    items: list[str] = []
+    matched = str(row.get("matched_text") or row.get("patrón detectado") or "").strip()
+    pattern = str(row.get("pattern_name") or row.get("patrón detectado") or "No disponible").strip()
+    dimension = dimension_label(row.get("competition_dimension", row.get("dimensión competitiva", "No disponible")))
+    priority = observation_priority(row)
+    occurrences = row.get("occurrence_count", row.get("número de coincidencias", 1))
+    pages = row.get("páginas relacionadas", row.get("página", "No disponible"))
+    mitigants = display_list(row.get("mitigating_factors", []))
+    ranking = display_list(row.get("criterios_de_priorizacion", row.get("escalation_factors", [])))
+    missing = display_list(row.get("missing_information", []))
+
+    items.append(f"Se identificó una señal textual relacionada con: {matched}.")
+    items.append(f"Se aplicó el patrón documental: {pattern}, asociado a la dimensión {dimension}.")
+    items.append(f"La observación consolida {occurrences} ocurrencia(s) en la(s) página(s) {pages}.")
+    if mitigants:
+        items.append("Mitigantes identificados: " + "; ".join(mitigants[:3]) + ".")
     else:
-        st.caption("No se pudo ubicar automáticamente el fragmento dentro de la página PDF; se conserva la evidencia textual como referencia principal.")
+        items.append("No se identificaron mitigantes textuales suficientes en el fragmento representativo.")
+    if ranking:
+        items.append("Factores considerados para priorización: " + "; ".join(ranking[:3]) + ".")
+    else:
+        items.append(f"La prioridad asignada es {priority}, orientada a ordenar qué conviene revisar primero.")
+    items.append("Interpretación contextual aplicada: " + corpus_context_sentence(row))
+    if missing:
+        items.append("Información o mitigantes no observados en el fragmento: " + "; ".join(missing[:3]) + ".")
+    items.append("Limitación: la lectura depende del texto extraído, la taxonomía documental y el corpus disponible; requiere revisión humana significativa.")
+    return items
 
 
 def render_evidence_panel(row: pd.Series, pages: list | None = None, pdf_bytes: bytes | None = None) -> None:
@@ -741,6 +756,7 @@ def render_observation_detail(
     st.markdown("**Qué conviene validar**")
     questions = row.get("human_review_questions") or row.get("suggested_questions") or row.get("pregunta_normativa_sugerida")
     st.markdown(display_bullets(questions, row.get("validación sugerida", "Validar proporcionalidad y necesidad técnica.")), unsafe_allow_html=True)
+    render_reasoning_expander(row)
     st.caption(f"Fuente: {safe_text(observation_source(row))}")
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -792,6 +808,7 @@ def _render_aspect_rows(
             st.markdown("**Qué conviene validar**")
             st.markdown(display_bullets(questions, row.get("validación sugerida", "Validar proporcionalidad y necesidad técnica.")), unsafe_allow_html=True)
             render_evidence_panel(row, pages=pages, pdf_bytes=pdf_bytes)
+            render_reasoning_expander(row)
             st.caption(f"Fuente: {safe_text(observation_source(row))}")
 
 # Backward-compatible name used by older flow sections.
@@ -1235,17 +1252,6 @@ def validate_extracted_pages(pages: list) -> None:
         )
 
 
-def render_llm_test_button() -> None:
-    st.sidebar.title("Configuración técnica")
-    st.sidebar.subheader("Prueba de conexión asistida")
-    if st.sidebar.button("Probar conexión"):
-        ok, message = test_llm_connection()
-        if ok:
-            st.sidebar.success(message)
-        else:
-            st.sidebar.warning(message)
-
-
 
 
 def render_setup_panel() -> tuple[object | None, bool, bool, bool]:
@@ -1437,5 +1443,4 @@ st.set_page_config(
 load_css()
 render_institutional_header()
 
-render_llm_test_button()
 render_review_flow()

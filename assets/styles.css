@@ -166,26 +166,6 @@ h3 {
     border: 1px solid var(--border);
     border-radius: 4px;
 }
-
-.pipeline {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 0.65rem;
-    margin: 1rem 0 1.2rem;
-}
-
-.pipeline-step {
-    background: var(--blue-soft);
-    border: 1px solid var(--border);
-    border-left: 4px solid var(--blue-medium);
-    color: var(--blue-dark);
-    border-radius: 3px;
-    padding: 0.75rem 0.8rem;
-    font-size: 0.9rem;
-    font-weight: 700;
-    min-height: 58px;
-}
-
 .executive-card {
     background: var(--white);
     border: 1px solid var(--border);
@@ -726,30 +706,6 @@ textarea {
     margin: 0.18rem 0 0.35rem;
 }
 
-.ai-token-badge,
-.no-ai-badge {
-    border-radius: 3px;
-    display: inline-block;
-    font-size: 0.68rem;
-    font-weight: 700;
-    line-height: 1;
-    margin: 0.15rem 0.25rem 0.25rem 0;
-    padding: 0.32rem 0.42rem;
-    text-transform: uppercase;
-}
-
-.ai-token-badge {
-    background: #FFF8E5;
-    border: 1px solid #E5D7A6;
-    color: #6B4E00;
-}
-
-.no-ai-badge {
-    background: #E8F5EE;
-    border: 1px solid #BFE3CF;
-    color: #1D6B45;
-}
-
 .action-help {
     color: #66727F;
     font-size: 0.76rem;
@@ -849,19 +805,6 @@ textarea {
 .top-finding-card {
     border-top: 1px solid var(--border);
     min-height: 220px;
-}
-
-.ai-token-badge {
-    background: transparent;
-    border: 0;
-    color: #6B4E00;
-    font-size: 0.72rem;
-    padding: 0;
-    text-transform: none;
-}
-
-.no-ai-badge {
-    display: none;
 }
 
 .pdf-frame {
