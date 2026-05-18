@@ -120,6 +120,8 @@ def _item_to_row(item: ReviewItem, document_name: str) -> dict[str, Any]:
         "occurrence_count": item.metadata.get("duplicate_count", len(item.evidence_items)),
         "occurrencias relacionadas": item.metadata.get("duplicate_count", len(item.evidence_items)),
         "representative_excerpt": item.evidence_summary,
+        "matched_text": evidence.get("matched_text", ""),
+        "visual_search_text": evidence.get("matched_text") or item.evidence_summary,
         "additional_excerpts": item.metadata.get("additional_excerpts", []),
         "fragmentos adicionales": item.metadata.get("additional_excerpts", []),
         "consolidated_from_finding_ids": item.metadata.get("consolidated_from_finding_ids", item.source_finding_ids),

@@ -7,6 +7,8 @@ from datetime import datetime
 from html import escape
 from pathlib import Path
 
+import fitz
+
 import pandas as pd
 import streamlit as st
 
@@ -563,6 +565,40 @@ def corpus_context_sentence(row: pd.Series) -> str:
     return str(row.get("comentario contextual") or row.get("interpretación_comparativa") or "Contexto comparativo no disponible.")
 
 
+def integrated_contextual_explanation(row: pd.Series, corpus_context: dict | None = None) -> str:
+    fallback = _deterministic_contextual_explanation(row)
+    if not os.getenv("OPENAI_API_KEY"):
+        return fallback
+    explanation = cached_explain_priority_with_llm(
+        row.to_dict(),
+        corpus_context,
+        os.getenv("OPENAI_MODEL", ""),
+        os.getenv("OPENAI_BASE_URL", ""),
+    )
+    if explanation.get("llm_available") is False or explanation.get("llm_error"):
+        return fallback
+    plain = str(explanation.get("plain_language_explanation") or "").strip()
+    why = str(explanation.get("why_it_matters") or "").strip()
+    parts = [part for part in [plain, why] if _is_useful_text(part) and "no disponible" not in part.lower()]
+    return short_fragment(" ".join(parts), 520) if parts else fallback
+
+
+def _deterministic_contextual_explanation(row: pd.Series) -> str:
+    priority = observation_priority(row)
+    dimension = dimension_label(row.get("competition_dimension", row.get("dimensión competitiva", "No disponible")))
+    context = corpus_context_sentence(row)
+    mitigants = display_list(row.get("mitigating_factors", []))
+    mitigation_text = (
+        " Se identificaron mitigantes textuales que conviene valorar en contexto."
+        if mitigants
+        else " No se identificaron mitigantes textuales suficientes en el fragmento representativo."
+    )
+    return (
+        f"Esta observación se presenta como {priority} porque puede requerir validar proporcionalidad "
+        f"dentro de la dimensión {dimension}. {context}{mitigation_text}"
+    )
+
+
 def render_human_actions(row: pd.Series, key_prefix: str = "detail") -> None:
     signal_id = str(row["signal_id"])
     note_key = f"review_note_{signal_id}"
@@ -578,6 +614,88 @@ def render_human_actions(row: pd.Series, key_prefix: str = "detail") -> None:
         st.rerun()
     with st.expander("Agregar comentario", expanded=False):
         st.text_area("Comentario de revisión", key=note_key, height=90, label_visibility="collapsed")
+
+
+@st.cache_data(show_spinner=False)
+def render_pdf_fragment_bytes(
+    pdf_bytes: bytes,
+    page_number: int,
+    search_text: str,
+    fallback_text: str,
+) -> bytes | None:
+    try:
+        with fitz.open(stream=pdf_bytes, filetype="pdf") as document:
+            if page_number < 1 or page_number > len(document):
+                return None
+            page = document[page_number - 1]
+            rect = _find_fragment_rect(page, search_text, fallback_text)
+            if rect is None:
+                return None
+            clip = _expanded_clip(rect, page.rect)
+            page.draw_rect(rect, color=(0, 0.35, 0.61), width=1.2)
+            pixmap = page.get_pixmap(matrix=fitz.Matrix(2.6, 2.6), clip=clip, alpha=False)
+            return pixmap.tobytes("png")
+    except Exception:
+        return None
+
+
+def _find_fragment_rect(page: fitz.Page, search_text: str, fallback_text: str) -> fitz.Rect | None:
+    for candidate in _visual_search_candidates(search_text, fallback_text):
+        rects = page.search_for(candidate, quads=False)
+        if rects:
+            return _union_rects(rects[:4])
+    return None
+
+
+def _visual_search_candidates(search_text: str, fallback_text: str) -> list[str]:
+    candidates: list[str] = []
+    for value in [search_text, fallback_text]:
+        clean = " ".join(str(value or "").split())
+        if not clean:
+            continue
+        candidates.append(clean[:120])
+        words = [word.strip('.,;:()[]{}"') for word in clean.split() if len(word.strip('.,;:()[]{}"')) > 3]
+        for size in (8, 6, 4):
+            for start in range(0, max(len(words) - size + 1, 0)):
+                phrase = " ".join(words[start:start + size])
+                if phrase and phrase not in candidates:
+                    candidates.append(phrase)
+                if len(candidates) >= 18:
+                    return candidates
+    return candidates
+
+
+def _union_rects(rects: list[fitz.Rect]) -> fitz.Rect:
+    rect = fitz.Rect(rects[0])
+    for item in rects[1:]:
+        rect |= item
+    return rect
+
+
+def _expanded_clip(rect: fitz.Rect, page_rect: fitz.Rect) -> fitz.Rect:
+    width_padding = max(80, rect.width * 1.2)
+    height_padding = max(70, rect.height * 5)
+    clip = fitz.Rect(
+        rect.x0 - width_padding,
+        rect.y0 - height_padding,
+        rect.x1 + width_padding,
+        rect.y1 + height_padding,
+    )
+    return clip & page_rect
+
+
+def render_visual_fragment(row: pd.Series, pdf_bytes: bytes | None) -> None:
+    if not pdf_bytes:
+        return
+    page_number = int(row.get("página", 1) or 1)
+    search_text = str(row.get("visual_search_text") or row.get("matched_text") or "")
+    fallback_text = str(row.get("fragmento textual") or row.get("representative_excerpt") or "")
+    image_bytes = render_pdf_fragment_bytes(pdf_bytes, page_number, search_text, fallback_text)
+    if image_bytes:
+        st.markdown("**Fragmento visual asociado**")
+        st.image(image_bytes, use_container_width=True)
+    else:
+        st.caption("No se pudo ubicar automáticamente el fragmento dentro de la página PDF; se conserva la evidencia textual como referencia principal.")
 
 
 def render_evidence_panel(row: pd.Series, pages: list | None = None, pdf_bytes: bytes | None = None) -> None:
@@ -603,10 +721,7 @@ def render_evidence_panel(row: pd.Series, pages: list | None = None, pdf_bytes: 
                 for index, item in enumerate(display_list(raw_items), start=1):
                     st.markdown(f"**Ocurrencia {index}**")
                     st.write(safe_text(item))
-    if pdf_bytes:
-        with st.expander("Consultar página completa del PDF", expanded=False):
-            st.caption("Vista ampliada de la página asociada a la observación. Si el PDF no permite navegación precisa, use el número de página indicado arriba.")
-            render_pdf_viewer(pdf_bytes, page_number)
+    render_visual_fragment(row, pdf_bytes)
 
 
 def render_observation_detail(
@@ -617,9 +732,8 @@ def render_observation_detail(
 ) -> None:
     st.markdown('<div class="observation-detail-panel">', unsafe_allow_html=True)
     render_evidence_panel(row, pages, pdf_bytes)
-    st.markdown("**Contexto y validación sugerida**")
-    st.write(short_fragment(row.get("por qué se sugiere revisar", "Requiere validación humana."), 360))
-    st.write(corpus_context_sentence(row))
+    st.markdown("**Explicación contextual**")
+    st.write(integrated_contextual_explanation(row, corpus_context))
     mitigants = display_list(row.get("mitigating_factors", []))
     if mitigants:
         st.markdown("**Mitigantes identificados**")
@@ -668,8 +782,9 @@ def _render_aspect_rows(
                 f"{safe_text(row.get('occurrence_count', row.get('número de coincidencias', 1)))} ocurrencia(s) · "
                 f"{safe_text(dimension_label(row.get('competition_dimension', row.get('dimensión competitiva', 'No disponible'))))}"
             )
-            st.markdown(f"**Por qué conviene revisar:** {safe_text(short_fragment(row.get('por qué se sugiere revisar', row.get('observación prudente', 'Requiere validación humana.')), 360))}")
-            st.caption(corpus_context_sentence(row))
+            st.markdown(f"**Observación breve:** {safe_text(short_fragment(row.get('por qué se sugiere revisar', row.get('observación prudente', 'Requiere validación humana.')), 280))}")
+            st.markdown("**Explicación contextual**")
+            st.write(integrated_contextual_explanation(row, corpus_context))
             mitigants = display_list(row.get("mitigating_factors", []))
             if mitigants:
                 st.caption("Mitigantes identificados: " + "; ".join(mitigants[:3]))
