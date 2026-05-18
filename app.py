@@ -751,7 +751,18 @@ def _analytical_dimensions_for_row(row: pd.Series) -> list[str]:
         base.append("Requisitos regulatorios, certificación, trazabilidad o calidad del bien.")
     if "experiencia" in text or "capacidad" in text:
         base.append("Criterios de participación, experiencia o capacidad técnica.")
-    return _unique(base)
+    return unique_texts(base)
+
+
+def unique_texts(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    output: list[str] = []
+    for value in values:
+        clean = str(value).strip()
+        if clean and clean not in seen:
+            output.append(clean)
+            seen.add(clean)
+    return output
 
 
 def render_evidence_panel(row: pd.Series, pages: list | None = None, pdf_bytes: bytes | None = None) -> None:
