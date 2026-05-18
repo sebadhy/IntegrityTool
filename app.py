@@ -1316,7 +1316,40 @@ def render_setup_panel() -> tuple[object | None, bool, bool, bool]:
         """,
         unsafe_allow_html=True,
     )
-    st.caption("La herramienta extrae texto, consolida observaciones y muestra evidencia documental para orientar revisión humana.")
+    st.markdown(
+        """
+        <div class="setup-explainability">
+            <p>La herramienta analiza el contenido del pliego, organiza evidencia documental y genera observaciones preliminares para apoyar la revisión humana.</p>
+            <p>El análisis combina extracción documental, reglas de revisión y contextualización asistida para identificar aspectos que podrían requerir validación adicional desde la perspectiva de neutralidad competitiva y proporcionalidad.</p>
+            <p>La herramienta no determina ilegalidad, corrupción ni direccionamiento, y no reemplaza revisión técnica, jurídica o institucional.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    with st.expander("Cómo funciona el análisis", expanded=False):
+        st.markdown(
+            """
+**Qué analiza**
+
+La herramienta puede identificar observaciones preliminares relacionadas con requisitos técnicos, condiciones de participación, experiencia requerida, criterios de evaluación, plazos, requisitos regulatorios, interoperabilidad y otras condiciones que podrían requerir validación adicional.
+
+**Organización de evidencia**
+
+El sistema extrae texto y estructura básica del documento, asocia observaciones con fragmentos verificables, identifica páginas relacionadas y organiza evidencia documental para facilitar trazabilidad.
+
+**Procesamiento asistido**
+
+Cuando existe capacidad de procesamiento asistido disponible, el sistema puede resumir contenido documental, contextualizar requisitos, consolidar observaciones relacionadas, comparar cláusulas con procesos similares y generar explicaciones narrativas adicionales. La identificación primaria de señales documentales se basa en reglas, taxonomías y patrones configurados.
+
+**Dimensiones consideradas**
+
+La revisión puede considerar neutralidad competitiva, proporcionalidad, aceptación de equivalencias, barreras de entrada, trazabilidad, interoperabilidad y relación entre requisitos y objeto contractual.
+
+**Alcance y límites**
+
+Las observaciones generadas son insumos preliminares para revisión humana. La herramienta no determina ilegalidad, no detecta corrupción, no confirma direccionamiento, no reemplaza criterio humano y no constituye dictamen técnico o jurídico.
+            """
+        )
     uploaded_file = st.file_uploader("Documento PDF", type=["pdf"], label_visibility="collapsed")
     process_document = st.button("Iniciar revisión", type="primary", width="stretch")
     st.markdown('<div class="setup-footer">Insumo preliminar para revisión humana.</div>', unsafe_allow_html=True)

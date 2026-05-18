@@ -930,6 +930,26 @@ textarea {
     margin: 0;
 }
 
+.setup-explainability {
+    background: #FBFCFE;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--blue-medium);
+    border-radius: 4px;
+    color: var(--text-gray);
+    font-size: 0.9rem;
+    line-height: 1.42;
+    margin: 0.55rem 0 0.45rem;
+    padding: 0.7rem 0.8rem;
+}
+
+.setup-explainability p {
+    margin: 0 0 0.35rem;
+}
+
+.setup-explainability p:last-child {
+    margin-bottom: 0;
+}
+
 .setup-footer {
     color: #66727F;
     font-size: 0.76rem;
@@ -942,4 +962,9 @@ textarea {
 
 [data-testid="stCheckbox"] {
     margin-top: 0.2rem;
+}
+
+[data-testid="stFileUploaderDropzoneInstructions"] small {
+    color: #7A8693;
+    font-size: 0.72rem;
 }
