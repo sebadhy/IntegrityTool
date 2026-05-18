@@ -441,14 +441,6 @@ def render_action_badge(label: str, uses_ai: bool) -> None:
     )
 
 
-def render_ai_action_button(action_label: str, key: str) -> bool:
-    st.caption(
-        "Genera una explicación adicional usando el fragmento seleccionado, la taxonomía "
-        "y los factores mitigantes. No reemplaza la revisión humana."
-    )
-    return st.button(action_label, key=f"ai_direct_{key}", width="stretch")
-
-
 def render_document_header(document_name: str, metadata: dict[str, str], signal_count: int) -> object:
     st.markdown(
         f"""
@@ -498,44 +490,32 @@ def render_pliego_summary(
     assisted_summary: list[str] | None = None,
 ) -> None:
     st.subheader("Resumen del pliego")
-    st.caption("Resumen preliminar del contenido y principales dimensiones identificadas para revisión.")
-    object_text = metadata.get("objeto", "No identificado automáticamente")
-    entity = metadata.get("entidad", "No identificado automáticamente")
+    st.caption("Lectura breve para orientar la revisión; los datos formales del procedimiento se muestran solo en el encabezado.")
+    object_text = metadata.get("objeto", "el objeto identificado en el documento")
     top_themes = brief.get("top_themes", [])[:3]
-    theme_text = ", ".join(top_themes) if top_themes else "condiciones del proceso"
+    theme_text = ", ".join(top_themes) if top_themes else "condiciones documentales del proceso"
     condition_count = len(reviewable_signals(filtered_df))
-    facts = [
-        ("Entidad contratante", entity),
-        ("Objeto", object_text),
-        ("Tipo de procedimiento", metadata.get("tipo_procedimiento", "No disponible")),
-        ("Presupuesto referencial", metadata.get("presupuesto", "No disponible")),
-        ("Fecha", metadata.get("fecha", "No disponible")),
-    ]
-    fact_html = "".join(
-        f"<div><strong>{safe_text(label)}</strong><span>{safe_text(value)}</span></div>"
-        for label, value in facts
-        if _is_useful_text(value) and value != "No disponible"
-    )
+    mitigant_count = sum(1 for _, row in filtered_df.iterrows() if display_list(row.get("mitigating_factors", []))) if not filtered_df.empty else 0
     if assisted_summary:
         bullets = assisted_summary[:4]
     elif ai_brief and ai_brief.get("document_summary") != "No disponible":
         ai_topics = display_list(ai_brief.get("main_review_topics", []))[:2]
         bullets = [
-            f"El proceso corresponde a {object_text}.",
-            f"La revisión preliminar identificó observaciones relacionadas con {', '.join(ai_topics) if ai_topics else theme_text}.",
+            f"El documento revisado corresponde a {object_text}.",
+            f"La lectura preliminar concentra la revisión en {', '.join(ai_topics) if ai_topics else theme_text}.",
             short_fragment(ai_brief.get("possible_competition_effects", "Algunas condiciones podrían requerir validación de proporcionalidad y necesidad técnica."), 180),
-            "Estas observaciones son insumos preliminares para revisión humana.",
+            "Las observaciones son insumos preliminares y deben confirmarse con revisión humana.",
         ]
     else:
         bullets = [
-            f"El proceso corresponde a {object_text}.",
-            f"La entidad contratante es {entity}.",
-            f"La revisión preliminar identificó {condition_count} observaciones relacionadas principalmente con {theme_text}.",
-            "Estas observaciones son insumos preliminares para revisión humana.",
+            f"El documento revisado corresponde a {object_text}.",
+            f"Se consolidaron {condition_count} aspectos sugeridos para revisión, principalmente vinculados con {theme_text}.",
+            f"Se identificaron mitigantes textuales en {mitigant_count} aspecto(s), cuando el documento incluye equivalencias, justificaciones o condiciones de apertura.",
+            "La lectura es preliminar: orienta qué revisar primero, sin emitir conclusiones técnicas o legales definitivas.",
         ]
     html = "".join(f"<li>{safe_text(item)}</li>" for item in bullets[:4] if _is_useful_text(item))
     st.markdown(
-        f'<div class="pliego-summary"><div class="document-facts">{fact_html}</div><div class="summary-label">Resumen preliminar</div><ul>{html}</ul></div>',
+        f'<div class="pliego-summary"><div class="summary-label">Lectura preliminar</div><ul>{html}</ul></div>',
         unsafe_allow_html=True,
     )
 
@@ -602,35 +582,30 @@ def render_human_actions(row: pd.Series, key_prefix: str = "detail") -> None:
 
 def render_evidence_panel(row: pd.Series, pages: list | None = None, pdf_bytes: bytes | None = None) -> None:
     page_number = int(row.get("página", 1) or 1)
-    st.markdown("**Evidencia documental**")
+    additional_count = len(display_list(row.get("additional_excerpts", row.get("fragmentos adicionales", []))))
     st.markdown(
         f"""
         <div class="evidence-detail-box">
-            <div><strong>Páginas relacionadas</strong><span>{safe_text(row.get('páginas relacionadas', page_number))}</span></div>
-            <div class="evidence-detail-fragment"><strong>Fragmento exacto</strong><p>{safe_text(row['fragmento textual'])}</p></div>
+            <div><strong>Evidencia documental</strong><span>Páginas {safe_text(row.get('páginas relacionadas', page_number))}</span></div>
+            <div class="evidence-detail-fragment"><strong>Fragmento representativo</strong><p>{safe_text(row['fragmento textual'])}</p></div>
         </div>
         """,
         unsafe_allow_html=True,
     )
-    if pages:
-        selected_text = next((page.text for page in pages if page.page_number == page_number), "")
-        if selected_text:
-            with st.expander("Contexto inmediato", expanded=False):
-                st.text_area("Contexto inmediato", value=selected_text, height=180, label_visibility="collapsed")
-    additional = display_list(row.get("additional_excerpts", row.get("fragmentos adicionales", [])))
-    if additional:
-        with st.expander("Ver ocurrencias adicionales", expanded=False):
-            raw_items = row.get("additional_excerpts", row.get("fragmentos adicionales", []))
+    raw_items = row.get("additional_excerpts", row.get("fragmentos adicionales", []))
+    if additional_count:
+        with st.expander(f"Ocurrencias relacionadas ({additional_count})", expanded=False):
             if isinstance(raw_items, list) and raw_items and isinstance(raw_items[0], dict):
                 for index, item in enumerate(raw_items, start=1):
                     st.markdown(f"**Ocurrencia {index} · página {safe_text(item.get('page', 'No disponible'))}**")
                     st.write(safe_text(item.get("text", "")))
             else:
-                for index, item in enumerate(additional, start=1):
+                for index, item in enumerate(display_list(raw_items), start=1):
                     st.markdown(f"**Ocurrencia {index}**")
                     st.write(safe_text(item))
     if pdf_bytes:
-        with st.expander("Ver página en PDF", expanded=False):
+        with st.expander("Consultar página completa del PDF", expanded=False):
+            st.caption("Vista ampliada de la página asociada a la observación. Si el PDF no permite navegación precisa, use el número de página indicado arriba.")
             render_pdf_viewer(pdf_bytes, page_number)
 
 
@@ -642,35 +617,17 @@ def render_observation_detail(
 ) -> None:
     st.markdown('<div class="observation-detail-panel">', unsafe_allow_html=True)
     render_evidence_panel(row, pages, pdf_bytes)
-    st.markdown("**Por qué conviene revisar**")
+    st.markdown("**Contexto y validación sugerida**")
     st.write(short_fragment(row.get("por qué se sugiere revisar", "Requiere validación humana."), 360))
-    st.markdown("**Dimensión competitiva**")
-    st.write(dimension_label(row.get("competition_dimension", row.get("dimensión competitiva", "No disponible"))))
-    st.markdown("**Factores mitigantes**")
-    st.markdown(display_bullets(row.get("mitigating_factors", []), "No se identificaron mitigantes cercanos."), unsafe_allow_html=True)
-    st.markdown("**Preguntas sugeridas para revisión humana**")
+    st.write(corpus_context_sentence(row))
+    mitigants = display_list(row.get("mitigating_factors", []))
+    if mitigants:
+        st.markdown("**Mitigantes identificados**")
+        st.markdown(display_bullets(mitigants, "No se identificaron mitigantes cercanos."), unsafe_allow_html=True)
+    st.markdown("**Qué conviene validar**")
     questions = row.get("human_review_questions") or row.get("suggested_questions") or row.get("pregunta_normativa_sugerida")
     st.markdown(display_bullets(questions, row.get("validación sugerida", "Validar proporcionalidad y necesidad técnica.")), unsafe_allow_html=True)
-    st.markdown("**Contexto histórico**")
-    st.write(corpus_context_sentence(row))
-    st.markdown("**Fuente de la señal**")
-    st.caption(observation_source(row))
-
-    with st.expander("Registro de revisión", expanded=False):
-        render_human_actions(row, key_prefix="obs")
-
-    with st.expander("Ampliar explicación", expanded=False):
-        if render_ai_action_button("Ampliar explicación con procesamiento asistido", key=f"obs_explain_{row['signal_id']}"):
-            if not os.getenv("OPENAI_API_KEY"):
-                st.warning("Procesamiento asistido no configurado. La revisión basada en reglas sigue disponible.")
-            else:
-                explanation = cached_explain_priority_with_llm(
-                    row.to_dict(),
-                    corpus_context,
-                    os.getenv("OPENAI_MODEL", ""),
-                    os.getenv("OPENAI_BASE_URL", ""),
-                )
-                render_finding_explanation(explanation)
+    st.caption(f"Fuente: {safe_text(observation_source(row))}")
     st.markdown('</div>', unsafe_allow_html=True)
 
 def render_suggested_aspects(
@@ -702,39 +659,25 @@ def _render_aspect_rows(
     key_prefix: str = "main",
 ) -> None:
     for position, (_, row) in enumerate(rows_df.iterrows(), start=1):
-        signal_id = str(row["signal_id"])
-        row_key = f"{key_prefix}_{position}_{signal_id}"
-        is_open = st.session_state.get("expanded_observation_id") == row_key
+        priority = observation_priority(row)
         with st.container(border=True):
-            header_cols = st.columns([0.70, 0.18, 0.12], vertical_alignment="center")
-            with header_cols[0]:
-                st.markdown(f"**{safe_text(str(row['patrón detectado']))}**")
-                st.caption(
-                    f"Páginas {safe_text(row.get('páginas relacionadas', row['página']))} · "
-                    f"{safe_text(row.get('occurrence_count', row.get('número de coincidencias', 1)))} ocurrencia(s) · "
-                    f"{safe_text(observation_priority(row))} · "
-                    f"{safe_text(dimension_label(row.get('competition_dimension', row.get('dimensión competitiva', 'No disponible'))))}"
-                )
-                st.caption(f"Fuente: {safe_text(observation_source(row))}")
-            with header_cols[1]:
-                st.write(safe_text(observation_priority(row)))
-            with header_cols[2]:
-                if st.button("Ver evidencia", key=f"aspect_view_{row_key}", width="stretch"):
-                    st.session_state["expanded_observation_id"] = None if is_open else row_key
-                    st.session_state["selected_signal_id"] = signal_id
-                    append_review_event("Evidencia abierta", row["patrón detectado"])
-                    st.rerun()
-
-            st.markdown(f"**Fragmento representativo:** {safe_text(short_fragment(row.get('representative_excerpt', row['fragmento textual']), 300))}")
-            st.markdown(f"**Por qué conviene revisar:** {safe_text(short_fragment(row.get('por qué se sugiere revisar', row.get('observación prudente', 'Requiere validación humana.')), 320))}")
-
+            st.markdown(f"**{safe_text(str(row['patrón detectado']))}**")
+            st.caption(
+                f"Prioridad: {safe_text(priority)} · "
+                f"Páginas {safe_text(row.get('páginas relacionadas', row['página']))} · "
+                f"{safe_text(row.get('occurrence_count', row.get('número de coincidencias', 1)))} ocurrencia(s) · "
+                f"{safe_text(dimension_label(row.get('competition_dimension', row.get('dimensión competitiva', 'No disponible'))))}"
+            )
+            st.markdown(f"**Por qué conviene revisar:** {safe_text(short_fragment(row.get('por qué se sugiere revisar', row.get('observación prudente', 'Requiere validación humana.')), 360))}")
+            st.caption(corpus_context_sentence(row))
             mitigants = display_list(row.get("mitigating_factors", []))
             if mitigants:
-                st.caption("Factores mitigantes: " + "; ".join(mitigants[:3]))
-            st.caption(corpus_context_sentence(row))
-
-            if is_open:
-                render_observation_detail(row, pages=pages, pdf_bytes=pdf_bytes, corpus_context=corpus_context)
+                st.caption("Mitigantes identificados: " + "; ".join(mitigants[:3]))
+            questions = row.get("human_review_questions") or row.get("suggested_questions") or row.get("pregunta_normativa_sugerida")
+            st.markdown("**Qué conviene validar**")
+            st.markdown(display_bullets(questions, row.get("validación sugerida", "Validar proporcionalidad y necesidad técnica.")), unsafe_allow_html=True)
+            render_evidence_panel(row, pages=pages, pdf_bytes=pdf_bytes)
+            st.caption(f"Fuente: {safe_text(observation_source(row))}")
 
 # Backward-compatible name used by older flow sections.
 def render_top_findings(priority_df: pd.DataFrame) -> None:
@@ -756,7 +699,6 @@ def render_executive_overview(
 ) -> None:
     render_document_header(document_name, metadata, signal_count)
     render_pliego_summary(metadata, brief, priority_df, document_text, ai_brief=ai_brief, assisted_summary=assisted_summary)
-    render_executive_summary(brief)
     render_suggested_aspects(priority_df, pages=pages, pdf_bytes=pdf_bytes, corpus_context=corpus_context)
 
 
@@ -953,37 +895,7 @@ def render_signal_inspector(row: pd.Series, corpus_context: dict | None = None) 
         st.markdown(f"**Criterio:** {safe_text(row['criterio_normativo_de_revision'])}")
         st.markdown(f"**Pregunta:** {safe_text(row['pregunta_normativa_sugerida'])}")
 
-    st.markdown("**Registro de revisión**")
-    note_key = f"review_note_{signal_id}"
-    current_status = st.session_state.get(f"review_status_{signal_id}", "Pendiente")
-    st.caption(f"Estado actual: {current_status}")
-    if st.button("Confirmar revisión", key=f"confirm_{signal_id}", width="stretch"):
-        set_review_status(row, "Confirmada", st.session_state.get(note_key, ""))
-        st.rerun()
-    cols = st.columns(2)
-    if cols[0].button("Descartar", key=f"dismiss_{signal_id}", width="stretch"):
-        set_review_status(row, "Descartada", st.session_state.get(note_key, ""))
-        st.rerun()
-    if cols[1].button("Marcar seguimiento", key=f"follow_{signal_id}", width="stretch"):
-        set_review_status(row, "Seguimiento", st.session_state.get(note_key, ""))
-        st.rerun()
-    with st.expander("Agregar comentario", expanded=False):
-        st.text_area("Comentario de revisión", key=note_key, height=90, label_visibility="collapsed")
-
-    with st.expander("Acciones adicionales", expanded=False):
-        if render_ai_action_button("Ampliar explicación", key=f"workbench_explain_{signal_id}"):
-            if not os.getenv("OPENAI_API_KEY"):
-                st.warning(
-                    "IA generativa no configurada. La revisión basada en reglas sigue disponible."
-                )
-            else:
-                explanation = cached_explain_priority_with_llm(
-                    row.to_dict(),
-                    corpus_context,
-                    os.getenv("OPENAI_MODEL", ""),
-                    os.getenv("OPENAI_BASE_URL", ""),
-                )
-                render_finding_explanation(explanation)
+    st.caption("La revisión humana se registra fuera de esta PoC. Esta pantalla solo orienta lectura y validación documental.")
 
 
 def render_review_workbench(
@@ -1091,22 +1003,6 @@ def render_aspect_card(row: pd.Series, corpus_context: dict | None = None) -> No
         """,
         unsafe_allow_html=True,
     )
-    button_key = f"explain_{row.name}_{row['página']}_{row['patrón detectado']}"
-    if render_ai_action_button("Ampliar explicación", key=button_key):
-        if not os.getenv("OPENAI_API_KEY"):
-            st.warning(
-                "IA generativa no configurada. Se muestran resultados basados en reglas "
-                "y comparación documental."
-            )
-        else:
-            explanation = cached_explain_priority_with_llm(
-                row.to_dict(),
-                corpus_context,
-                os.getenv("OPENAI_MODEL", ""),
-                os.getenv("OPENAI_BASE_URL", ""),
-            )
-            render_finding_explanation(explanation)
-
 
 def render_theme_groups(enriched_df: pd.DataFrame, corpus_context: dict | None = None) -> None:
     st.subheader("Aspectos sugeridos para revisión")
@@ -1247,12 +1143,11 @@ def render_setup_panel() -> tuple[object | None, bool, bool, bool]:
         """,
         unsafe_allow_html=True,
     )
+    st.caption("La herramienta extrae texto, consolida observaciones y muestra evidencia documental para orientar revisión humana.")
     uploaded_file = st.file_uploader("Documento PDF", type=["pdf"], label_visibility="collapsed")
-    enable_assisted_analysis = st.checkbox("Agregar análisis asistido", value=False)
-    st.caption("Genera resumen preliminar y comparación con procesos similares.")
     process_document = st.button("Iniciar revisión", type="primary", width="stretch")
     st.markdown('<div class="setup-footer">Insumo preliminar para revisión humana.</div>', unsafe_allow_html=True)
-    return uploaded_file, enable_assisted_analysis, enable_assisted_analysis, process_document
+    return uploaded_file, True, bool(os.getenv("OPENAI_API_KEY")), process_document
 
 def render_review_top_bar(document_name: str, signal_count: int) -> None:
     st.markdown(
@@ -1407,13 +1302,7 @@ def render_review_flow() -> None:
 
     filtered_df = visible_df
 
-    with st.expander("Preguntas sugeridas para revisión humana", expanded=False):
-        render_review_questions(filtered_df)
-
-    with st.expander("Limitaciones metodológicas", expanded=False):
-        render_methodological_limitations(validation_messages)
-
-    render_technical_details(corpus_payload, validation_messages)
+    render_methodological_limitations(validation_messages)
 
     with st.expander("Exportar resultados", expanded=False):
         st.caption("Exporta los aspectos sugeridos para revisión en formato tabular.")

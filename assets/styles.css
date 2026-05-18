@@ -846,35 +846,6 @@ textarea {
     white-space: normal;
 }
 
-.document-facts {
-    border-bottom: 1px solid var(--border);
-    display: grid;
-    gap: 0.65rem;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.75rem;
-}
-
-.document-facts div {
-    font-size: 0.88rem;
-    line-height: 1.35;
-}
-
-.document-facts strong {
-    color: #52606D;
-    display: block;
-    font-size: 0.72rem;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-}
-
-.document-facts span {
-    color: #1F2D3A;
-    display: block;
-    margin-top: 0.15rem;
-    white-space: normal;
-}
-
 .top-finding-card {
     border-top: 1px solid var(--border);
     min-height: 220px;
@@ -904,8 +875,7 @@ textarea {
 }
 
 @media (max-width: 900px) {
-    .document-header-simple,
-    .document-facts {
+    .document-header-simple {
         grid-template-columns: 1fr;
     }
 
