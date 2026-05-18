@@ -1148,42 +1148,6 @@ def render_theme_groups(enriched_df: pd.DataFrame, corpus_context: dict | None =
         st.info("No hay señales de revisión en los filtros actuales. Revise el balance analítico para mitigantes o requisitos habituales.")
 
 
-def render_mitigating_factors_section(enriched_df: pd.DataFrame) -> None:
-    st.subheader("Factores mitigantes identificados")
-    st.caption("Elementos que pueden reducir la prioridad de revisión cuando son claros y aplicables al requisito observado.")
-    rows = []
-    for _, row in enriched_df.iterrows():
-        mitigants = display_list(row.get("mitigating_factors", []))
-        if mitigants:
-            rows.append({
-                "Página": row.get("página", ""),
-                "Aspecto": row.get("patrón detectado", ""),
-                "Mitigantes": "; ".join(mitigants[:4]),
-            })
-    if not rows:
-        st.info("No se identificaron mitigantes explícitos cercanos en los aspectos revisados.")
-        return
-    st.dataframe(pd.DataFrame(rows).drop_duplicates(), width="stretch", hide_index=True)
-
-
-def render_corpus_context_section(enriched_df: pd.DataFrame) -> None:
-    st.subheader("Comparación con corpus histórico")
-    st.caption("La comparación contextualiza patrones frecuentes o poco frecuentes; no constituye una observación separada.")
-    if enriched_df.empty or "clasificación histórica" not in enriched_df.columns:
-        st.info("Comparación histórica no disponible para esta revisión.")
-        return
-    rows = []
-    for _, row in reviewable_signals(enriched_df).head(8).iterrows():
-        rows.append({
-            "Aspecto": row.get("patrón detectado", ""),
-            "Frecuencia": row.get("frecuencia en corpus", "No disponible"),
-            "Lectura contextual": corpus_context_sentence(row),
-        })
-    if rows:
-        st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
-    else:
-        st.info("No hay aspectos de revisión con contexto histórico disponible.")
-
 
 def render_methodological_limitations(validation_messages: list[str]) -> None:
     st.subheader("Limitaciones metodológicas")
@@ -1454,9 +1418,6 @@ def render_review_flow() -> None:
     )
 
     filtered_df = visible_df
-
-    render_mitigating_factors_section(filtered_df)
-    render_corpus_context_section(filtered_df)
 
     with st.expander("Preguntas sugeridas para revisión humana", expanded=False):
         render_review_questions(filtered_df)
