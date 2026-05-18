@@ -1341,13 +1341,51 @@ El sistema extrae texto y estructura básica del documento, asocia observaciones
 
 Cuando existe capacidad de procesamiento asistido disponible, el sistema puede resumir contenido documental, contextualizar requisitos, consolidar observaciones relacionadas, comparar cláusulas con procesos similares y generar explicaciones narrativas adicionales. La identificación primaria de señales documentales se basa en reglas, taxonomías y patrones configurados.
 
+**Comparación contextual**
+
+Cuando existe un corpus documental disponible, la herramienta puede comparar cláusulas y patrones con procesos previamente analizados para aportar contexto adicional durante la revisión.
+
+Estas comparaciones permiten identificar patrones frecuentes, contextualizar requisitos similares, reducir sobreinterpretación de cláusulas habituales y organizar referencias documentales comparables.
+
+La presencia frecuente de un patrón en el corpus no implica validez ni invalidez del requisito analizado y debe interpretarse junto con el contexto específico del procedimiento.
+
+El uso de referencias comparativas busca apoyar una revisión más contextual y consistente, alineada con enfoques internacionales sobre competencia, acceso y proporcionalidad en contratación pública.
+
 **Dimensiones consideradas**
 
-La revisión puede considerar neutralidad competitiva, proporcionalidad, aceptación de equivalencias, barreras de entrada, trazabilidad, interoperabilidad y relación entre requisitos y objeto contractual.
+La revisión puede considerar distintas dimensiones analíticas utilizadas para organizar y contextualizar observaciones documentales preliminares.
+
+**Neutralidad competitiva**
+
+Evalúa si los requisitos y condiciones del procedimiento podrían limitar innecesariamente la participación de potenciales oferentes o favorecer determinadas soluciones, tecnologías o condiciones de participación.
+
+**Proporcionalidad**
+
+Analiza si los requisitos técnicos, financieros, administrativos o de experiencia parecen razonablemente vinculados con el objeto, complejidad y alcance del procedimiento.
+
+**Aceptación de equivalencias**
+
+Revisa si el procedimiento admite alternativas equivalentes en especificaciones técnicas, certificaciones o estándares, lo que puede reducir restricciones innecesarias sobre concurrencia.
+
+**Barreras de entrada**
+
+Considera condiciones que podrían dificultar la participación de oferentes potenciales, como requisitos acumulativos, experiencia altamente específica, exigencias financieras desproporcionadas o condiciones administrativas restrictivas.
+
+**Trazabilidad y regulación**
+
+Contextualiza requisitos relacionados con calidad, certificaciones, registros regulatorios, soporte técnico, seguridad, garantías o trazabilidad del bien o servicio, especialmente en sectores regulados.
+
+**Interoperabilidad y compatibilidad**
+
+Analiza referencias a compatibilidad técnica, integración con plataformas existentes o continuidad operativa, considerando que algunas exigencias pueden responder a necesidades funcionales legítimas y no necesariamente implican restricciones indebidas.
+
+**Relación entre requisitos y objeto contractual**
+
+Evalúa si las condiciones observadas parecen guardar relación razonable con el objeto, finalidad y características del procedimiento analizado.
 
 **Alcance y límites**
 
-Las observaciones generadas son insumos preliminares para revisión humana. La herramienta no determina ilegalidad, no detecta corrupción, no confirma direccionamiento, no reemplaza criterio humano y no constituye dictamen técnico o jurídico.
+Estas dimensiones se utilizan únicamente como apoyo analítico para organizar observaciones preliminares y facilitar revisión humana contextual. Las observaciones generadas son insumos preliminares para revisión humana. La herramienta no determina ilegalidad, no detecta corrupción, no confirma direccionamiento, no reemplaza criterio humano y no constituye dictamen técnico o jurídico.
             """
         )
     uploaded_file = st.file_uploader("Documento PDF", type=["pdf"], label_visibility="collapsed")
