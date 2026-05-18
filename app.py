@@ -865,43 +865,46 @@ def _methodology_sections(row: pd.Series) -> list[tuple[str, list[str]]]:
     occurrences = row.get("occurrence_count", row.get("número de coincidencias", 1))
     pages = row.get("páginas relacionadas", row.get("página", "No disponible"))
     mitigants = display_list(row.get("mitigating_factors", []))
-    ranking = display_list(row.get("criterios_de_priorizacion", row.get("escalation_factors", [])))
     missing = display_list(row.get("missing_information", []))
-    evidence = short_fragment(row.get("fragmento textual", row.get("representative_excerpt", "No disponible")), 260)
+    evidence = short_fragment(row.get("fragmento textual", row.get("representative_excerpt", "No disponible")), 240)
     ai_active = bool(os.getenv("OPENAI_API_KEY"))
 
-    analytical_dimensions = _analytical_dimensions_for_row(row)
-    logic_items = [
-        "La identificación primaria se basa en taxonomías documentales, reglas y patrones configurados.",
-        "La herramienta revisa si el requisito podría requerir validación desde proporcionalidad, equivalencias y posible efecto sobre concurrencia.",
-        f"La prioridad visible es {priority}; se usa para ordenar revisión humana, no como calificación legal ni determinación automática.",
+    basis = [
+        f"Patrón aplicado: {pattern}.",
+        f"Dimensión considerada: {dimension}.",
+        f"Se consolidaron {occurrences} ocurrencia(s) en la(s) página(s) {pages}.",
     ]
-    if ranking:
-        logic_items.append("Factores de priorización considerados: " + "; ".join(ranking[:4]) + ".")
+    if matched and matched != "No disponible":
+        basis.insert(0, f"Señal textual: {matched}.")
 
-    ai_items = [
-        (
-            "Se utilizó procesamiento asistido por modelos de lenguaje para apoyar resumen, metadata o contextualización narrativa. "
-            "La identificación primaria de señales documentales se mantiene basada en reglas, taxonomía y evidencia textual."
-            if ai_active
-            else "No se utilizó procesamiento asistido por modelos de lenguaje en esta observación porque no hay API key configurada en el entorno."
-        ),
-        "La IA no determina conclusiones, no asigna responsabilidades y no reemplaza revisión humana significativa.",
+    context = [
+        f"Prioridad visible: {priority}. Sirve para ordenar revisión humana, no como conclusión automática.",
+        "La observación se evalúa con criterios de proporcionalidad, equivalencias y relación con el objeto contractual.",
     ]
+    if mitigants:
+        context.append("Mitigantes identificados: " + "; ".join(mitigants[:3]) + ".")
+    else:
+        context.append("No se identificaron mitigantes textuales suficientes en el fragmento representativo.")
+
+    assisted = (
+        "Procesamiento asistido disponible: puede apoyar síntesis o redacción contextual; la señal primaria proviene de reglas, taxonomía y evidencia textual."
+        if ai_active
+        else "Procesamiento asistido no configurado en este entorno; la observación se generó con reglas, taxonomía y evidencia textual."
+    )
+
+    limits = [
+        "La lectura depende de la calidad del texto extraído, anexos disponibles, taxonomía configurada y corpus local.",
+        "La ausencia de mitigantes textuales no descarta justificaciones técnicas fuera del fragmento analizado.",
+        "No constituye dictamen técnico o jurídico ni determinación de ilegalidad, corrupción o direccionamiento.",
+    ]
+    if missing:
+        limits.append("Información a validar: " + "; ".join(missing[:3]) + ".")
 
     return [
-        ("A. Señales detectadas", [f"Se identificó una señal textual relacionada con: {matched}.", f"Patrón documental aplicado: {pattern}."]),
-        ("B. Dimensiones analizadas", analytical_dimensions),
-        ("C. Lógica aplicada", logic_items),
-        ("D. Factores mitigantes", mitigants[:4] if mitigants else ["No se identificaron mitigantes textuales suficientes en el fragmento representativo."]),
-        ("E. Evidencia utilizada", [f"Fragmento representativo: {evidence}", f"La observación consolida {occurrences} ocurrencia(s) en la(s) página(s) {pages}.", f"Fuente visible: {observation_source(row)}."]),
-        ("F. Uso de IA", ai_items),
-        ("G. Limitaciones metodológicas", [
-            "La lectura depende de la calidad del texto extraído, la taxonomía configurada y el corpus disponible.",
-            "La ausencia de un mitigante textual no significa que no exista justificación en anexos u otros documentos.",
-            "Esta observación constituye una lectura preliminar asistida y no debe interpretarse como evidencia de corrupción, fraude, ilegalidad ni direccionamiento.",
-            "Requiere revisión humana significativa antes de cualquier conclusión técnica, jurídica o institucional.",
-        ] + (["Información o mitigantes no observados: " + "; ".join(missing[:3]) + "."] if missing else [])),
+        ("Base documental", basis + [f"Fragmento usado: {evidence}"]),
+        ("Contexto aplicado", context),
+        ("Uso de procesamiento asistido", [assisted]),
+        ("Límites de interpretación", limits),
     ]
 
 
@@ -1533,64 +1536,30 @@ def render_setup_panel() -> tuple[object | None, bool, bool, bool]:
     with st.expander("Cómo funciona el análisis", expanded=False):
         st.markdown(
             """
-**Qué analiza**
+<div class="methodology-brief">
+    <div class="methodology-brief-item">
+        <strong>Qué revisa</strong>
+        <p>Identifica observaciones preliminares sobre requisitos técnicos, participación, experiencia, plazos, certificaciones, interoperabilidad y condiciones que podrían requerir validación adicional.</p>
+    </div>
+    <div class="methodology-brief-item">
+        <strong>Cómo organiza evidencia</strong>
+        <p>Extrae texto del PDF, agrupa fragmentos relacionados, consolida ocurrencias y vincula cada observación con páginas y evidencia verificable.</p>
+    </div>
+    <div class="methodology-brief-item">
+        <strong>Cómo contextualiza</strong>
+        <p>Aplica reglas y taxonomías configuradas. Cuando hay corpus disponible, compara patrones para distinguir condiciones habituales de aspectos menos frecuentes.</p>
+    </div>
+    <div class="methodology-brief-item">
+        <strong>Qué dimensiones considera</strong>
+        <p>Neutralidad competitiva, proporcionalidad, equivalencias, barreras de entrada, trazabilidad regulatoria, interoperabilidad y relación con el objeto contractual.</p>
+    </div>
+</div>
 
-La herramienta puede identificar observaciones preliminares relacionadas con requisitos técnicos, condiciones de participación, experiencia requerida, criterios de evaluación, plazos, requisitos regulatorios, interoperabilidad y otras condiciones que podrían requerir validación adicional.
-
-**Organización de evidencia**
-
-El sistema extrae texto y estructura básica del documento, asocia observaciones con fragmentos verificables, identifica páginas relacionadas y organiza evidencia documental para facilitar trazabilidad.
-
-**Procesamiento asistido**
-
-Cuando existe capacidad de procesamiento asistido disponible, el sistema puede resumir contenido documental, contextualizar requisitos, consolidar observaciones relacionadas, comparar cláusulas con procesos similares y generar explicaciones narrativas adicionales. La identificación primaria de señales documentales se basa en reglas, taxonomías y patrones configurados.
-
-**Comparación contextual**
-
-Cuando existe un corpus documental disponible, la herramienta puede comparar cláusulas y patrones con procesos previamente analizados para aportar contexto adicional durante la revisión.
-
-Estas comparaciones permiten identificar patrones frecuentes, contextualizar requisitos similares, reducir sobreinterpretación de cláusulas habituales y organizar referencias documentales comparables.
-
-La presencia frecuente de un patrón en el corpus no implica validez ni invalidez del requisito analizado y debe interpretarse junto con el contexto específico del procedimiento.
-
-El uso de referencias comparativas busca apoyar una revisión más contextual y consistente, alineada con enfoques internacionales sobre competencia, acceso y proporcionalidad en contratación pública.
-
-**Dimensiones consideradas**
-
-La revisión puede considerar distintas dimensiones analíticas utilizadas para organizar y contextualizar observaciones documentales preliminares.
-
-**Neutralidad competitiva**
-
-Evalúa si los requisitos y condiciones del procedimiento podrían limitar innecesariamente la participación de potenciales oferentes o favorecer determinadas soluciones, tecnologías o condiciones de participación.
-
-**Proporcionalidad**
-
-Analiza si los requisitos técnicos, financieros, administrativos o de experiencia parecen razonablemente vinculados con el objeto, complejidad y alcance del procedimiento.
-
-**Aceptación de equivalencias**
-
-Revisa si el procedimiento admite alternativas equivalentes en especificaciones técnicas, certificaciones o estándares, lo que puede reducir restricciones innecesarias sobre concurrencia.
-
-**Barreras de entrada**
-
-Considera condiciones que podrían dificultar la participación de oferentes potenciales, como requisitos acumulativos, experiencia altamente específica, exigencias financieras desproporcionadas o condiciones administrativas restrictivas.
-
-**Trazabilidad y regulación**
-
-Contextualiza requisitos relacionados con calidad, certificaciones, registros regulatorios, soporte técnico, seguridad, garantías o trazabilidad del bien o servicio, especialmente en sectores regulados.
-
-**Interoperabilidad y compatibilidad**
-
-Analiza referencias a compatibilidad técnica, integración con plataformas existentes o continuidad operativa, considerando que algunas exigencias pueden responder a necesidades funcionales legítimas y no necesariamente implican restricciones indebidas.
-
-**Relación entre requisitos y objeto contractual**
-
-Evalúa si las condiciones observadas parecen guardar relación razonable con el objeto, finalidad y características del procedimiento analizado.
-
-**Alcance y límites**
-
-Estas dimensiones se utilizan únicamente como apoyo analítico para organizar observaciones preliminares y facilitar revisión humana contextual. Las observaciones generadas son insumos preliminares para revisión humana. La herramienta no determina ilegalidad, no detecta corrupción, no confirma direccionamiento, no reemplaza criterio humano y no constituye dictamen técnico o jurídico.
-            """
+<div class="methodology-limits">
+    Las observaciones son insumos preliminares para revisión humana. La herramienta no determina ilegalidad, no detecta corrupción, no confirma direccionamiento y no reemplaza análisis técnico o jurídico.
+</div>
+            """,
+            unsafe_allow_html=True,
         )
     st.markdown('<div class="upload-panel"><div class="upload-panel-title">Documento a revisar</div><div class="upload-panel-help">Seleccione un pliego en formato PDF. La revisión se ejecuta localmente sobre el documento cargado.</div>', unsafe_allow_html=True)
     uploaded_file = st.file_uploader("Documento PDF", type=["pdf"], label_visibility="collapsed")
