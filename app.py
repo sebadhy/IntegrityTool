@@ -463,8 +463,64 @@ def render_original_document(pdf_bytes: bytes | None) -> None:
     if not pdf_bytes:
         return
     with st.expander("Ver documento original", expanded=False):
-        st.caption("Consulta integral del PDF cargado con navegación, scroll y zoom del visor del navegador.")
-        render_pdf_viewer(pdf_bytes, 1, height=820, viewer_class="pdf-frame pdf-frame-original")
+        st.caption("Consulta integral del PDF cargado. Se muestra una página a la vez para mantener lectura legible y navegación estable.")
+        render_original_pdf_page_viewer(pdf_bytes)
+
+
+
+def pdf_page_count(pdf_bytes: bytes) -> int:
+    try:
+        with fitz.open(stream=pdf_bytes, filetype="pdf") as document:
+            return int(document.page_count)
+    except Exception:
+        return 0
+
+
+def render_pdf_page_image_bytes(pdf_bytes: bytes, page_number: int, zoom: float = 1.8) -> bytes | None:
+    try:
+        with fitz.open(stream=pdf_bytes, filetype="pdf") as document:
+            if document.page_count == 0:
+                return None
+            page_index = max(0, min(int(page_number) - 1, document.page_count - 1))
+            page = document.load_page(page_index)
+            pixmap = page.get_pixmap(matrix=fitz.Matrix(float(zoom), float(zoom)), alpha=False)
+            return pixmap.tobytes("png")
+    except Exception:
+        return None
+
+
+def render_original_pdf_page_viewer(pdf_bytes: bytes) -> None:
+    total_pages = pdf_page_count(pdf_bytes)
+    if total_pages <= 0:
+        st.warning("No se pudo preparar la vista del documento original. La evidencia textual sigue disponible en cada observación.")
+        return
+
+    controls = st.columns([0.28, 0.28, 0.44])
+    with controls[0]:
+        page_number = st.number_input(
+            "Página",
+            min_value=1,
+            max_value=total_pages,
+            value=1,
+            step=1,
+            key="original_pdf_page_number",
+        )
+    with controls[1]:
+        zoom_label = st.selectbox(
+            "Zoom",
+            options=["Cómodo", "Grande", "Muy grande"],
+            index=1,
+            key="original_pdf_zoom_label",
+        )
+    with controls[2]:
+        st.caption(f"Documento original · {total_pages} página(s)")
+
+    zoom = {"Cómodo": 1.45, "Grande": 1.9, "Muy grande": 2.35}[zoom_label]
+    image_bytes = render_pdf_page_image_bytes(pdf_bytes, int(page_number), zoom)
+    if image_bytes:
+        st.image(image_bytes, use_container_width=True)
+    else:
+        st.warning("No se pudo renderizar esta página del PDF.")
 
 
 def render_pliego_summary(
