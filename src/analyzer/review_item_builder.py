@@ -65,6 +65,10 @@ def _build_item(finding: ConsolidatedFinding) -> ReviewItem:
             "detected_mitigants": finding.detected_mitigants,
             "missing_mitigants": finding.missing_mitigants,
             "consolidation_key": finding.consolidation_key,
+            "additional_excerpts": _additional_excerpts(finding, evidence_summary),
+            "consolidated_from_finding_ids": [finding.finding_id],
+            "consolidated_from_signal_ids": [signal.signal_id for signal in finding.signals],
+            "aggregated_sources": _aggregated_sources(finding),
         },
     )
 
@@ -116,6 +120,11 @@ def _item_to_row(item: ReviewItem, document_name: str) -> dict[str, Any]:
         "occurrence_count": item.metadata.get("duplicate_count", len(item.evidence_items)),
         "occurrencias relacionadas": item.metadata.get("duplicate_count", len(item.evidence_items)),
         "representative_excerpt": item.evidence_summary,
+        "additional_excerpts": item.metadata.get("additional_excerpts", []),
+        "fragmentos adicionales": item.metadata.get("additional_excerpts", []),
+        "consolidated_from_finding_ids": item.metadata.get("consolidated_from_finding_ids", item.source_finding_ids),
+        "consolidated_from_signal_ids": item.metadata.get("consolidated_from_signal_ids", []),
+        "fuentes agregadas": item.metadata.get("aggregated_sources", []),
         "categoría de revisión": item.display_group,
         "patrón detectado": item.title,
         "atención sugerida": attention,
@@ -170,12 +179,57 @@ def _why_it_matters(finding: ConsolidatedFinding) -> str:
 
 
 def _evidence_summary(finding: ConsolidatedFinding) -> str:
-    excerpts = []
-    for evidence in finding.evidence_items[:3]:
-        text = str(evidence.get("text", "")).strip()
-        if text and text not in excerpts:
-            excerpts.append(text)
-    return " / ".join(excerpts)
+    return _representative_evidence(finding).get("text", "")
+
+
+def _representative_evidence(finding: ConsolidatedFinding) -> dict[str, Any]:
+    evidence_items = [item for item in finding.evidence_items if str(item.get("text", "")).strip()]
+    if not evidence_items:
+        return {}
+    return sorted(evidence_items, key=_evidence_rank)[0]
+
+
+def _evidence_rank(evidence: dict[str, Any]) -> tuple[int, int, int, str]:
+    text = " ".join(str(evidence.get("text", "")).split())
+    lower = text.lower()
+    structural_penalty = 0
+    if any(term in lower for term in ["índice", "indice", "tabla de contenido", "portada", "versión", "version"]):
+        structural_penalty += 10
+    if len(text) < 25:
+        structural_penalty += 4
+    matched = str(evidence.get("matched_text", "")).lower().strip()
+    pattern_name = str(evidence.get("pattern_name", "")).lower()
+    density_terms = [term for term in [matched, *pattern_name.split()] if len(term) > 3]
+    density = sum(1 for term in density_terms if term and term in lower)
+    direct_requirement = 0 if any(term in lower for term in ["deberá", "debera", "debe", "se requiere", "solo se acept", "obligatorio"]) else 1
+    return (structural_penalty, direct_requirement, -density, text[:220])
+
+
+def _additional_excerpts(finding: ConsolidatedFinding, representative: str) -> list[dict[str, Any]]:
+    output: list[dict[str, Any]] = []
+    seen = {representative}
+    for evidence in sorted(finding.evidence_items, key=_evidence_rank):
+        text = " ".join(str(evidence.get("text", "")).split())
+        if not text or text in seen:
+            continue
+        output.append({
+            "page": evidence.get("page", ""),
+            "section": evidence.get("section", "No determinada"),
+            "text": text,
+            "matched_text": evidence.get("matched_text", ""),
+        })
+        seen.add(text)
+    return output
+
+
+def _aggregated_sources(finding: ConsolidatedFinding) -> list[str]:
+    sources = ["Taxonomía documental"]
+    historical = finding.historical_context or {}
+    if historical.get("frequency_label") not in {None, "", "No disponible", "0 de 0 procesos"}:
+        sources.append("comparación con corpus")
+    if finding.detected_mitigants or finding.missing_mitigants or finding.candidate_rationale:
+        sources.append("revisión contextual")
+    return sources
 
 
 def _mitigants_summary(finding: ConsolidatedFinding) -> str:

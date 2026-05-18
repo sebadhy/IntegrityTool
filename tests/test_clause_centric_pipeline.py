@@ -6,7 +6,7 @@ from src.analyzer.consolidator import consolidate_candidates
 from src.analyzer.contextualizer import build_finding_candidates
 from src.analyzer.detector import detect_signals
 from src.analyzer.document_segmenter import segment_document
-from src.analyzer.domain_models import Clause
+from src.analyzer.domain_models import Clause, ConsolidatedFinding
 from src.analyzer.pdf_extractor import PageText
 from src.analyzer.prioritizer import prioritize_consolidated_findings
 from src.analyzer.relevance_filter import filter_relevant_findings
@@ -118,6 +118,75 @@ def test_regression_same_input_same_visible_output():
     assert first == second
 
 
+
+
+def test_same_medical_platform_pattern_across_pages_is_one_visible_review_item():
+    texts = [
+        "ESPECIFICACIONES TÉCNICAS. El insumo debe ser compatible con el generador ultrasónico instalado.",
+        "FICHA TÉCNICA. Consumible para utilizar con plataforma compatible de energía existente en el hospital.",
+    ]
+    _, signals, _, consolidated, items = _run_text_pipeline(texts)
+    platform_signals = [signal for signal in signals if signal.pattern_id == "cn-medical-device-platform-lock-in"]
+    platform_findings = [finding for finding in consolidated if finding.pattern_id == "cn-medical-device-platform-lock-in"]
+    platform_items = [item for item in items if item.metadata.get("pattern_id") == "cn-medical-device-platform-lock-in"]
+
+    assert len(platform_signals) == 2
+    assert len(platform_findings) == 1
+    assert len(platform_items) == 1
+
+    item = platform_items[0]
+    assert item.metadata["duplicate_count"] == 2
+    assert len(item.evidence_items) == 2
+
+    df = review_items_to_dataframe(platform_items, "doc.pdf")
+    assert len(df) == 1
+    assert df.iloc[0]["related_pages"] == [1, 2]
+    assert df.iloc[0]["occurrence_count"] == 2
+    assert df.iloc[0]["patrón detectado"] == "Compatibilidad con plataforma médica instalada"
+
+
+def test_representative_excerpt_prefers_direct_requirement_over_structural_text():
+    finding = ConsolidatedFinding(
+        finding_id="finding-platform",
+        family="dependencia técnica potencial",
+        competition_dimension="interoperability_lock_in",
+        normalized_issue="compatibilidad plataforma médica",
+        signals=[],
+        clauses=[],
+        evidence_items=[
+            {
+                "page": 1,
+                "section": "Índice",
+                "pattern_id": "cn-medical-device-platform-lock-in",
+                "pattern_name": "Compatibilidad con plataforma médica instalada",
+                "matched_text": "compatible con el generador",
+                "text": "Índice de compatibilidad: compatible con el generador ultrasónico.",
+            },
+            {
+                "page": 2,
+                "section": "Especificaciones técnicas",
+                "pattern_id": "cn-medical-device-platform-lock-in",
+                "pattern_name": "Compatibilidad con plataforma médica instalada",
+                "matched_text": "compatible con el generador",
+                "text": "El consumible debe ser compatible con el generador ultrasónico instalado en la unidad médica.",
+            },
+        ],
+        detected_mitigants=[],
+        historical_context={},
+        consolidation_key="doc|platform|interoperability",
+        duplicate_count=2,
+        internal_ranking_score=3,
+        ranking_factors=["Múltiples señales relacionadas consolidadas."],
+        pattern_id="cn-medical-device-platform-lock-in",
+        title="Compatibilidad con plataforma médica instalada",
+        missing_mitigants=["No se identificó mitigante textual cercano."],
+        candidate_rationale="Convendría revisar compatibilidad y alternativas equivalentes.",
+    )
+    df = review_items_to_dataframe(build_review_items([finding]), "doc.pdf")
+    representative = df.iloc[0]["representative_excerpt"]
+    assert "debe ser compatible" in representative.lower()
+    assert "índice" not in representative.lower()
+    assert df.iloc[0]["additional_excerpts"]
 
 def test_review_item_dataframe_contains_legacy_summary_columns():
     _, _, _, _, items = _run_text_pipeline([

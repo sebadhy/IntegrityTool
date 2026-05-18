@@ -562,6 +562,9 @@ def observation_priority(row: pd.Series) -> str:
 
 
 def observation_source(row: pd.Series) -> str:
+    aggregated = display_list(row.get("fuentes agregadas", []))
+    if aggregated:
+        return " + ".join(aggregated)
     has_corpus = str(row.get("frecuencia en corpus", "")).strip() not in {"", "No disponible", "0 de 0 procesos"}
     has_context = str(row.get("signal_type", "")).strip() == "contextual_review_signal"
     if has_corpus and has_context:
@@ -624,6 +627,18 @@ def render_evidence_panel(row: pd.Series, pages: list | None = None, pdf_bytes: 
         if selected_text:
             with st.expander("Contexto inmediato", expanded=False):
                 st.text_area("Contexto inmediato", value=selected_text, height=180, label_visibility="collapsed")
+    additional = display_list(row.get("additional_excerpts", row.get("fragmentos adicionales", [])))
+    if additional:
+        with st.expander("Ver ocurrencias adicionales", expanded=False):
+            raw_items = row.get("additional_excerpts", row.get("fragmentos adicionales", []))
+            if isinstance(raw_items, list) and raw_items and isinstance(raw_items[0], dict):
+                for index, item in enumerate(raw_items, start=1):
+                    st.markdown(f"**Ocurrencia {index} · página {safe_text(item.get('page', 'No disponible'))}**")
+                    st.write(safe_text(item.get("text", "")))
+            else:
+                for index, item in enumerate(additional, start=1):
+                    st.markdown(f"**Ocurrencia {index}**")
+                    st.write(safe_text(item))
     if pdf_bytes:
         with st.expander("Ver página en PDF", expanded=False):
             render_pdf_viewer(pdf_bytes, page_number)

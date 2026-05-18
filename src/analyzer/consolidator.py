@@ -54,16 +54,41 @@ def consolidate_candidates(
 
 
 def _consolidation_key(candidate: FindingCandidate, document_id: str) -> str:
-    section_group = _section_group(candidate.evidence[0].get("section", "")) if candidate.evidence else "unknown"
-    normalized = _requirement_signature(candidate.normalized_requirement)
+    semantic_group = _semantic_group_key(candidate)
     return "|".join([
         document_id,
-        candidate.family,
-        candidate.competition_dimension,
         candidate.pattern_id,
-        section_group,
-        normalized,
+        candidate.competition_dimension,
+        semantic_group,
     ])
+
+
+def _semantic_group_key(candidate: FindingCandidate) -> str:
+    """Return the conceptual unit used for user-visible consolidation.
+
+    The UI should show one review item per analytical observation, not one card per
+    textual match. A taxonomy-provided semantic group can make this narrower later;
+    until then, pattern + competitive dimension is the deterministic grouping unit.
+    """
+    for signal in candidate.signals:
+        semantic_group = signal.metadata.get("semantic_group_key") or signal.metadata.get("semantic_group")
+        if semantic_group:
+            return _slug(str(semantic_group))
+    pattern_names = [
+        str(item.get("pattern_name", ""))
+        for item in candidate.evidence
+        if item.get("pattern_name")
+    ]
+    if pattern_names:
+        return _slug(pattern_names[0])
+    return _slug(candidate.pattern_id or candidate.family or "general")
+
+
+def _slug(value: str) -> str:
+    text = value.lower()
+    text = text.translate(str.maketrans("áéíóúñü", "aeiounu"))
+    tokens = [token for token in re.findall(r"[a-z0-9]+", text) if len(token) > 2]
+    return "-".join(tokens[:12]) or "general"
 
 
 def _requirement_signature(text: str) -> str:
