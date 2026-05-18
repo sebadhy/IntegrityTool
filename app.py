@@ -1526,14 +1526,14 @@ def render_setup_panel() -> tuple[object | None, bool, bool, bool]:
     st.markdown(
         """
         <div class="setup-hero">
-            <div class="setup-kicker">Flujo de revisión documental</div>
+            <div class="setup-kicker">Inicio de revisión</div>
             <h1>Revisar pliego</h1>
-            <p>Suba un PDF para iniciar una lectura preliminar centrada en evidencia, observaciones consolidadas y revisión humana.</p>
+            <p>Suba el PDF del pliego y presione Iniciar revisión.</p>
         </div>
         """,
         unsafe_allow_html=True,
     )
-    with st.expander("Cómo funciona el análisis", expanded=False):
+    with st.expander("Qué revisa la herramienta", expanded=False):
         st.markdown(
             """
 <div class="methodology-brief">
@@ -1561,7 +1561,7 @@ def render_setup_panel() -> tuple[object | None, bool, bool, bool]:
             """,
             unsafe_allow_html=True,
         )
-    st.markdown('<div class="upload-panel"><div class="upload-panel-title">Documento a revisar</div><div class="upload-panel-help">Seleccione un pliego en formato PDF. La revisión se ejecuta localmente sobre el documento cargado.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="upload-panel"><div class="upload-panel-title">Archivo PDF</div>', unsafe_allow_html=True)
     uploaded_file = st.file_uploader("Documento PDF", type=["pdf"], label_visibility="collapsed")
     process_document = st.button("Iniciar revisión", type="primary", width="stretch")
     st.markdown('</div>', unsafe_allow_html=True)
