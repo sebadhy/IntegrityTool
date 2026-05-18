@@ -11,18 +11,14 @@ def _by_pattern(findings, pattern_id):
 
 
 def test_brand_without_equivalence_has_missing_equivalence():
-    findings = _findings(
-        "Las especificaciones técnicas exigen distribuidor exclusivo del fabricante para todos los equipos."
-    )
+    findings = _findings("Las especificaciones técnicas exigen marca ACME y modelo X100 para todos los equipos.")
     brand = _by_pattern(findings, "cn-brand-model-provider-reference")
     assert brand
     assert any("equivalencia" in item.lower() for item in brand[0].missing_information)
 
 
 def test_brand_with_equivalence_registers_mitigant():
-    findings = _findings(
-        "Se solicita representante autorizado del fabricante o equivalente funcional, con parámetros verificables."
-    )
+    findings = _findings("Se solicita marca ACME o equivalente funcional, con parámetros verificables.")
     brand = _by_pattern(findings, "cn-brand-model-provider-reference")
     assert brand
     assert brand[0].mitigating_factors

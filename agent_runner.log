@@ -1,0 +1,279 @@
+07:53:28  INFO      ============================================================
+07:53:28  INFO      Agente de análisis de pliegos — inicio batch
+07:53:28  INFO      ============================================================
+07:53:28  INFO      Inicializando schema SQL Server...
+07:53:30  INFO      Schema listo.
+07:53:30  ERROR     No se encontró data\raw\metadata\procesos.csv
+08:14:34  INFO      ============================================================
+08:14:34  INFO      Agente de análisis de pliegos — inicio batch
+08:14:34  INFO      ============================================================
+08:14:34  INFO      Inicializando schema SQL Server...
+08:14:36  INFO      Schema listo.
+08:14:36  INFO      Procesos en metadata: 1
+08:14:36  INFO      Procesos a analizar: 1
+08:14:36  INFO      DRY RUN — no se ejecutará el análisis
+08:14:36  INFO        → SIE-001 | Entidad de prueba | Proceso de prueba
+08:15:04  INFO      ============================================================
+08:15:04  INFO      Agente de análisis de pliegos — inicio batch
+08:15:04  INFO      ============================================================
+08:15:04  INFO      Inicializando schema SQL Server...
+08:15:06  INFO      Schema listo.
+08:15:06  INFO      Procesos en metadata: 1
+08:15:07  INFO      Procesos a analizar: 1
+08:15:07  INFO      [1/1] Analizando SIE-001 — Proceso de prueba
+08:15:08  INFO      [fd8fe843-0408-467f-94b6-8ec6aa47ed38] Iniciando análisis de SIE-001
+08:15:09  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+08:15:09  ERROR     get_document_structure error: No module named 'pdf_extractor'
+08:15:10  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+08:15:10  ERROR     get_document_structure error: No module named 'pdf_extractor'
+08:15:10  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+08:15:10  INFO      Retrying request to /openai/v1/chat/completions in 23.000000 seconds
+08:15:34  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+08:15:34  ERROR     get_document_structure error: No module named 'pdf_extractor'
+08:15:35  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+08:15:35  ERROR     get_document_structure error: No module named 'pdf_extractor'
+08:15:35  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+08:15:35  INFO      Retrying request to /openai/v1/chat/completions in 15.000000 seconds
+08:15:51  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+08:15:51  ERROR     get_document_structure error: No module named 'pdf_extractor'
+08:15:51  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+08:15:51  INFO      Retrying request to /openai/v1/chat/completions in 8.000000 seconds
+08:16:00  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+08:16:00  ERROR     get_document_structure error: No module named 'pdf_extractor'
+08:16:00  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+08:16:00  INFO      Retrying request to /openai/v1/chat/completions in 9.000000 seconds
+08:18:40  INFO      ============================================================
+08:18:40  INFO      Agente de análisis de pliegos — inicio batch
+08:18:40  INFO      ============================================================
+08:18:40  INFO      Inicializando schema SQL Server...
+08:18:42  INFO      Schema listo.
+08:18:42  INFO      Procesos en metadata: 1
+08:18:42  INFO      Procesos a analizar: 1
+08:18:42  INFO      [1/1] Analizando SIE-001 — Proceso de prueba
+08:18:43  INFO      [12af3ea5-6559-4437-894d-11aebad3e005] Iniciando análisis de SIE-001
+08:18:45  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+08:18:46  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+08:18:46  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+08:18:46  INFO      Retrying request to /openai/v1/chat/completions in 25.000000 seconds
+08:19:13  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+08:19:13  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+08:19:13  INFO      Retrying request to /openai/v1/chat/completions in 52.000000 seconds
+08:20:08  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+08:20:08  ERROR     detect_patterns error: cannot import name 'run_detection' from 'src.analyzer.detector' (D:\Users\villa\Downloads\tenderdocsreview-main\tenderdocsreview-main\src\analyzer\detector.py)
+08:20:09  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+08:20:09  INFO      Retrying request to /openai/v1/chat/completions in 55.000000 seconds
+08:21:05  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+08:21:05  ERROR     search_corpus error: cannot import name 'load_corpus' from 'src.analyzer.corpus_loader' (D:\Users\villa\Downloads\tenderdocsreview-main\tenderdocsreview-main\src\analyzer\corpus_loader.py)
+08:21:05  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+08:21:05  INFO      Retrying request to /openai/v1/chat/completions in 13.000000 seconds
+08:21:19  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+08:21:19  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+08:21:19  INFO      Retrying request to /openai/v1/chat/completions in 54.000000 seconds
+08:23:14  INFO      ============================================================
+08:23:14  INFO      Agente de análisis de pliegos — inicio batch
+08:23:14  INFO      ============================================================
+08:23:14  INFO      Inicializando schema SQL Server...
+08:23:16  INFO      Schema listo.
+08:23:16  INFO      Procesos en metadata: 1
+08:23:16  INFO      Procesos a analizar: 1
+08:23:16  INFO      [1/1] Analizando SIE-001 — Proceso de prueba
+08:23:16  INFO      [494973fb-566f-4896-961a-12fb6efd4763] Iniciando análisis de SIE-001
+08:23:17  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+08:23:18  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+08:23:18  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+08:23:18  INFO      Retrying request to /openai/v1/chat/completions in 26.000000 seconds
+08:23:47  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 400 Bad Request"
+08:23:47  ERROR     [494973fb-566f-4896-961a-12fb6efd4763] Análisis fallido: Error code: 400 - {'error': {'message': "Failed to call a function. Please adjust your prompt. See 'failed_generation' for more details.", 'type': 'invalid_request_error', 'code': 'tool_use_failed', 'failed_generation': '<function=detect_patterns>{"page_number":1,"text":"Página 1 de 12\\nRESOLUCIÓN ADMINISTRATIVA DE INICIO\\nProceso No:\\nLICB-GADMC-E-2025-002\\n“ADQUISICIÓN DE EQUIPOS INFORMÁTICOS PARA EL\\nGADMCE”\\nLcda. Laura Yagual Salazar\\nALCALDESA DEL CANTÓN ESMERALDAS (S)\\nConsiderando:\\nQue, el Ecuador es un Estado constitucional de derechos y justicia, social,\\ndemocrático, soberano, independiente, unitario, intercultural, plurinacional y\\nlaico, de organiza en forma de república y se gobierna de manera\\ndescentralizadas según el artículo 1 de la Constitución de la República del\\nEcuador; por lo tanto, las compras gubernamentales que realicen las\\nentidades que integran el sector público deben regirse a la constitución y la\\nley;\\nQue, el Art. 76 de la Constitución de la República del Ecuador, manda: “En\\ntodo proceso en el que se determinen derechos y obligaciones de cualquier\\norden, se asegurará el derecho al debido proceso que incluirá las\\ngarantías básicas: 7. El derecho de las personas a la defensa incluirá las\\nsiguientes garantías: l) Las resoluciones de los poderes públicos deberán ser\\nmotivadas. No habrá motivación si en la resolución no se enuncian las normas\\no principios jurídicos en que se funda y no se explica la pertinencia de su\\naplicación a los antecedentes de hecho. Los actos administrativos,\\nresoluciones o fallos que no se encuentren debidamente motivados se\\nconsiderarán \\nnulos. \\nLas \\nservidoras \\no \\nservidores \\nresponsables \\nserán\\nsancionados”;\\nQue, el artículo 226 de la Constitución de la República del Ecuador expresa:\\n“Las instituciones del Estado, sus organismos, dependencias, las servidoras o\\nservidores públicos y las personas que actúen en virtud de una potestad\\nestatal ejercerán solamente las competencias y facultades que les sean\\natribuidas en la Constitución y la ley. Tendrán el deber de coordinar acciones", "}</function>'}}
+Traceback (most recent call last):
+  File "D:\Users\villa\Downloads\tenderdocsreview-main\tenderdocsreview-main\agent.py", line 129, in analyze
+    brief = self._run_loop(state)
+  File "D:\Users\villa\Downloads\tenderdocsreview-main\tenderdocsreview-main\agent.py", line 183, in _run_loop
+    response = self.client.chat.completions.create(
+  File "C:\Users\villa\AppData\Local\Programs\Python\Python310\lib\site-packages\groq\resources\chat\completions.py", line 461, in create
+    return self._post(
+  File "C:\Users\villa\AppData\Local\Programs\Python\Python310\lib\site-packages\groq\_base_client.py", line 1242, in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+  File "C:\Users\villa\AppData\Local\Programs\Python\Python310\lib\site-packages\groq\_base_client.py", line 1044, in request
+    raise self._make_status_error_from_response(err.response) from None
+groq.BadRequestError: Error code: 400 - {'error': {'message': "Failed to call a function. Please adjust your prompt. See 'failed_generation' for more details.", 'type': 'invalid_request_error', 'code': 'tool_use_failed', 'failed_generation': '<function=detect_patterns>{"page_number":1,"text":"Página 1 de 12\\nRESOLUCIÓN ADMINISTRATIVA DE INICIO\\nProceso No:\\nLICB-GADMC-E-2025-002\\n“ADQUISICIÓN DE EQUIPOS INFORMÁTICOS PARA EL\\nGADMCE”\\nLcda. Laura Yagual Salazar\\nALCALDESA DEL CANTÓN ESMERALDAS (S)\\nConsiderando:\\nQue, el Ecuador es un Estado constitucional de derechos y justicia, social,\\ndemocrático, soberano, independiente, unitario, intercultural, plurinacional y\\nlaico, de organiza en forma de república y se gobierna de manera\\ndescentralizadas según el artículo 1 de la Constitución de la República del\\nEcuador; por lo tanto, las compras gubernamentales que realicen las\\nentidades que integran el sector público deben regirse a la constitución y la\\nley;\\nQue, el Art. 76 de la Constitución de la República del Ecuador, manda: “En\\ntodo proceso en el que se determinen derechos y obligaciones de cualquier\\norden, se asegurará el derecho al debido proceso que incluirá las\\ngarantías básicas: 7. El derecho de las personas a la defensa incluirá las\\nsiguientes garantías: l) Las resoluciones de los poderes públicos deberán ser\\nmotivadas. No habrá motivación si en la resolución no se enuncian las normas\\no principios jurídicos en que se funda y no se explica la pertinencia de su\\naplicación a los antecedentes de hecho. Los actos administrativos,\\nresoluciones o fallos que no se encuentren debidamente motivados se\\nconsiderarán \\nnulos. \\nLas \\nservidoras \\no \\nservidores \\nresponsables \\nserán\\nsancionados”;\\nQue, el artículo 226 de la Constitución de la República del Ecuador expresa:\\n“Las instituciones del Estado, sus organismos, dependencias, las servidoras o\\nservidores públicos y las personas que actúen en virtud de una potestad\\nestatal ejercerán solamente las competencias y facultades que les sean\\natribuidas en la Constitución y la ley. Tendrán el deber de coordinar acciones", "}</function>'}}
+08:23:49  INFO      [SIE-001] Persistido: 0 hallazgos, 2 tool calls
+08:23:49  INFO      ============================================================
+08:23:49  INFO      Batch completado en 33.1s
+08:23:49  INFO      Completados: 0 | Fallidos: 1 | Hallazgos totales: 0
+08:23:49  INFO      ============================================================
+09:00:52  INFO      ============================================================
+09:00:52  INFO      Agente de análisis de pliegos — inicio batch
+09:00:52  INFO      ============================================================
+09:00:52  INFO      Inicializando schema SQL Server...
+09:00:54  INFO      Schema listo.
+09:00:54  INFO      Procesos en metadata: 1
+09:00:54  INFO      Procesos a analizar: 1
+09:00:54  INFO      [1/1] Analizando SIE-001 — Proceso de prueba
+09:00:55  INFO      [bd13ed99-bb97-4737-9df2-d8d1f01ca2ed] Iniciando análisis de SIE-001
+09:00:56  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+09:00:57  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+09:00:57  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+09:00:57  ERROR     [bd13ed99-bb97-4737-9df2-d8d1f01ca2ed] Análisis fallido: Error code: 429 - {'error': {'message': 'Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kj8zf0hsfse89b4s1s7c0pws` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 90794, Requested 14407. Please try again in 1h14m53.664s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}
+Traceback (most recent call last):
+  File "D:\Users\villa\Downloads\tenderdocsreview-main\tenderdocsreview-main\agent.py", line 129, in analyze
+    brief = self._run_loop(state)
+  File "D:\Users\villa\Downloads\tenderdocsreview-main\tenderdocsreview-main\agent.py", line 183, in _run_loop
+    response = self.client.chat.completions.create(
+  File "C:\Users\villa\AppData\Local\Programs\Python\Python310\lib\site-packages\groq\resources\chat\completions.py", line 461, in create
+    return self._post(
+  File "C:\Users\villa\AppData\Local\Programs\Python\Python310\lib\site-packages\groq\_base_client.py", line 1242, in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+  File "C:\Users\villa\AppData\Local\Programs\Python\Python310\lib\site-packages\groq\_base_client.py", line 1044, in request
+    raise self._make_status_error_from_response(err.response) from None
+groq.RateLimitError: Error code: 429 - {'error': {'message': 'Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kj8zf0hsfse89b4s1s7c0pws` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 90794, Requested 14407. Please try again in 1h14m53.664s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}
+09:00:59  INFO      [SIE-001] Persistido: 0 hallazgos, 2 tool calls
+09:00:59  INFO      ============================================================
+09:00:59  INFO      Batch completado en 4.9s
+09:00:59  INFO      Completados: 0 | Fallidos: 1 | Hallazgos totales: 0
+09:00:59  INFO      ============================================================
+18:01:43  INFO      ============================================================
+18:01:43  INFO      Agente de análisis de pliegos — inicio batch
+18:01:43  INFO      ============================================================
+18:01:43  INFO      Inicializando schema SQL Server...
+18:01:45  INFO      Schema listo.
+18:01:45  INFO      Procesos en metadata: 1
+18:01:45  INFO      Procesos a analizar: 1
+18:01:45  INFO      [1/1] Analizando SIE-001 — Proceso de prueba
+18:01:45  INFO      [91f222b9-a965-402e-afe3-51b45726ec6a] Iniciando análisis de SIE-001
+18:01:46  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+18:01:47  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+18:01:47  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+18:01:47  INFO      Retrying request to /openai/v1/chat/completions in 46.000000 seconds
+18:02:35  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+18:02:36  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+18:02:36  INFO      Retrying request to /openai/v1/chat/completions in 52.000000 seconds
+18:09:40  INFO      ============================================================
+18:09:40  INFO      Agente de análisis de pliegos — inicio batch
+18:09:40  INFO      ============================================================
+18:09:40  INFO      Inicializando schema SQL Server...
+18:09:42  INFO      Schema listo.
+18:09:42  INFO      Procesos en metadata: 1
+18:09:42  INFO      Procesos a analizar: 1
+18:09:42  INFO      [1/1] Analizando SIE-001 — Proceso de prueba
+18:09:43  INFO      [aad3ccf9-6d5a-4855-9e16-55b446afc712] Iniciando análisis de SIE-001
+18:09:44  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+18:09:44  ERROR     get_document_structure error: No module named 'pdf_extractor'
+18:09:44  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+18:09:44  ERROR     get_document_structure error: No module named 'pdf_extractor'
+18:09:44  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+18:09:44  INFO      Retrying request to /openai/v1/chat/completions in 24.000000 seconds
+18:10:09  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+18:10:09  ERROR     get_document_structure error: No module named 'pdf_extractor'
+18:10:09  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+18:10:09  INFO      Retrying request to /openai/v1/chat/completions in 28.000000 seconds
+18:10:38  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+18:10:38  ERROR     get_document_structure error: No module named 'pdf_extractor'
+18:10:38  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+18:10:38  INFO      Retrying request to /openai/v1/chat/completions in 8.000000 seconds
+18:10:47  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+18:10:47  ERROR     get_document_structure error: No module named 'pdf_extractor'
+18:10:47  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+18:10:47  ERROR     get_document_structure error: No module named 'pdf_extractor'
+18:10:48  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+18:10:48  ERROR     [aad3ccf9-6d5a-4855-9e16-55b446afc712] Análisis fallido: Error code: 429 - {'error': {'message': 'Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kj8zf0hsfse89b4s1s7c0pws` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 96800, Requested 5938. Please try again in 39m25.632s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}
+Traceback (most recent call last):
+  File "D:\Users\villa\Downloads\tenderdocsreview-main\tenderdocsreview-main\agent.py", line 129, in analyze
+    brief = self._run_loop(state)
+  File "D:\Users\villa\Downloads\tenderdocsreview-main\tenderdocsreview-main\agent.py", line 183, in _run_loop
+    response = self.client.chat.completions.create(
+  File "C:\Users\villa\AppData\Local\Programs\Python\Python310\lib\site-packages\groq\resources\chat\completions.py", line 461, in create
+    return self._post(
+  File "C:\Users\villa\AppData\Local\Programs\Python\Python310\lib\site-packages\groq\_base_client.py", line 1242, in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+  File "C:\Users\villa\AppData\Local\Programs\Python\Python310\lib\site-packages\groq\_base_client.py", line 1044, in request
+    raise self._make_status_error_from_response(err.response) from None
+groq.RateLimitError: Error code: 429 - {'error': {'message': 'Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kj8zf0hsfse89b4s1s7c0pws` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 96800, Requested 5938. Please try again in 39m25.632s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}
+18:10:50  INFO      [SIE-001] Persistido: 0 hallazgos, 6 tool calls
+18:10:50  INFO      ============================================================
+18:10:50  INFO      Batch completado en 67.6s
+18:10:50  INFO      Completados: 0 | Fallidos: 1 | Hallazgos totales: 0
+18:10:50  INFO      ============================================================
+18:12:46  INFO      ============================================================
+18:12:46  INFO      Agente de análisis de pliegos — inicio batch
+18:12:46  INFO      ============================================================
+18:12:46  INFO      Inicializando schema SQL Server...
+18:12:47  INFO      Schema listo.
+18:12:47  INFO      Procesos en metadata: 1
+18:12:47  INFO      Procesos a analizar: 1
+18:12:48  INFO      [1/1] Analizando SIE-001 — Proceso de prueba
+18:12:48  INFO      [b0d221a9-c43a-4fb4-80eb-8aa1271fdab3] Iniciando análisis de SIE-001
+18:12:48  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+18:12:48  ERROR     [b0d221a9-c43a-4fb4-80eb-8aa1271fdab3] Análisis fallido: Error code: 429 - {'error': {'message': 'Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kj8zf0hsfse89b4s1s7c0pws` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 96660, Requested 5524. Please try again in 31m26.976s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}
+Traceback (most recent call last):
+  File "D:\Users\villa\Downloads\tenderdocsreview-main\tenderdocsreview-main\agent.py", line 129, in analyze
+    brief = self._run_loop(state)
+  File "D:\Users\villa\Downloads\tenderdocsreview-main\tenderdocsreview-main\agent.py", line 183, in _run_loop
+    response = self.client.chat.completions.create(
+  File "C:\Users\villa\AppData\Local\Programs\Python\Python310\lib\site-packages\groq\resources\chat\completions.py", line 461, in create
+    return self._post(
+  File "C:\Users\villa\AppData\Local\Programs\Python\Python310\lib\site-packages\groq\_base_client.py", line 1242, in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+  File "C:\Users\villa\AppData\Local\Programs\Python\Python310\lib\site-packages\groq\_base_client.py", line 1044, in request
+    raise self._make_status_error_from_response(err.response) from None
+groq.RateLimitError: Error code: 429 - {'error': {'message': 'Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kj8zf0hsfse89b4s1s7c0pws` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 96660, Requested 5524. Please try again in 31m26.976s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}
+18:12:49  INFO      [SIE-001] Persistido: 0 hallazgos, 0 tool calls
+18:12:49  INFO      ============================================================
+18:12:49  INFO      Batch completado en 2.0s
+18:12:49  INFO      Completados: 0 | Fallidos: 1 | Hallazgos totales: 0
+18:12:49  INFO      ============================================================
+18:14:16  INFO      ============================================================
+18:14:16  INFO      Agente de análisis de pliegos — inicio batch
+18:14:16  INFO      ============================================================
+18:14:16  INFO      Inicializando schema SQL Server...
+18:14:18  INFO      Schema listo.
+18:14:18  INFO      Procesos en metadata: 1
+18:14:18  INFO      Procesos a analizar: 1
+18:14:18  INFO      [1/1] Analizando SIE-001 — Proceso de prueba
+18:14:18  INFO      [80a3b145-63da-4f2a-b2d5-80dbc32d9bf4] Iniciando análisis de SIE-001
+18:14:19  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 400 Bad Request"
+18:14:19  ERROR     [80a3b145-63da-4f2a-b2d5-80dbc32d9bf4] Análisis fallido: Error code: 400 - {'error': {'message': 'The model `llama3-8b-8192` has been decommissioned and is no longer supported. Please refer to https://console.groq.com/docs/deprecations for a recommendation on which model to use instead.', 'type': 'invalid_request_error', 'code': 'model_decommissioned'}}
+Traceback (most recent call last):
+  File "D:\Users\villa\Downloads\tenderdocsreview-main\tenderdocsreview-main\agent.py", line 129, in analyze
+    brief = self._run_loop(state)
+  File "D:\Users\villa\Downloads\tenderdocsreview-main\tenderdocsreview-main\agent.py", line 183, in _run_loop
+    response = self.client.chat.completions.create(
+  File "C:\Users\villa\AppData\Local\Programs\Python\Python310\lib\site-packages\groq\resources\chat\completions.py", line 461, in create
+    return self._post(
+  File "C:\Users\villa\AppData\Local\Programs\Python\Python310\lib\site-packages\groq\_base_client.py", line 1242, in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+  File "C:\Users\villa\AppData\Local\Programs\Python\Python310\lib\site-packages\groq\_base_client.py", line 1044, in request
+    raise self._make_status_error_from_response(err.response) from None
+groq.BadRequestError: Error code: 400 - {'error': {'message': 'The model `llama3-8b-8192` has been decommissioned and is no longer supported. Please refer to https://console.groq.com/docs/deprecations for a recommendation on which model to use instead.', 'type': 'invalid_request_error', 'code': 'model_decommissioned'}}
+18:14:20  INFO      [SIE-001] Persistido: 0 hallazgos, 0 tool calls
+18:14:20  INFO      ============================================================
+18:14:20  INFO      Batch completado en 2.3s
+18:14:20  INFO      Completados: 0 | Fallidos: 1 | Hallazgos totales: 0
+18:14:20  INFO      ============================================================
+18:14:52  INFO      ============================================================
+18:14:52  INFO      Agente de análisis de pliegos — inicio batch
+18:14:52  INFO      ============================================================
+18:14:52  INFO      Inicializando schema SQL Server...
+18:14:54  INFO      Schema listo.
+18:14:54  INFO      Procesos en metadata: 1
+18:14:54  INFO      Procesos a analizar: 1
+18:14:54  INFO      [1/1] Analizando SIE-001 — Proceso de prueba
+18:14:55  INFO      [fd4e4f0f-33a0-4533-af22-3aadcbb332d9] Iniciando análisis de SIE-001
+18:14:55  INFO      HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 400 Bad Request"
+18:14:55  ERROR     [fd4e4f0f-33a0-4533-af22-3aadcbb332d9] Análisis fallido: Error code: 400 - {'error': {'message': "Failed to call a function. Please adjust your prompt. See 'failed_generation' for more details.", 'type': 'invalid_request_error', 'code': 'tool_use_failed', 'failed_generation': '<function=get_document_structure>{"pdf_path": "D:\\\\Users\\\\villa\\\\Downloads\\\\tenderdocsreview-main\\\\tenderdocsreview-main\\\\data\\\\raw\\\\pliegos\\\\46615531.pdf"}'}}
+Traceback (most recent call last):
+  File "D:\Users\villa\Downloads\tenderdocsreview-main\tenderdocsreview-main\agent.py", line 129, in analyze
+    brief = self._run_loop(state)
+  File "D:\Users\villa\Downloads\tenderdocsreview-main\tenderdocsreview-main\agent.py", line 183, in _run_loop
+    response = self.client.chat.completions.create(
+  File "C:\Users\villa\AppData\Local\Programs\Python\Python310\lib\site-packages\groq\resources\chat\completions.py", line 461, in create
+    return self._post(
+  File "C:\Users\villa\AppData\Local\Programs\Python\Python310\lib\site-packages\groq\_base_client.py", line 1242, in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+  File "C:\Users\villa\AppData\Local\Programs\Python\Python310\lib\site-packages\groq\_base_client.py", line 1044, in request
+    raise self._make_status_error_from_response(err.response) from None
+groq.BadRequestError: Error code: 400 - {'error': {'message': "Failed to call a function. Please adjust your prompt. See 'failed_generation' for more details.", 'type': 'invalid_request_error', 'code': 'tool_use_failed', 'failed_generation': '<function=get_document_structure>{"pdf_path": "D:\\\\Users\\\\villa\\\\Downloads\\\\tenderdocsreview-main\\\\tenderdocsreview-main\\\\data\\\\raw\\\\pliegos\\\\46615531.pdf"}'}}
+18:14:56  INFO      [SIE-001] Persistido: 0 hallazgos, 0 tool calls
+18:14:56  INFO      ============================================================
+18:14:56  INFO      Batch completado en 2.2s
+18:14:56  INFO      Completados: 0 | Fallidos: 1 | Hallazgos totales: 0
+18:14:56  INFO      ============================================================

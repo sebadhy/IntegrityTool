@@ -1,17 +1,24 @@
+"""
+llm_reviewer.py — Lectura asistida por LLM para revisión de pliegos.
+
+Proveedores soportados (prioridad descendente):
+  1. Azure OpenAI  — OPENAI_API_KEY + OPENAI_BASE_URL
+  2. Groq          — GROQ_API_KEY  (llama-3.3-70b-versatile)
+
+Máximo 2 llamadas LLM por documento: un brief + explicaciones individuales on-demand.
+Reintentos automáticos con backoff exponencial para errores 429 de rate limit.
+"""
+
 from __future__ import annotations
 
 import json
 import logging
 import os
+import random
+import time
 from typing import Any
 
 from dotenv import load_dotenv
-from openai import OpenAI
-
-from src.config import APP_MAX_DOCUMENT_CHARS, OPENAI_MODEL
-
-from .taxonomy_loader import taxonomy_context
-
 
 load_dotenv()
 
@@ -20,181 +27,97 @@ LOGGER = logging.getLogger(__name__)
 SYSTEM_PROMPT = (
     "Eres un asistente técnico para revisión preliminar de neutralidad competitiva en "
     "documentos de contratación pública de Ecuador. Tu función es resumir, contextualizar "
-    "y apoyar la priorización de revisión humana a partir de señales documentales ya detectadas. Puedes apoyarte en principios normativos "
-    "como concurrencia, igualdad, trato justo, no discriminación, transparencia, mejor valor "
-    "por dinero, claridad de especificaciones, proporcionalidad y justificación técnica. "
-    "No emites dictámenes legales, no atribuyes intencionalidad, no infieres proveedores beneficiados "
-    "y no inventas evidencia. Si el fragmento no sustenta una señal documental, responde: "
-    "No se identifica una señal documental suficiente en el fragmento revisado."
+    "y apoyar la priorización de revisión humana a partir de señales documentales ya detectadas. "
+    "Puedes apoyarte en principios normativos como concurrencia, igualdad, trato justo, "
+    "no discriminación, transparencia, mejor valor por dinero, claridad de especificaciones, "
+    "proporcionalidad y justificación técnica. "
+    "No emites dictámenes legales, no atribuyes intencionalidad, no infieres proveedores "
+    "beneficiados y no inventas evidencia. Si el fragmento no sustenta una señal documental, "
+    "responde: No se identifica una señal documental suficiente en el fragmento revisado."
 )
 
-DEFAULT_MODEL = OPENAI_MODEL
 UNAVAILABLE = "No disponible"
-MAX_DOCUMENT_CHARS = APP_MAX_DOCUMENT_CHARS
-
-DOCUMENT_BRIEF_SCHEMA = {
-    "type": "json_schema",
-    "json_schema": {
-        "name": "document_review_brief",
-        "strict": True,
-        "schema": {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "document_summary": {"type": "string"},
-                "main_review_topics": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "minItems": 1,
-                    "maxItems": 6,
-                },
-                "overall_attention_level": {
-                    "type": "string",
-                    "enum": ["Bajo", "Medio", "Alto"],
-                },
-                "possible_competition_effects": {"type": "string"},
-                "comparative_context": {"type": "string"},
-                "top_priorities_rationale": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "minItems": 1,
-                    "maxItems": 5,
-                },
-                "suggested_human_review_questions": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "minItems": 2,
-                    "maxItems": 6,
-                },
-                "methodological_note": {"type": "string"},
-            },
-            "required": [
-                "document_summary",
-                "overall_attention_level",
-                "main_review_topics",
-                "possible_competition_effects",
-                "comparative_context",
-                "top_priorities_rationale",
-                "suggested_human_review_questions",
-                "methodological_note",
-            ],
-        },
-    },
-}
-
-FINDING_EXPLANATION_SCHEMA = {
-    "type": "json_schema",
-    "json_schema": {
-        "name": "finding_review_explanation",
-        "strict": True,
-        "schema": {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "plain_language_explanation": {"type": "string"},
-                "why_it_matters": {"type": "string"},
-                "possible_legitimate_justification": {"type": "string"},
-                "suggested_review_action": {"type": "string"},
-                "questions_for_reviewer": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "minItems": 1,
-                    "maxItems": 4,
-                },
-            },
-            "required": [
-                "plain_language_explanation",
-                "why_it_matters",
-                "possible_legitimate_justification",
-                "suggested_review_action",
-                "questions_for_reviewer",
-            ],
-        },
-    },
-}
+MAX_DOCUMENT_CHARS = 12_000
+MAX_RETRIES = 4
+BASE_DELAY = 2.0  # segundos base para backoff
 
 
-PLIEGO_METADATA_SCHEMA = {
-    "type": "json_schema",
-    "json_schema": {
-        "name": "pliego_metadata_assisted",
-        "strict": True,
-        "schema": {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "entidad_contratante": {"$ref": "#/$defs/metadata_field"},
-                "objeto_contratacion": {"$ref": "#/$defs/metadata_field"},
-                "tipo_procedimiento": {"$ref": "#/$defs/metadata_field"},
-                "presupuesto_referencial": {"$ref": "#/$defs/metadata_field"},
-                "fecha": {"$ref": "#/$defs/metadata_field"},
-                "resumen_pliego": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "minItems": 1,
-                    "maxItems": 4,
-                },
-            },
-            "required": [
-                "entidad_contratante",
-                "objeto_contratacion",
-                "tipo_procedimiento",
-                "presupuesto_referencial",
-                "fecha",
-                "resumen_pliego",
-            ],
-            "$defs": {
-                "metadata_field": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {
-                        "value": {"type": "string"},
-                        "confidence": {"type": "string", "enum": ["alta", "media", "baja"]},
-                        "source": {"type": "string"},
-                        "evidence": {"type": "string"},
-                    },
-                    "required": ["value", "confidence", "source", "evidence"],
-                }
-            },
-        },
-    },
-}
+# ---------------------------------------------------------------------------
+# Retry con backoff exponencial
+# ---------------------------------------------------------------------------
+
+def _is_rate_limit(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return "429" in msg or "rate_limit" in msg or "ratelimit" in msg or "too many requests" in msg
 
 
-def extract_pliego_metadata_assisted(
-    document_text: str,
-    heuristic_candidates: dict,
-    first_pages: str,
-) -> dict:
-    """Validate and complete pliego metadata using optional assisted processing."""
-    if not os.getenv("OPENAI_API_KEY"):
-        return _unavailable_pliego_metadata("OPENAI_API_KEY no está configurada.")
+def _call_with_retry(fn):
+    """Ejecuta fn() con hasta MAX_RETRIES reintentos ante rate limit (429)."""
+    last_exc: Exception | None = None
+    for attempt in range(MAX_RETRIES):
+        try:
+            return fn()
+        except Exception as exc:
+            last_exc = exc
+            if _is_rate_limit(exc) and attempt < MAX_RETRIES - 1:
+                delay = BASE_DELAY * (2 ** attempt) + random.uniform(0, 0.5)
+                LOGGER.warning(
+                    "Rate limit detectado. Reintentando en %.1fs (intento %d/%d).",
+                    delay, attempt + 1, MAX_RETRIES,
+                )
+                time.sleep(delay)
+            else:
+                raise
+    raise last_exc  # type: ignore[misc]
 
-    try:
-        response = _client().chat.completions.create(
-            model=os.getenv("OPENAI_MODEL", DEFAULT_MODEL),
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "Eres un asistente técnico para extracción preliminar de metadata de pliegos "
-                        "de contratación pública de Ecuador. Debes validar campos con evidencia textual, "
-                        "corregir truncamientos obvios y no inventar datos. Si un campo no está sustentado, "
-                        "usa 'No identificado'. Responde solo JSON estricto."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": _build_pliego_metadata_prompt(document_text, heuristic_candidates, first_pages),
-                },
-            ],
-            response_format=PLIEGO_METADATA_SCHEMA,
+
+# ---------------------------------------------------------------------------
+# Factory de cliente LLM
+# ---------------------------------------------------------------------------
+
+def _use_azure() -> bool:
+    return bool(os.getenv("OPENAI_API_KEY") and os.getenv("OPENAI_BASE_URL"))
+
+
+def _use_groq() -> bool:
+    return bool(os.getenv("GROQ_API_KEY"))
+
+
+def _llm_available() -> bool:
+    return _use_azure() or _use_groq()
+
+
+def _client():
+    """Retorna cliente OpenAI-compatible según las variables de entorno disponibles."""
+    if _use_azure():
+        from openai import AzureOpenAI
+        return AzureOpenAI(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            azure_endpoint=os.getenv("OPENAI_BASE_URL"),
+            api_version=os.getenv("OPENAI_API_VERSION", "2024-06-01"),
         )
-        content = response.choices[0].message.content or "{}"
-        return _normalize_pliego_metadata(json.loads(content))
-    except Exception as exc:
-        LOGGER.warning("Pliego metadata assisted extraction failed: %s", exc)
-        return _unavailable_pliego_metadata(_friendly_llm_error(exc))
+    if _use_groq():
+        from openai import OpenAI
+        return OpenAI(
+            api_key=os.getenv("GROQ_API_KEY"),
+            base_url="https://api.groq.com/openai/v1",
+        )
+    raise ValueError("Sin LLM configurado. Define OPENAI_API_KEY o GROQ_API_KEY en .env")
+
+
+def _model() -> str:
+    if _use_azure():
+        return os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    return os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+
+
+def _provider_name() -> str:
+    return "Azure OpenAI" if _use_azure() else "Groq"
+
+
+# ---------------------------------------------------------------------------
+# Llamadas principales
+# ---------------------------------------------------------------------------
 
 def generate_document_brief(
     document_text: str,
@@ -202,31 +125,35 @@ def generate_document_brief(
     corpus_context: dict | None = None,
     normative_context: dict | None = None,
 ) -> dict:
-    """Generate a cautious executive brief from document text and prior rule findings."""
-    if not os.getenv("OPENAI_API_KEY"):
-        return _unavailable_document_brief("OPENAI_API_KEY no está configurada.")
+    """Genera un brief ejecutivo a partir del texto del documento y los hallazgos."""
+    if not _llm_available():
+        return _unavailable_document_brief("Sin API key configurada (OPENAI_API_KEY o GROQ_API_KEY).")
+
+    prompt = _build_document_brief_prompt(
+        document_text=document_text,
+        findings=prioritized_findings,
+        corpus_context=corpus_context,
+        normative_context=normative_context,
+    )
 
     try:
-        response = _client().chat.completions.create(
-            model=os.getenv("OPENAI_MODEL", DEFAULT_MODEL),
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": _build_document_brief_prompt(
-                        document_text=document_text,
-                        findings=prioritized_findings,
-                        corpus_context=corpus_context,
-                        normative_context=normative_context,
-                    ),
-                },
-            ],
-            response_format=DOCUMENT_BRIEF_SCHEMA,
-        )
+        def _call():
+            return _client().chat.completions.create(
+                model=_model(),
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.1,
+                max_tokens=1500,
+            )
+
+        response = _call_with_retry(_call)
         content = response.choices[0].message.content or "{}"
         return _normalize_document_brief(json.loads(content))
     except Exception as exc:
-        LOGGER.warning("Document brief LLM failed: %s", exc)
+        LOGGER.warning("Document brief LLM (%s) falló: %s", _provider_name(), exc)
         return _unavailable_document_brief(_friendly_llm_error(exc))
 
 
@@ -234,29 +161,30 @@ def explain_priority_with_llm(
     priority: dict,
     corpus_context: dict | None = None,
 ) -> dict:
-    """Explain one prioritized signal in plain language."""
-    if not os.getenv("OPENAI_API_KEY"):
-        return _unavailable_finding_explanation("OPENAI_API_KEY no está configurada.")
+    """Explica un hallazgo prioritario en lenguaje claro."""
+    if not _llm_available():
+        return _unavailable_finding_explanation("Sin API key configurada (OPENAI_API_KEY o GROQ_API_KEY).")
+
+    prompt = _build_finding_prompt(finding=priority, corpus_context=corpus_context)
 
     try:
-        response = _client().chat.completions.create(
-            model=os.getenv("OPENAI_MODEL", DEFAULT_MODEL),
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": _build_finding_prompt(
-                        finding=priority,
-                        corpus_context=corpus_context,
-                    ),
-                },
-            ],
-            response_format=FINDING_EXPLANATION_SCHEMA,
-        )
+        def _call():
+            return _client().chat.completions.create(
+                model=_model(),
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.1,
+                max_tokens=800,
+            )
+
+        response = _call_with_retry(_call)
         content = response.choices[0].message.content or "{}"
         return _normalize_finding_explanation(json.loads(content))
     except Exception as exc:
-        LOGGER.warning("Finding explanation LLM failed: %s", exc)
+        LOGGER.warning("Finding explanation LLM (%s) falló: %s", _provider_name(), exc)
         return _unavailable_finding_explanation(_friendly_llm_error(exc))
 
 
@@ -264,12 +192,10 @@ def explain_finding_with_llm(
     finding: dict,
     corpus_context: dict | None = None,
 ) -> dict:
-    """Backward-compatible wrapper for previous UI paths."""
     return explain_priority_with_llm(finding, corpus_context)
 
 
 def review_detection_with_llm(detection: dict) -> dict:
-    """Backward-compatible wrapper for older UI paths."""
     explanation = explain_finding_with_llm(detection)
     return {
         "llm_explanation": explanation["plain_language_explanation"],
@@ -280,110 +206,33 @@ def review_detection_with_llm(detection: dict) -> dict:
 
 
 def test_llm_connection() -> tuple[bool, str]:
-    """Check API key presence and perform a minimal model call."""
-    if not os.getenv("OPENAI_API_KEY"):
-        return False, "OPENAI_API_KEY no está configurada."
+    """Verifica la conexión con el proveedor LLM activo."""
+    if not _llm_available():
+        return False, "Sin API key configurada. Define OPENAI_API_KEY (Azure) o GROQ_API_KEY (Groq)."
 
     try:
-        response = _client().chat.completions.create(
-            model=os.getenv("OPENAI_MODEL", DEFAULT_MODEL),
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Responde de forma breve y técnica.",
-                },
-                {
-                    "role": "user",
-                    "content": "Responde exactamente: OK",
-                },
-            ],
-        )
+        def _call():
+            return _client().chat.completions.create(
+                model=_model(),
+                messages=[
+                    {"role": "system", "content": "Responde de forma breve y técnica."},
+                    {"role": "user", "content": "Responde exactamente: OK"},
+                ],
+                max_tokens=10,
+            )
+
+        response = _call_with_retry(_call)
         content = (response.choices[0].message.content or "").strip()
         if content:
-            return True, "Conexión LLM OK"
-        return False, "La conexión respondió, pero no devolvió contenido."
+            return True, f"Conexión {_provider_name()} OK — modelo: {_model()}"
+        return False, "La conexión respondió pero no devolvió contenido."
     except Exception as exc:
         return False, _friendly_llm_error(exc)
 
 
-def _client() -> OpenAI:
-    return OpenAI(
-        api_key=os.getenv("OPENAI_API_KEY"),
-        base_url=os.getenv("OPENAI_BASE_URL") or None,
-    )
-
-
-def _friendly_llm_error(exc: Exception) -> str:
-    message = str(exc)
-    lower_message = message.lower()
-    if "insufficient_quota" in lower_message or "quota" in lower_message:
-        return "No hay cuota o crédito disponible para usar el modelo configurado."
-    if "authentication" in lower_message or "api key" in lower_message or "401" in lower_message:
-        return "La API key no pudo autenticarse. Verifique OPENAI_API_KEY."
-    if "connection" in lower_message or "timeout" in lower_message:
-        return "No se pudo conectar con el proveedor LLM. Revise red o OPENAI_BASE_URL."
-    if "model" in lower_message and ("not found" in lower_message or "does not exist" in lower_message):
-        return "El modelo configurado no está disponible. Revise OPENAI_MODEL."
-    return f"No se pudo verificar la conexión LLM: {message[:240]}"
-
-
-
-def _build_pliego_metadata_prompt(document_text: str, heuristic_candidates: dict, first_pages: str) -> str:
-    return (
-        "Extrae y valida metadata administrativa del pliego. Prioriza valores completos y verificables.\n\n"
-        "Reglas:\n"
-        "- Entidad contratante debe ser nombre institucional, no una cláusula.\n"
-        "- No aceptes entidad si contiene verbos como será, deberá, podrá o corresponde.\n"
-        "- Objeto de contratación debe conservarse completo, sin truncarlo.\n"
-        "- Normaliza tipo de procedimiento, por ejemplo: Subasta Inversa Electrónica.\n"
-        "- Presupuesto solo si hay valor monetario claro; si no existe, usa No identificado.\n"
-        "- Resumen del pliego: máximo 4 bullets, lenguaje administrativo, sin metodología.\n"
-        "- No emitas conclusiones legales.\n\n"
-        f"Candidatos heurísticos actuales:\n{json.dumps(heuristic_candidates, ensure_ascii=False, indent=2)}\n\n"
-        f"Primeras páginas / encabezado:\n{first_pages[:8000]}\n\n"
-        f"Texto adicional del documento:\n{document_text[:MAX_DOCUMENT_CHARS]}\n"
-    )
-
-
-def _normalize_pliego_metadata(payload: dict[str, Any]) -> dict:
-    return {
-        "entidad_contratante": _normalize_metadata_field(payload.get("entidad_contratante")),
-        "objeto_contratacion": _normalize_metadata_field(payload.get("objeto_contratacion")),
-        "tipo_procedimiento": _normalize_metadata_field(payload.get("tipo_procedimiento")),
-        "presupuesto_referencial": _normalize_metadata_field(payload.get("presupuesto_referencial")),
-        "fecha": _normalize_metadata_field(payload.get("fecha")),
-        "resumen_pliego": _normalize_list(payload.get("resumen_pliego"))[:4],
-        "llm_available": True,
-    }
-
-
-def _normalize_metadata_field(value: Any) -> dict[str, str]:
-    if not isinstance(value, dict):
-        return {"value": "No identificado", "confidence": "baja", "source": UNAVAILABLE, "evidence": UNAVAILABLE}
-    confidence = str(value.get("confidence") or "baja").lower()
-    if confidence not in {"alta", "media", "baja"}:
-        confidence = "baja"
-    return {
-        "value": str(value.get("value") or "No identificado").strip() or "No identificado",
-        "confidence": confidence,
-        "source": str(value.get("source") or UNAVAILABLE),
-        "evidence": str(value.get("evidence") or UNAVAILABLE),
-    }
-
-
-def _unavailable_pliego_metadata(reason: str = UNAVAILABLE) -> dict:
-    field = {"value": "No identificado", "confidence": "baja", "source": UNAVAILABLE, "evidence": UNAVAILABLE}
-    return {
-        "entidad_contratante": dict(field),
-        "objeto_contratacion": dict(field),
-        "tipo_procedimiento": dict(field),
-        "presupuesto_referencial": dict(field),
-        "fecha": dict(field),
-        "resumen_pliego": [UNAVAILABLE],
-        "llm_available": False,
-        "llm_error": reason,
-    }
-
+# ---------------------------------------------------------------------------
+# Construcción de prompts
+# ---------------------------------------------------------------------------
 
 def _build_document_brief_prompt(
     document_text: str,
@@ -391,188 +240,163 @@ def _build_document_brief_prompt(
     corpus_context: dict | None,
     normative_context: dict | None,
 ) -> str:
+    from .taxonomy_loader import taxonomy_context
+
     representative_text = _representative_document_excerpt(document_text, findings)
     findings_summary = _findings_summary(findings)
     comparative_summary = _comparative_summary(findings, corpus_context)
 
     return (
-        "Genera una lectura preliminar asistida para revisión humana de un documento de "
-        "contratación pública, con foco en neutralidad competitiva.\n\n"
+        "Genera una lectura preliminar asistida para revisión humana de neutralidad competitiva.\n\n"
         "Condiciones:\n"
         "- Usa únicamente el extracto documental, las señales sugeridas y el contexto comparativo provisto.\n"
-        "- No inventes señales nuevas ni agregues conclusiones no soportadas.\n"
-        "- No emitas dictámenes legales ni asignes responsabilidad.\n"
-        "- No atribuyas intencionalidad ni infieras proveedores beneficiados.\n"
-        "- Usa la taxonomía únicamente como marco de explicación y no como conclusión automática.\n"
-        "- Usa la capa normativa solo como referencia orientativa para revisión humana.\n"
-        "- Distingue requisitos regulatorios o habituales de señales atípicas o acumuladas.\n"
-        "- Reconoce mitigantes como equivalentes funcionales, consorcios, apertura a oferentes "
-        "extranjeros, criterios funcionales o pluralidad de marcas.\n"
-        "- Si un criterio parece razonable o estándar, dilo expresamente con lenguaje prudente.\n"
-        "- Usa lenguaje prudente: señales de restricción competitiva, requisitos potencialmente "
-        "limitantes, baja neutralidad competitiva, condiciones que podrían reducir concurrencia, "
-        "validación de proporcionalidad, revisión humana sugerida, posible afectación a concurrencia.\n"
-        "- Si no hay evidencia suficiente, indícalo de forma explícita y prudente.\n"
-        "- Devuelve únicamente JSON estricto con las claves solicitadas.\n\n"
-        "Objeto de contratación: No disponible en el documento cargado.\n\n"
-        f"Extracto representativo del documento (máximo {MAX_DOCUMENT_CHARS} caracteres):\n"
+        "- No inventes señales nuevas ni concluyas sin evidencia.\n"
+        "- No emitas dictámenes legales ni atribuyas intencionalidad.\n"
+        "- Distingue requisitos habituales de señales atípicas.\n"
+        "- Reconoce mitigantes como equivalentes funcionales, consorcios, apertura a extranjeros.\n"
+        "- Usa lenguaje prudente: señales preliminares, posible restricción, revisión humana sugerida.\n\n"
+        "Devuelve ÚNICAMENTE un JSON con estas claves exactas:\n"
+        "{\n"
+        '  "document_summary": "...",\n'
+        '  "overall_attention_level": "Bajo|Medio|Alto",\n'
+        '  "main_review_topics": ["...", "..."],\n'
+        '  "possible_competition_effects": "...",\n'
+        '  "comparative_context": "...",\n'
+        '  "top_priorities_rationale": ["...", "..."],\n'
+        '  "suggested_human_review_questions": ["...", "..."],\n'
+        '  "methodological_note": "..."\n'
+        "}\n\n"
+        f"Extracto representativo del documento (máx {MAX_DOCUMENT_CHARS} caracteres):\n"
         f"{representative_text}\n\n"
-        "Señales sugeridas para revisión, derivadas del análisis previo:\n"
+        "Señales sugeridas para revisión:\n"
         f"{json.dumps(findings_summary, ensure_ascii=False, indent=2)}\n\n"
-        "Frecuencias comparativas y contexto del corpus, si está disponible:\n"
-        f"{json.dumps(comparative_summary, ensure_ascii=False, indent=2)}\n"
-        "\nCapa normativa orientativa curada:\n"
-        f"{json.dumps(normative_context or _default_normative_context(), ensure_ascii=False, indent=2)}\n"
-        "\nTaxonomía documental de referencia:\n"
+        "Contexto comparativo del corpus:\n"
+        f"{json.dumps(comparative_summary, ensure_ascii=False, indent=2)}\n\n"
+        "Capa normativa orientativa:\n"
+        f"{json.dumps(normative_context or _default_normative_context(), ensure_ascii=False, indent=2)}\n\n"
+        "Taxonomía documental:\n"
         f"{json.dumps(taxonomy_context(), ensure_ascii=False, indent=2)}\n"
     )
 
 
 def _build_finding_prompt(finding: dict, corpus_context: dict | None) -> str:
+    from .taxonomy_loader import taxonomy_context
+
     pattern = str(finding.get("patrón detectado", "No disponible"))
     context = (corpus_context or {}).get(pattern, {})
 
     return (
         "Explica una señal sugerida para revisión humana de forma clara y prudente.\n\n"
         "Condiciones:\n"
-        "- La señal ya fue detectada por reglas; no inventes señales adicionales.\n"
-        "- No emitas dictámenes legales ni asignes responsabilidad.\n"
-        "- No infieras intención ni proveedor beneficiado.\n"
-        "- Usa la referencia normativa de la señal solo como apoyo orientativo.\n"
-        "- Distingue si se trata de un requisito habitual, un mitigante o una señal que requiere revisión.\n"
-        "- Reconoce factores que favorecen concurrencia y explica si reducen la atención sugerida.\n"
-        "- No atribuyas intencionalidad.\n"
-        "- Usa lenguaje técnico, breve y orientado a decisión.\n"
-        "- Devuelve únicamente JSON estricto con las claves solicitadas.\n\n"
-        f"Señal sugerida:\n{json.dumps(_compact_finding(finding), ensure_ascii=False, indent=2)}\n\n"
+        "- La señal fue detectada por reglas; no inventes señales adicionales.\n"
+        "- No emitas dictámenes legales ni atribuyas intencionalidad.\n"
+        "- Distingue si es requisito habitual, mitigante o señal que requiere revisión.\n"
+        "- Usa lenguaje técnico, breve y orientado a decisión.\n\n"
+        "Devuelve ÚNICAMENTE un JSON con estas claves exactas:\n"
+        "{\n"
+        '  "plain_language_explanation": "...",\n'
+        '  "why_it_matters": "...",\n'
+        '  "possible_legitimate_justification": "...",\n'
+        '  "suggested_review_action": "...",\n'
+        '  "questions_for_reviewer": ["...", "..."]\n'
+        "}\n\n"
+        f"Señal:\n{json.dumps(_compact_finding(finding), ensure_ascii=False, indent=2)}\n\n"
         f"Contexto histórico del patrón:\n{json.dumps(context, ensure_ascii=False, indent=2)}\n\n"
-        f"Taxonomía documental de referencia:\n{json.dumps(taxonomy_context(limit=6), ensure_ascii=False, indent=2)}\n"
+        f"Taxonomía de referencia:\n{json.dumps(taxonomy_context(limit=6), ensure_ascii=False, indent=2)}\n"
     )
 
 
+# ---------------------------------------------------------------------------
+# Helpers de datos
+# ---------------------------------------------------------------------------
+
 def _representative_document_excerpt(document_text: str, findings: list[dict]) -> str:
     fragments = []
-    seen = set()
+    seen: set[str] = set()
     for finding in findings:
         fragment = str(finding.get("fragmento textual", "")).strip()
         if fragment and fragment not in seen:
             fragments.append(fragment)
             seen.add(fragment)
-        if sum(len(item) for item in fragments) >= 6_000:
+        if sum(len(f) for f in fragments) >= 6_000:
             break
 
     prioritized = "\n\n".join(fragments)
-    remaining_budget = max(0, MAX_DOCUMENT_CHARS - len(prioritized))
-    document_start = document_text[:remaining_budget]
-    excerpt = f"Secciones con señales sugeridas:\n{prioritized}\n\nInicio del documento:\n{document_start}"
+    remaining = max(0, MAX_DOCUMENT_CHARS - len(prioritized))
+    excerpt = f"Secciones con señales:\n{prioritized}\n\nInicio del documento:\n{document_text[:remaining]}"
     return excerpt[:MAX_DOCUMENT_CHARS]
 
 
 def _findings_summary(findings: list[dict], max_items: int = 18) -> list[dict[str, Any]]:
-    priority = {"Alto": 0, "Medio": 1, "Bajo": 2}
+    priority_map = {"Alto": 0, "Medio": 1, "Bajo": 2}
     sorted_findings = sorted(
         findings,
         key=lambda item: (
-            priority.get(str(item.get("atención sugerida") or item.get("nivel de atención")), 3),
+            priority_map.get(str(item.get("atención sugerida") or item.get("nivel de atención")), 3),
             str(item.get("clasificación histórica", "")),
         ),
     )
-    return [_compact_finding(finding) for finding in sorted_findings[:max_items]]
+    return [_compact_finding(f) for f in sorted_findings[:max_items]]
 
 
 def _compact_finding(finding: dict) -> dict[str, Any]:
     return {
-        "signal_id": finding.get("signal_id", "No disponible"),
+        "signal_id": finding.get("signal_id", UNAVAILABLE),
         "tipo_senal": finding.get("tipo_señal", "señal_revision"),
-        "tema": finding.get("tema de revisión", "No disponible"),
-        "pagina": finding.get("página", "No disponible"),
-        "patron": finding.get("patrón detectado", "No disponible"),
-        "pattern_id": finding.get("pattern_id", "No disponible"),
-        "pattern_name": finding.get("pattern_name", finding.get("patrón detectado", "No disponible")),
-        "dimension_competitiva": finding.get("competition_dimension", finding.get("dimensión competitiva", "No disponible")),
-        "seccion_documental_probable": finding.get("document_section", finding.get("sección documental probable", "No disponible")),
-        "categoria_revision": finding.get("categoría de revisión", "No disponible"),
-        "atencion_sugerida": finding.get(
-            "atención sugerida",
-            finding.get("nivel de atención", "No disponible"),
-        ),
-        "clasificacion_historica": finding.get("clasificación histórica", "No disponible"),
-        "frecuencia_corpus": finding.get("frecuencia en corpus", "No disponible"),
-        "comentario_contextual": finding.get("comentario contextual", "No disponible"),
-        "criterio_priorizacion": finding.get(
-            "explicacion_priorizacion",
-            finding.get(
-                "por qué se sugiere revisar",
-                finding.get("validación sugerida", "No disponible"),
-            ),
-        ),
-        "prioridad_revision": finding.get("prioridad de revisión", finding.get("review_priority", "No disponible")),
-        "criterios_de_priorizacion": finding.get(
-            "criterios_de_priorizacion",
-            finding.get("validación sugerida", "No disponible"),
-        ),
+        "tema": finding.get("tema de revisión", UNAVAILABLE),
+        "pagina": finding.get("página", UNAVAILABLE),
+        "patron": finding.get("patrón detectado", UNAVAILABLE),
+        "pattern_id": finding.get("pattern_id", UNAVAILABLE),
+        "pattern_name": finding.get("pattern_name", finding.get("patrón detectado", UNAVAILABLE)),
+        "dimension_competitiva": finding.get("competition_dimension", finding.get("dimensión competitiva", UNAVAILABLE)),
+        "seccion_documental": finding.get("document_section", finding.get("sección documental probable", UNAVAILABLE)),
+        "categoria_revision": finding.get("categoría de revisión", UNAVAILABLE),
+        "atencion_sugerida": finding.get("atención sugerida", finding.get("nivel de atención", UNAVAILABLE)),
+        "clasificacion_historica": finding.get("clasificación histórica", UNAVAILABLE),
+        "frecuencia_corpus": finding.get("frecuencia en corpus", UNAVAILABLE),
+        "comentario_contextual": finding.get("comentario contextual", UNAVAILABLE),
+        "criterio_priorizacion": finding.get("explicacion_priorizacion", finding.get("por qué se sugiere revisar", UNAVAILABLE)),
+        "prioridad_revision": finding.get("prioridad de revisión", finding.get("review_priority", UNAVAILABLE)),
         "factores_mitigantes": finding.get("mitigating_factors", []),
         "justificaciones_posibles": finding.get("possible_legitimate_justifications", []),
         "informacion_faltante": finding.get("missing_information", []),
-        "lenguaje_recomendado": finding.get("suggested_neutral_wording", finding.get("lenguaje recomendado", "No disponible")),
-        "posible_efecto_sobre_concurrencia": finding.get(
-            "posible efecto sobre concurrencia",
-            "No disponible",
-        ),
-        "criterio_normativo": finding.get("criterio_normativo_de_revision", "No disponible"),
-        "pregunta_normativa": finding.get("pregunta_normativa_sugerida", "No disponible"),
-        "elementos_que_favorecen_concurrencia": finding.get(
-            "elementos que favorecen concurrencia",
-            "No disponible",
-        ),
-        "fragmento": finding.get("fragmento textual", "No disponible"),
+        "posible_efecto_concurrencia": finding.get("posible efecto sobre concurrencia", UNAVAILABLE),
+        "criterio_normativo": finding.get("criterio_normativo_de_revision", UNAVAILABLE),
+        "pregunta_normativa": finding.get("pregunta_normativa_sugerida", UNAVAILABLE),
+        "fragmento": finding.get("fragmento textual", UNAVAILABLE),
     }
 
 
-def _comparative_summary(
-    findings: list[dict],
-    corpus_context: dict | None,
-) -> dict[str, Any]:
+def _comparative_summary(findings: list[dict], corpus_context: dict | None) -> dict[str, Any]:
     if not corpus_context:
-        return {"estado": "No disponible"}
+        return {"estado": UNAVAILABLE}
+    patterns = sorted({str(f.get("patrón detectado", "")) for f in findings})
+    return {p: corpus_context.get(p, {}) for p in patterns if p}
 
-    patterns = sorted({str(finding.get("patrón detectado", "")) for finding in findings})
-    return {
-        pattern: corpus_context.get(pattern, {})
-        for pattern in patterns
-        if pattern
-    }
 
+# ---------------------------------------------------------------------------
+# Normalización de respuestas LLM
+# ---------------------------------------------------------------------------
 
 def _normalize_document_brief(brief: dict[str, Any]) -> dict:
     return {
         "document_summary": str(brief.get("document_summary") or UNAVAILABLE),
         "overall_attention_level": _normalize_attention(brief.get("overall_attention_level")),
         "main_review_topics": _normalize_list(brief.get("main_review_topics")),
-        "possible_competition_effects": str(
-            brief.get("possible_competition_effects") or UNAVAILABLE
-        ),
+        "possible_competition_effects": str(brief.get("possible_competition_effects") or UNAVAILABLE),
         "comparative_context": str(brief.get("comparative_context") or UNAVAILABLE),
         "top_priorities_rationale": _normalize_list(brief.get("top_priorities_rationale")),
-        "suggested_human_review_questions": _normalize_list(
-            brief.get("suggested_human_review_questions")
-        ),
+        "suggested_human_review_questions": _normalize_list(brief.get("suggested_human_review_questions")),
         "methodological_note": str(brief.get("methodological_note") or UNAVAILABLE),
     }
 
 
 def _normalize_finding_explanation(explanation: dict[str, Any]) -> dict:
     return {
-        "plain_language_explanation": str(
-            explanation.get("plain_language_explanation") or UNAVAILABLE
-        ),
+        "plain_language_explanation": str(explanation.get("plain_language_explanation") or UNAVAILABLE),
         "why_it_matters": str(explanation.get("why_it_matters") or UNAVAILABLE),
-        "possible_legitimate_justification": str(
-            explanation.get("possible_legitimate_justification") or UNAVAILABLE
-        ),
-        "suggested_review_action": str(
-            explanation.get("suggested_review_action") or UNAVAILABLE
-        ),
+        "possible_legitimate_justification": str(explanation.get("possible_legitimate_justification") or UNAVAILABLE),
+        "suggested_review_action": str(explanation.get("suggested_review_action") or UNAVAILABLE),
         "questions_for_reviewer": _normalize_list(explanation.get("questions_for_reviewer")),
     }
 
@@ -587,11 +411,13 @@ def _normalize_list(value: Any) -> list[str]:
 
 
 def _normalize_attention(value: Any) -> str:
-    value_text = str(value or "").strip()
-    if value_text in {"Bajo", "Medio", "Alto"}:
-        return value_text
-    return UNAVAILABLE
+    v = str(value or "").strip()
+    return v if v in {"Bajo", "Medio", "Alto"} else UNAVAILABLE
 
+
+# ---------------------------------------------------------------------------
+# Fallbacks cuando el LLM no está disponible
+# ---------------------------------------------------------------------------
 
 def _unavailable_document_brief(reason: str = UNAVAILABLE) -> dict:
     return {
@@ -610,17 +436,33 @@ def _unavailable_document_brief(reason: str = UNAVAILABLE) -> dict:
 
 def _unavailable_finding_explanation(reason: str = UNAVAILABLE) -> dict:
     return {
-        "plain_language_explanation": "La explicación asistida por IA no está disponible en este momento.",
-        "why_it_matters": "Se mantiene la revisión basada en reglas, taxonomía documental y contexto comparativo.",
-        "possible_legitimate_justification": "Revise la posible justificación legítima indicada por el análisis estructurado de la señal.",
-        "suggested_review_action": "Use la evidencia textual, mitigantes y preguntas de revisión ya mostradas para continuar la revisión humana.",
+        "plain_language_explanation": "La explicación asistida por IA no está disponible.",
+        "why_it_matters": "Se mantiene el análisis basado en reglas y contexto comparativo.",
+        "possible_legitimate_justification": "Revise la justificación legítima del análisis estructurado.",
+        "suggested_review_action": "Use la evidencia textual, mitigantes y preguntas ya mostradas.",
         "questions_for_reviewer": [
-            "¿La señal cuenta con justificación técnica proporcional en el documento?",
+            "¿La señal tiene justificación técnica proporcional en el documento?",
             "¿Existen mitigantes o equivalencias aplicables en la práctica?",
         ],
         "llm_available": False,
         "llm_error": reason,
     }
+
+
+def _friendly_llm_error(exc: Exception) -> str:
+    msg = str(exc)
+    lower = msg.lower()
+    if "insufficient_quota" in lower or "quota" in lower:
+        return "Sin cuota o crédito disponible para el modelo configurado."
+    if "authentication" in lower or "api key" in lower or "401" in lower:
+        return "API key no autenticada. Verifique OPENAI_API_KEY o GROQ_API_KEY."
+    if "connection" in lower or "timeout" in lower:
+        return "No se pudo conectar con el proveedor LLM. Revise red o OPENAI_BASE_URL."
+    if "model" in lower and ("not found" in lower or "does not exist" in lower):
+        return "El modelo configurado no está disponible. Revise OPENAI_MODEL o GROQ_MODEL."
+    if "429" in msg or "rate_limit" in lower:
+        return f"Rate limit agotado después de {MAX_RETRIES} reintentos. Intente más tarde."
+    return f"Error LLM: {msg[:240]}"
 
 
 def _default_normative_context() -> dict[str, list[str]]:
@@ -631,11 +473,10 @@ def _default_normative_context() -> dict[str, list[str]]:
             "trato justo",
             "transparencia",
             "mejor valor por dinero",
-            "claridad, completitud y no ambigüedad de especificaciones",
-            "especificaciones relacionadas con bienes/rubros y no con proveedores",
-            "necesidad de justificación técnica o jurídica cuando un requisito pueda limitar competencia",
+            "claridad y no ambigüedad de especificaciones",
             "proporcionalidad",
-            "consistencia entre pliego y anexos",
+            "justificación técnica",
+            "consistencia documental",
             "uso adecuado de CPC",
         ]
     }

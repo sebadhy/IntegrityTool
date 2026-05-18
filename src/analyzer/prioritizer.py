@@ -7,8 +7,6 @@ from typing import Any
 
 import pandas as pd
 
-from .taxonomy_loader import taxonomy_sha256
-
 
 ENGINE_VERSION = "0.4.0"
 RULE_VERSION = "neutralidad-competitiva-v1"
@@ -22,7 +20,6 @@ REVIEW_PRIORITY_LABEL = {
     "priority": "revisión prioritaria",
 }
 RARE_LABELS = {"Poco frecuente", "Sin histórico"}
-COMMON_LABELS = {"Habitual"}
 STRUCTURED_SEVERITY_SCORE = {"low": 0, "medium": 1, "contextual": 2}
 CRITICAL_SECTION_TERMS = (
     "requisito",
@@ -65,7 +62,6 @@ def prioritize_signals(enriched_df: pd.DataFrame) -> pd.DataFrame:
                 "rule_version": RULE_VERSION,
                 "timestamp_analisis": timestamp,
                 "engine_version": ENGINE_VERSION,
-                "taxonomy_sha256": taxonomy_sha256(),
                 "frecuencia_corpus": row.get("frecuencia en corpus", "No disponible"),
                 "categoria": row.get("categoría de revisión", "No disponible"),
                 "criterio_normativo": row.get(
@@ -176,9 +172,6 @@ def _criteria_for_row(row: pd.Series, related_count: int) -> list[str]:
     for factor in mitigating_factors:
         criteria.append(f"Factor mitigante identificado: {factor}.")
 
-    if str(row.get("clasificación histórica")) in COMMON_LABELS and not escalation_factors:
-        criteria.append("Patrón frecuente en corpus; su presencia aislada no eleva la prioridad de revisión.")
-
     dimension = str(row.get("competition_dimension") or row.get("dimensión competitiva", "")).strip()
     if dimension:
         criteria.append(f"Dimensión competitiva asociada: {dimension}.")
@@ -239,9 +232,6 @@ def _relevance_from_criteria(row: pd.Series, criteria: list[str]) -> str:
     }:
         return "Bajo"
 
-    if str(row.get("clasificación histórica")) in COMMON_LABELS and not _list_field(row.get("escalation_factors", [])):
-        return "Bajo"
-
     score = 0
     score += STRUCTURED_SEVERITY_SCORE.get(str(row.get("severity", "")).lower(), 0)
     score += ATTENTION_SCORE.get(str(row.get("atención sugerida") or row.get("nivel de atención")), 1)
@@ -275,9 +265,6 @@ def _attention_from_relevance(row: pd.Series, relevance: str, criteria: list[str
     }:
         return "Bajo"
 
-    if str(row.get("clasificación histórica")) in COMMON_LABELS and not _list_field(row.get("escalation_factors", [])):
-        return "Bajo"
-
     score = ATTENTION_SCORE.get(str(row.get("nivel de atención")), 1)
     score = max(score, RELEVANCE_SCORE.get(relevance, 1))
     score += min(len(_list_field(row.get("escalation_factors", []))), 2)
@@ -302,9 +289,6 @@ def _review_priority_from_context(row: pd.Series, criteria: list[str], relevance
         "mitigante_concurrencia",
     }:
         return "general"
-    if str(row.get("clasificación histórica")) in COMMON_LABELS and not _list_field(row.get("escalation_factors", [])):
-        return "general"
-
     existing = str(row.get("review_priority", "")).strip()
     if existing in REVIEW_PRIORITY_SCORE:
         base = REVIEW_PRIORITY_SCORE[existing]
@@ -405,23 +389,3 @@ def _unique(values: list[str]) -> list[str]:
             unique_values.append(normalized)
             seen.add(normalized)
     return unique_values
-
-
-def prioritize_consolidated_findings(findings: list) -> list:
-    """Order ConsolidatedFinding objects and keep internal ranking hidden from UI."""
-    return sorted(
-        findings,
-        key=lambda finding: (
-            -int(getattr(finding, "internal_ranking_score", 0)),
-            -int(getattr(finding, "duplicate_count", 1)),
-            str(getattr(finding, "title", "")),
-        ),
-    )
-
-
-def review_priority_from_score(score: int) -> str:
-    if score >= 6:
-        return "alta"
-    if score >= 3:
-        return "media"
-    return "baja"

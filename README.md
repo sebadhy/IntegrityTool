@@ -71,15 +71,6 @@ Luego abre:
 http://localhost:8501
 ```
 
-
-## Arquitectura del pipeline
-
-El pipeline técnico actual se documenta en:
-
-- `docs/architecture.md`
-
-La arquitectura es clause-centric, taxonomy-driven y deterministic-first. La interfaz Streamlit renderiza `ReviewItem[]`; la detección, mitigantes, consolidación, priorización y filtrado de relevancia viven en módulos separados de `src/analyzer/`.
-
 ## Enfoque analítico
 
 La interfaz se presenta como:
@@ -186,15 +177,6 @@ El loader `src/analyzer/taxonomy_loader.py` valida campos obligatorios y aplica 
 La diferencia metodológica central es que una señal preliminar no equivale a una conclusión legal o técnica. El motor preserva evidencia y contexto para revisión humana: equivalencias, justificaciones cercanas, acumulación de condiciones y frecuencia histórica.
 
 Los mitigantes no eliminan automáticamente una señal. La contextualizan. Por ejemplo, una mención a marca con “o equivalente” se mantiene como aspecto revisable, pero con menor prioridad y con una pregunta sobre si la equivalencia es efectiva y verificable.
-
-
-## Segmentación documental y calibración contextual
-
-La detección incorpora una segmentación liviana por secciones documentales para reducir falsos positivos. Las reglas se aplican con mayor intensidad en especificaciones técnicas, experiencia/capacidad y soporte; se restringen en condiciones generales y se omiten en formularios o anexos puramente administrativos cuando corresponde.
-
-La taxonomía registra un hash SHA256 en la exportación para mejorar reproducibilidad y auditoría de qué versión de patrones se usó en cada análisis.
-
-Las acciones humanas de revisión (`Confirmar`, `Descartar`, `Seguimiento`) pueden guardarse localmente en `data/feedback/cases.jsonl`. Ese archivo queda fuera de Git para evitar subir comentarios de trabajo o casos de revisión del equipo.
 
 ## Modelo estructurado de hallazgos
 
@@ -325,20 +307,6 @@ La atención sube cuando aparecen combinaciones como:
 - **Alto:** conviene revisar primero por baja frecuencia, acumulación de condiciones, combinación de requisitos o posible impacto relevante sobre concurrencia.
 - **Medio:** requiere validación de proporcionalidad, justificación técnica o equivalencias disponibles.
 - **Bajo:** señal habitual o de menor concentración; se mantiene como apoyo documental y puede adquirir relevancia si aparece combinada con otros requisitos.
-
-
-## Configuración avanzada por variables de entorno
-
-La app funciona con valores por defecto, pero permite ajustar rutas y límites sin tocar código:
-
-- `OPENAI_MODEL`: modelo usado por la capa LLM opcional.
-- `APP_MAX_DOCUMENT_CHARS`: máximo de caracteres enviados al LLM para el brief.
-- `APP_DEFAULT_CONTEXT_CHARS`: ventana textual usada alrededor de cada señal.
-- `APP_CORPUS_METADATA_PATH`: ruta del CSV de metadata del corpus.
-- `APP_CORPUS_PLIEGOS_DIR`: carpeta de pliegos del corpus.
-- `APP_CORPUS_ESPECIFICACIONES_DIR`: carpeta de especificaciones técnicas.
-- `APP_CORPUS_PROCESSED_DIR`: carpeta de textos extraídos incrementales.
-- `APP_FEEDBACK_PATH`: archivo JSONL local para feedback humano.
 
 ## Corpus histórico integrado
 

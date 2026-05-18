@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -141,13 +140,6 @@ class TaxonomyLoadResult:
     patterns: list[TaxonomyPattern]
     messages: list[str]
     loaded: bool
-
-
-def taxonomy_sha256(path: Path | None = None) -> str:
-    taxonomy_path = path or TAXONOMY_PATH
-    if not taxonomy_path.exists():
-        return "unavailable"
-    return hashlib.sha256(taxonomy_path.read_bytes()).hexdigest()
 
 
 def load_taxonomy(path: Path | None = None) -> TaxonomyLoadResult:

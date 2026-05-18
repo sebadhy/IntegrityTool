@@ -5,7 +5,6 @@ import re
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 
-from .domain_models import Clause, Signal
 from .finding_model import (
     Finding,
     REVIEW_GENERAL,
@@ -16,9 +15,6 @@ from .finding_model import (
     SEVERITY_MEDIUM,
 )
 from .patterns.competitive_neutrality_patterns import PATTERNS
-from src.config import APP_DEFAULT_CONTEXT_CHARS
-
-from .document_segmenter import DocumentSection, section_for_page
 from .pdf_extractor import PageText
 from .taxonomy_loader import TaxonomyPattern, load_taxonomy
 
@@ -30,8 +26,6 @@ SIGNAL_HABITUAL = "requisito_habitual"
 GLOBAL_MITIGATING_TERMS = [
     "o equivalente",
     "se aceptarán equivalentes",
-    "certificación equivalente",
-    "registro sanitario o equivalente",
     "o superior",
     "personas naturales o jurídicas",
     "consorcios",
@@ -42,80 +36,11 @@ GLOBAL_MITIGATING_TERMS = [
 
 GLOBAL_JUSTIFICATION_TERMS = [
     "según normativa aplicable",
-    "cumplimiento de normativa aplicable",
     "debidamente justificado",
     "por razones de interoperabilidad",
     "por compatibilidad con infraestructura existente",
     "por seguridad",
     "por continuidad operativa",
-    "garantía técnica",
-    "trazabilidad",
-    "calidad del bien",
-    "soporte técnico",
-    "mantenimiento",
-    "bienes regulados",
-]
-
-GOODS_PROCUREMENT_TERMS = [
-    "bien",
-    "bienes",
-    "insumo",
-    "insumos",
-    "dispositivo",
-    "dispositivos",
-    "equipamiento",
-    "equipo",
-    "equipos",
-    "repuestos",
-    "medicamento",
-    "medicamentos",
-    "tecnología",
-    "tecnologia",
-    "materiales",
-    "productos",
-    "certificado",
-    "certificación",
-    "certificacion",
-    "fabricante",
-    "distribuidor",
-    "autorizado",
-    "registro sanitario",
-    "bpm",
-    "garantía",
-    "garantia",
-    "trazabilidad",
-]
-
-GOODS_COMMON_PATTERN_IDS = {
-    "cn-brand-model-provider-reference",
-    "cn-specific-certification",
-}
-
-GOODS_COMMON_RATIONALE = (
-    "Este tipo de exigencia puede ser habitual en compras de bienes regulados o bienes que requieren "
-    "garantía, trazabilidad, soporte o control de calidad."
-)
-
-GOODS_NOT_AUTOMATICALLY_RESTRICTIVE = (
-    "No debe tratarse automáticamente como restricción competitiva; requiere revisar proporcionalidad, "
-    "equivalencias y relación con el objeto contractual."
-)
-
-STRONG_RESTRICTIVE_TERMS = [
-    "exclusivo",
-    "único",
-    "unico",
-    "solo se aceptará",
-    "sólo se aceptará",
-    "solo se aceptan",
-    "sólo se aceptan",
-    "sin equivalente",
-    "sin equivalentes",
-    "no se aceptan equivalentes",
-    "no admite equivalentes",
-    "marca específica",
-    "marca x",
-    "fabricante x",
 ]
 
 SECTION_HINTS = {
@@ -169,8 +94,6 @@ class Detection(Finding):
             output_label="aspecto a revisar",
             signal_type=signal_type,
             match_count=match_count,
-            review_priority=REVIEW_GENERAL if signal_type != SIGNAL_REVIEW or attention_level == "Bajo" else REVIEW_SUGGESTED,
-            analytical_signal_type="textual_signal" if signal_type != SIGNAL_REVIEW else "contextual_review_signal",
         )
 
 
@@ -252,25 +175,33 @@ RULES = [
     ),
     PatternRule(
         pattern="fabricante",
-        category="Requisitos regulatorios o habituales",
-        attention_level="Bajo",
+        category="Referencias a marca, origen o fabricante",
+        attention_level="Medio",
         observation=(
-            "La referencia general a fabricante puede ser habitual en fichas técnicas; por sí sola no se prioriza."
+            "Se detectó una referencia a fabricante; conviene validar si opera como "
+            "referencia técnica abierta o como condición cerrada."
         ),
-        possible_competition_effect="No se aprecia efecto limitante por sí solo.",
-        suggested_validation="Revisar solo si se combina con autorización exclusiva, marca cerrada o ausencia de equivalentes.",
-        signal_type=SIGNAL_HABITUAL,
+        possible_competition_effect=(
+            "Podría reducir concurrencia si privilegia un origen o fabricante específico."
+        ),
+        suggested_validation=(
+            "Confirmar si se aceptan alternativas equivalentes."
+        ),
     ),
     PatternRule(
         pattern="marca",
-        category="Requisitos regulatorios o habituales",
-        attention_level="Bajo",
+        category="Referencias a marca, origen o fabricante",
+        attention_level="Medio",
         observation=(
-            "La palabra marca puede aparecer en formularios o referencias generales; por sí sola no se prioriza."
+            "Se detectó referencia a marca; conviene revisar si la especificación admite "
+            "equivalentes funcionales."
         ),
-        possible_competition_effect="No se aprecia efecto limitante por sí solo.",
-        suggested_validation="Revisar solo si la mención opera como requisito cerrado sin equivalentes.",
-        signal_type=SIGNAL_HABITUAL,
+        possible_competition_effect=(
+            "Podría reducir participación si se interpreta como preferencia cerrada."
+        ),
+        suggested_validation=(
+            "Confirmar si se aceptan alternativas equivalentes."
+        ),
     ),
     PatternRule(
         pattern="repuestos",
@@ -603,25 +534,6 @@ RULES = [
         suggested_validation="Confirmar consistencia con el resto de requisitos del pliego.",
         signal_type=SIGNAL_MITIGANT,
     ),
-
-    PatternRule(
-        pattern="homologación ANT",
-        category="Requisitos regulatorios o habituales",
-        attention_level="Bajo",
-        observation="La homologación ANT puede corresponder a un requisito regulatorio aplicable en Ecuador.",
-        possible_competition_effect="No se aprecia efecto limitante por sí solo.",
-        suggested_validation="Confirmar que se exige conforme al tipo de bien y normativa aplicable.",
-        signal_type=SIGNAL_HABITUAL,
-    ),
-    PatternRule(
-        pattern="norma INEN",
-        category="Requisitos regulatorios o habituales",
-        attention_level="Bajo",
-        observation="La referencia a norma INEN puede corresponder a un estándar técnico nacional.",
-        possible_competition_effect="No se aprecia efecto limitante por sí solo.",
-        suggested_validation="Confirmar relación con el objeto contractual y aceptación de estándares equivalentes cuando corresponda.",
-        signal_type=SIGNAL_HABITUAL,
-    ),
     PatternRule(
         pattern="marcas equivalentes",
         category="Elementos que favorecen concurrencia",
@@ -636,21 +548,13 @@ RULES = [
 ]
 
 
-def detect_patterns(
-    pages: list[PageText],
-    sections: list[DocumentSection] | None = None,
-) -> list[Detection]:
+def detect_patterns(pages: list[PageText]) -> list[Detection]:
     raw_detections: list[Detection] = []
 
     for page in pages:
         normalized_text = _normalize_whitespace(page.text)
-        section = section_for_page(sections or [], page.page_number)
-        if section and section.detection_profile == "skip":
-            continue
         taxonomy_terms = _taxonomy_terms_set()
         for rule in RULES:
-            if section and section.detection_profile == "restricted" and rule.signal_type != SIGNAL_REVIEW:
-                continue
             if rule.signal_type == SIGNAL_REVIEW and normalize_text(rule.pattern) in taxonomy_terms:
                 continue
             for match in re.finditer(_pattern_regex(rule.pattern), normalized_text, re.IGNORECASE):
@@ -677,21 +581,13 @@ def detect_patterns(
                 )
 
 
-        if section and section.detection_profile == "restricted":
-            continue
-
         active_patterns = _active_taxonomy_patterns()
         page_pattern_ids: set[str] = set()
-        context_chars = int(APP_DEFAULT_CONTEXT_CHARS * (section.context_multiplier if section else 1.0))
         for pattern in active_patterns:
-            pattern_context_chars = _context_chars_for_pattern(pattern.id, context_chars)
             for term, start, end in find_terms(normalized_text, pattern.textual_signals):
-                fragment = extract_context_window(normalized_text, start, end, context_chars=pattern_context_chars)
-                is_common_goods_signal = _is_weak_goods_signal(pattern, fragment)
+                fragment = extract_context_window(normalized_text, start, end)
                 mitigating_factors = _contextual_mitigating_factors(fragment, pattern)
                 possible_justifications = _contextual_justifications(fragment, pattern)
-                if is_common_goods_signal:
-                    possible_justifications = _unique(possible_justifications + [GOODS_COMMON_RATIONALE])
                 escalation_factors = _taxonomy_escalation_factors(
                     fragment=fragment,
                     pattern=pattern,
@@ -699,7 +595,6 @@ def detect_patterns(
                     mitigating_factors=mitigating_factors,
                     possible_justifications=possible_justifications,
                     page_pattern_ids=page_pattern_ids,
-                    is_common_goods_signal=is_common_goods_signal,
                 )
                 page_pattern_ids.add(pattern.id)
                 document_section = _document_section(fragment, pattern)
@@ -716,7 +611,7 @@ def detect_patterns(
                         severity=_taxonomy_severity(pattern, mitigating_factors, escalation_factors),
                         evidence=fragment,
                         page=page.page_number,
-                        rationale=_taxonomy_rationale(pattern, term, mitigating_factors, possible_justifications, is_common_goods_signal),
+                        rationale=_taxonomy_rationale(pattern, term, mitigating_factors, possible_justifications),
                         pattern_id=pattern.id,
                         mitigating_factors=mitigating_factors,
                         escalation_factors=escalation_factors,
@@ -726,27 +621,22 @@ def detect_patterns(
                         signal_type=SIGNAL_REVIEW,
                         pattern_name=pattern.name,
                         competition_dimension=pattern.competition_dimension,
-                        document_section=section.section_label if section else document_section,
+                        document_section=document_section,
                         clause_excerpt=fragment,
                         reason_for_review=_taxonomy_rationale(
-                            pattern, term, mitigating_factors, possible_justifications, is_common_goods_signal
+                            pattern, term, mitigating_factors, possible_justifications
                         ),
                         possible_legitimate_justifications=pattern.possible_legitimate_justifications
                         + possible_justifications,
                         missing_information=missing_information,
                         suggested_neutral_wording=pattern.recommended_language,
-                        confidence=_taxonomy_confidence(pattern, mitigating_factors, escalation_factors, is_common_goods_signal),
+                        confidence=_taxonomy_confidence(pattern, mitigating_factors, escalation_factors),
                         review_priority=_taxonomy_review_priority(
-                            pattern, mitigating_factors, escalation_factors, is_common_goods_signal
+                            pattern, mitigating_factors, escalation_factors
                         ),
-                        analytical_signal_type="textual_signal" if is_common_goods_signal else "contextual_review_signal",
-                        is_common_in_goods_procurement=is_common_goods_signal,
-                        legitimate_procurement_rationale=GOODS_COMMON_RATIONALE if is_common_goods_signal else "",
-                        escalation_reason="; ".join(escalation_factors),
-                        why_not_automatically_restrictive=GOODS_NOT_AUTOMATICALLY_RESTRICTIVE if is_common_goods_signal else "",
                         contextual_notes=_contextual_notes(
                             mitigating_factors, possible_justifications, missing_information
-                        ) + ([f"Sección documental: {section.section_label}"] if section else []),
+                        ),
                     )
                 )
 
@@ -802,16 +692,6 @@ def _legacy_pattern_to_taxonomy(pattern: dict) -> TaxonomyPattern:
     )
 
 
-
-def _context_chars_for_pattern(pattern_id: str, default_chars: int) -> int:
-    overrides = {
-        "cn-medical-device-platform-lock-in": 600,
-        "cn-interoperability-lock-in": 500,
-        "cn-equipment-series-specific-reference": 500,
-    }
-    return max(default_chars, overrides.get(pattern_id, default_chars))
-
-
 def _category_from_dimension(dimension: str) -> str:
     return {
         "barrier_to_entry": "Combinaciones de requisitos potencialmente limitantes",
@@ -847,23 +727,6 @@ def _contextual_justifications(fragment: str, pattern: TaxonomyPattern) -> list[
     )
 
 
-def _is_goods_procurement_context(text: str) -> bool:
-    normalized = normalize_text(text)
-    return any(term in normalized for term in GOODS_PROCUREMENT_TERMS)
-
-
-def _is_goods_common_pattern(pattern: TaxonomyPattern) -> bool:
-    return pattern.id in GOODS_COMMON_PATTERN_IDS
-
-
-def _has_strong_restrictive_language(text: str) -> bool:
-    normalized = normalize_text(text)
-    return any(term in normalized for term in STRONG_RESTRICTIVE_TERMS)
-
-
-def _is_weak_goods_signal(pattern: TaxonomyPattern, fragment: str) -> bool:
-    return _is_goods_common_pattern(pattern) and _is_goods_procurement_context(fragment) and not _has_strong_restrictive_language(fragment)
-
 def _taxonomy_escalation_factors(
     fragment: str,
     pattern: TaxonomyPattern,
@@ -871,22 +734,15 @@ def _taxonomy_escalation_factors(
     mitigating_factors: list[str],
     possible_justifications: list[str],
     page_pattern_ids: set[str],
-    is_common_goods_signal: bool = False,
 ) -> list[str]:
     factors: list[str] = []
     normalized_fragment = normalize_text(fragment)
-    if _has_strong_restrictive_language(fragment):
-        factors.append("Lenguaje de exclusividad, marca única o ausencia explícita de equivalentes.")
-    if (
-        not is_common_goods_signal
-        and not mitigating_factors
-        and pattern.id in {
-            "cn-brand-model-provider-reference",
-            "cn-weak-equivalence-clause",
-            "cn-technical-closed-requirement",
-            "cn-specific-certification",
-        }
-    ):
+    if not mitigating_factors and pattern.id in {
+        "cn-brand-model-provider-reference",
+        "cn-weak-equivalence-clause",
+        "cn-technical-closed-requirement",
+        "cn-specific-certification",
+    }:
         factors.append("No se observa mitigante de equivalencia cerca del fragmento.")
     if not possible_justifications and pattern.competition_dimension in {
         "interoperability_lock_in",
@@ -900,7 +756,7 @@ def _taxonomy_escalation_factors(
         if indicator_text and indicator_text in normalized_fragment:
             factors.append(indicator)
     related_seen = sorted(set(pattern.related_patterns).intersection(page_pattern_ids))
-    if related_seen and not is_common_goods_signal:
+    if related_seen:
         factors.append("Coexistencia con patrones relacionados en la misma página.")
     if normalize_text(term) in {"adicionalmente", "además deberá", "conjuntamente"}:
         factors.append("Lenguaje acumulativo de requisitos.")
@@ -944,15 +800,7 @@ def _taxonomy_rationale(
     term: str,
     mitigating_factors: list[str],
     possible_justifications: list[str],
-    is_common_goods_signal: bool = False,
 ) -> str:
-    if is_common_goods_signal:
-        return (
-            "Se identificó un requisito de acreditación, autorización o certificación asociado al bien ofertado. "
-            "Este tipo de exigencia puede ser habitual en compras de bienes regulados o bienes que requieren "
-            "garantía, trazabilidad, soporte o control de calidad. Se sugiere revisar únicamente si el requisito "
-            "resulta proporcional, si admite equivalencias y si no limita innecesariamente la concurrencia."
-        )
     parts = [
         f"Se identificó una señal preliminar asociada a '{pattern.name}' por la expresión '{term}'.",
         "Convendría revisar si el requisito es proporcional, verificable y compatible con concurrencia.",
@@ -975,8 +823,6 @@ def _taxonomy_severity(
     mitigating_factors: list[str],
     escalation_factors: list[str],
 ) -> str:
-    if _is_goods_common_pattern(pattern) and not escalation_factors:
-        return SEVERITY_LOW
     if mitigating_factors and not escalation_factors:
         return SEVERITY_LOW
     if pattern.severity_guidance == REVIEW_PRIORITY or len(escalation_factors) >= 2:
@@ -988,10 +834,7 @@ def _taxonomy_confidence(
     pattern: TaxonomyPattern,
     mitigating_factors: list[str],
     escalation_factors: list[str],
-    is_common_goods_signal: bool = False,
 ) -> str:
-    if is_common_goods_signal:
-        return "medium"
     if mitigating_factors and not escalation_factors:
         return "medium"
     if escalation_factors:
@@ -1003,12 +846,7 @@ def _taxonomy_review_priority(
     pattern: TaxonomyPattern,
     mitigating_factors: list[str],
     escalation_factors: list[str],
-    is_common_goods_signal: bool = False,
 ) -> str:
-    if is_common_goods_signal and not escalation_factors:
-        return REVIEW_GENERAL
-    if _is_goods_common_pattern(pattern) and not escalation_factors:
-        return REVIEW_GENERAL
     if mitigating_factors and not escalation_factors:
         return REVIEW_GENERAL
     if pattern.severity_guidance == REVIEW_PRIORITY or len(escalation_factors) >= 2:
@@ -1081,7 +919,7 @@ def find_terms(text: str, terms: list[str]) -> list[tuple[str, int, int]]:
     return matches
 
 
-def extract_context_window(text: str, start: int, end: int, context_chars: int = APP_DEFAULT_CONTEXT_CHARS) -> str:
+def extract_context_window(text: str, start: int, end: int, context_chars: int = 260) -> str:
     fragment_start = max(0, start - context_chars)
     fragment_end = min(len(text), end + context_chars)
     prefix = "... " if fragment_start > 0 else ""
@@ -1227,44 +1065,3 @@ def _unique(values: list[str]) -> list[str]:
             result.append(clean_value)
             seen.add(clean_value)
     return result
-
-# --- Clause-centric signal extraction -------------------------------------------------
-# This deterministic API is the preferred pipeline entry point. The legacy detect_patterns
-# function above remains for backward compatibility with older tests/corpus utilities.
-
-def detect_signals(clauses: list[Clause]) -> list[Signal]:
-    """Extract textual Signals from active clauses using the editable taxonomy.
-
-    This function only observes textual evidence. It does not prioritize, consolidate,
-    produce user-visible language, or decide legal/technical conclusions.
-    """
-    patterns = load_taxonomy().patterns
-    signals: list[Signal] = []
-    for clause in clauses:
-        if clause.exclude_from_detection:
-            continue
-        for pattern in patterns:
-            matches = find_terms(clause.text, pattern.textual_signals)
-            if not matches:
-                continue
-            term, start, end = sorted(matches, key=lambda item: (item[1], -len(item[0])))[0]
-            evidence = extract_context_window(clause.text, start, end, context_chars=APP_DEFAULT_CONTEXT_CHARS)
-            signal_id = _finding_id(f"signal-{pattern.id}-{clause.clause_id}", clause.page, evidence)
-            signals.append(
-                Signal(
-                    signal_id=signal_id,
-                    clause_id=clause.clause_id,
-                    pattern_id=pattern.id,
-                    family=pattern.risk_type,
-                    competition_dimension=pattern.competition_dimension,
-                    signal_type="textual_signal",
-                    matched_text=term,
-                    evidence_text=evidence,
-                    page=clause.page,
-                    section_title=clause.section_title,
-                    detector_name="taxonomy_textual_detector_v1",
-                    confidence=pattern.confidence_guidance,
-                    metadata={"pattern_name": pattern.name, "taxonomy_pattern": pattern.to_dict()},
-                )
-            )
-    return signals
