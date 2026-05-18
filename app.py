@@ -463,8 +463,8 @@ def render_original_document(pdf_bytes: bytes | None) -> None:
     if not pdf_bytes:
         return
     with st.expander("Ver documento original", expanded=False):
-        st.caption("Consulta integral del PDF cargado para auditoría y revisión contextual completa.")
-        render_pdf_viewer(pdf_bytes, 1)
+        st.caption("Consulta integral del PDF cargado con navegación, scroll y zoom del visor del navegador.")
+        render_pdf_viewer(pdf_bytes, 1, height=820, viewer_class="pdf-frame pdf-frame-original")
 
 
 def render_pliego_summary(
@@ -1063,15 +1063,35 @@ def render_signal_queue_item(row: pd.Series) -> None:
         st.rerun()
 
 
-def render_pdf_viewer(pdf_bytes: bytes, page_number: int) -> None:
+def render_pdf_viewer(
+    pdf_bytes: bytes,
+    page_number: int = 1,
+    *,
+    height: int = 760,
+    viewer_class: str = "pdf-frame",
+) -> None:
     encoded_pdf = base64.b64encode(pdf_bytes).decode("utf-8")
+    pdf_url = f"data:application/pdf;base64,{encoded_pdf}#page={int(page_number)}&zoom=page-width&toolbar=1&navpanes=0"
     st.markdown(
         f"""
-        <iframe
-            class="pdf-frame"
-            src="data:application/pdf;base64,{encoded_pdf}#page={int(page_number)}&zoom=page-width"
-            title="Documento PDF"
-        ></iframe>
+        <div class="pdf-viewer-shell" style="height: {int(height)}px;">
+            <object
+                class="{safe_text(viewer_class)}"
+                data="{pdf_url}"
+                type="application/pdf"
+                aria-label="Documento PDF original"
+            >
+                <iframe
+                    class="{safe_text(viewer_class)}"
+                    src="{pdf_url}"
+                    title="Documento PDF original"
+                ></iframe>
+                <p class="pdf-fallback-text">
+                    El visor PDF del navegador no está disponible en este entorno.
+                    Use la descarga del navegador o revise los fragmentos textuales asociados.
+                </p>
+            </object>
+        </div>
         """,
         unsafe_allow_html=True,
     )
