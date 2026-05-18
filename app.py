@@ -620,6 +620,15 @@ def observation_priority(row: pd.Series) -> str:
     return str(row.get("prioridad de revisión") or "revisión sugerida")
 
 
+def priority_css_class(priority: str) -> str:
+    normalized = str(priority).lower()
+    if "prioritaria" in normalized or "alta" in normalized:
+        return "priority-high"
+    if "sugerida" in normalized or "media" in normalized:
+        return "priority-medium"
+    return "priority-low"
+
+
 def observation_source(row: pd.Series) -> str:
     aggregated = display_list(row.get("fuentes agregadas", []))
     if aggregated:
@@ -979,8 +988,18 @@ def render_suggested_aspects(
     pdf_bytes: bytes | None = None,
     corpus_context: dict | None = None,
 ) -> None:
-    st.subheader("Aspectos sugeridos para revisión")
-    render_explanation_tooltip("Lista consolidada de aspectos preliminares que podrían requerir validación humana. La fuente se muestra como metadata, no como una categoría separada.")
+    st.markdown(
+        """
+        <div class="section-heading">
+            <div>
+                <div class="section-eyebrow">Revisión humana</div>
+                <h2>Aspectos sugeridos para revisión</h2>
+            </div>
+            <p>Observaciones consolidadas, ordenadas para revisar primero lo más accionable.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     signal_df = reviewable_signals(priority_df)
     if signal_df.empty:
         st.info("No hay aspectos sugeridos para revisión con las reglas actuales.")
@@ -1003,26 +1022,38 @@ def _render_aspect_rows(
 ) -> None:
     for position, (_, row) in enumerate(rows_df.iterrows(), start=1):
         priority = observation_priority(row)
-        with st.container(border=True):
-            st.markdown(f"**{safe_text(str(row['patrón detectado']))}**")
-            st.caption(
-                f"Prioridad: {safe_text(priority)} · "
-                f"Páginas {safe_text(row.get('páginas relacionadas', row['página']))} · "
-                f"{safe_text(row.get('occurrence_count', row.get('número de coincidencias', 1)))} ocurrencia(s) · "
-                f"{safe_text(dimension_label(row.get('competition_dimension', row.get('dimensión competitiva', 'No disponible'))))}"
-            )
-            st.markdown(f"**Observación breve:** {safe_text(short_fragment(row.get('por qué se sugiere revisar', row.get('observación prudente', 'Requiere validación humana.')), 280))}")
-            st.markdown("**Explicación contextual**")
-            st.write(integrated_contextual_explanation(row, corpus_context))
-            mitigants = display_list(row.get("mitigating_factors", []))
-            if mitigants:
-                st.caption("Mitigantes identificados: " + "; ".join(mitigants[:3]))
-            questions = row.get("human_review_questions") or row.get("suggested_questions") or row.get("pregunta_normativa_sugerida")
-            st.markdown("**Qué conviene validar**")
-            st.markdown(display_bullets(questions, row.get("validación sugerida", "Validar proporcionalidad y necesidad técnica.")), unsafe_allow_html=True)
-            render_evidence_panel(row, pages=pages, pdf_bytes=pdf_bytes)
-            render_reasoning_expander(row)
-            st.caption(f"Fuente: {safe_text(observation_source(row))}")
+        priority_class = priority_css_class(priority)
+        pages_label = row.get('páginas relacionadas', row['página'])
+        occurrence_label = row.get('occurrence_count', row.get('número de coincidencias', 1))
+        dimension = dimension_label(row.get('competition_dimension', row.get('dimensión competitiva', 'No disponible')))
+        st.markdown(
+            f"""
+            <div class="review-item-card">
+                <div class="review-item-topline">
+                    <span class="review-item-number">{position}</span>
+                    <span class="priority-pill {priority_class}">{safe_text(priority)}</span>
+                    <span class="review-item-meta">Páginas {safe_text(pages_label)} · {safe_text(occurrence_label)} ocurrencia(s)</span>
+                </div>
+                <div class="review-item-title">{safe_text(str(row['patrón detectado']))}</div>
+                <div class="review-item-dimension">{safe_text(dimension)}</div>
+                <div class="review-item-summary">{safe_text(short_fragment(row.get('por qué se sugiere revisar', row.get('observación prudente', 'Requiere validación humana.')), 320))}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown('<div class="review-item-body">', unsafe_allow_html=True)
+        st.markdown("**Explicación contextual**")
+        st.write(integrated_contextual_explanation(row, corpus_context))
+        mitigants = display_list(row.get("mitigating_factors", []))
+        if mitigants:
+            st.markdown('<div class="mitigant-strip"><strong>Mitigantes identificados:</strong> ' + safe_text("; ".join(mitigants[:3])) + '</div>', unsafe_allow_html=True)
+        questions = row.get("human_review_questions") or row.get("suggested_questions") or row.get("pregunta_normativa_sugerida")
+        st.markdown("**Qué conviene validar**")
+        st.markdown(display_bullets(questions, row.get("validación sugerida", "Validar proporcionalidad y necesidad técnica.")), unsafe_allow_html=True)
+        render_evidence_panel(row, pages=pages, pdf_bytes=pdf_bytes)
+        render_reasoning_expander(row)
+        st.caption(f"Fuente: {safe_text(observation_source(row))}")
+        st.markdown('</div>', unsafe_allow_html=True)
 
 # Backward-compatible name used by older flow sections.
 def render_top_findings(priority_df: pd.DataFrame) -> None:
@@ -1491,9 +1522,10 @@ def validate_extracted_pages(pages: list) -> None:
 def render_setup_panel() -> tuple[object | None, bool, bool, bool]:
     st.markdown(
         """
-        <div class="start-panel compact-start">
+        <div class="setup-hero">
+            <div class="setup-kicker">Flujo de revisión documental</div>
             <h1>Revisar pliego</h1>
-            <p>Suba un PDF para iniciar revisión documental preliminar.</p>
+            <p>Suba un PDF para iniciar una lectura preliminar centrada en evidencia, observaciones consolidadas y revisión humana.</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1560,8 +1592,10 @@ Evalúa si las condiciones observadas parecen guardar relación razonable con el
 Estas dimensiones se utilizan únicamente como apoyo analítico para organizar observaciones preliminares y facilitar revisión humana contextual. Las observaciones generadas son insumos preliminares para revisión humana. La herramienta no determina ilegalidad, no detecta corrupción, no confirma direccionamiento, no reemplaza criterio humano y no constituye dictamen técnico o jurídico.
             """
         )
+    st.markdown('<div class="upload-panel"><div class="upload-panel-title">Documento a revisar</div><div class="upload-panel-help">Seleccione un pliego en formato PDF. La revisión se ejecuta localmente sobre el documento cargado.</div>', unsafe_allow_html=True)
     uploaded_file = st.file_uploader("Documento PDF", type=["pdf"], label_visibility="collapsed")
     process_document = st.button("Iniciar revisión", type="primary", width="stretch")
+    st.markdown('</div>', unsafe_allow_html=True)
     return uploaded_file, True, bool(os.getenv("OPENAI_API_KEY")), process_document
 
 def render_review_top_bar(document_name: str, signal_count: int) -> None:

@@ -975,3 +975,307 @@ textarea {
     line-height: 1.45;
     padding: 1rem;
 }
+
+
+/* Enterprise UX refinement pass */
+:root {
+    --surface: #FFFFFF;
+    --surface-muted: #F8FAFC;
+    --text-muted: #5F6B76;
+    --shadow-soft: 0 1px 2px rgba(31, 45, 58, 0.04), 0 8px 24px rgba(31, 45, 58, 0.06);
+}
+
+.block-container {
+    max-width: 1180px;
+    padding-top: 0.85rem;
+}
+
+h2,
+h3 {
+    border-bottom: 0;
+    margin-top: 1.15rem;
+    padding-bottom: 0.15rem;
+}
+
+[data-testid="stExpander"] {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: none;
+}
+
+[data-testid="stExpander"] details summary {
+    color: #1F2D3A;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.setup-hero {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 5px solid var(--blue-dark);
+    border-radius: 6px;
+    box-shadow: var(--shadow-soft);
+    margin: 0.45rem 0 0.8rem;
+    padding: 1.05rem 1.15rem;
+}
+
+.setup-kicker,
+.section-eyebrow {
+    color: var(--blue-medium);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+}
+
+.setup-hero h1 {
+    color: #1F2D3A;
+    font-size: 1.45rem;
+    margin: 0;
+}
+
+.setup-hero p {
+    color: var(--text-muted);
+    font-size: 0.94rem;
+    line-height: 1.45;
+    margin: 0.3rem 0 0;
+    max-width: 720px;
+}
+
+.upload-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: var(--shadow-soft);
+    margin-top: 0.85rem;
+    padding: 1rem;
+}
+
+.upload-panel-title {
+    color: #1F2D3A;
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin-bottom: 0.18rem;
+}
+
+.upload-panel-help {
+    color: var(--text-muted);
+    font-size: 0.84rem;
+    line-height: 1.35;
+    margin-bottom: 0.6rem;
+}
+
+.document-header-simple {
+    border-radius: 6px;
+    box-shadow: var(--shadow-soft);
+    gap: 0.95rem 1.15rem;
+    grid-template-columns: 1.15fr 1fr;
+    padding: 1rem 1.1rem;
+}
+
+.doc-label {
+    color: #6C7782;
+    font-size: 0.67rem;
+}
+
+.doc-title,
+.doc-value {
+    color: #1F2D3A;
+    font-size: 0.9rem;
+    line-height: 1.35;
+}
+
+.pliego-summary {
+    border-left-width: 5px;
+    border-radius: 6px;
+    box-shadow: var(--shadow-soft);
+    margin-bottom: 1.15rem;
+    padding: 0.95rem 1.05rem;
+}
+
+.section-heading {
+    align-items: end;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 1.15rem 0 0.75rem;
+    padding-bottom: 0.55rem;
+}
+
+.section-heading h2 {
+    color: #1F2D3A;
+    font-size: 1.18rem;
+    line-height: 1.2;
+    margin: 0;
+}
+
+.section-heading p {
+    color: var(--text-muted);
+    font-size: 0.86rem;
+    line-height: 1.35;
+    margin: 0;
+    max-width: 420px;
+    text-align: right;
+}
+
+.review-item-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 5px solid var(--blue-medium);
+    border-radius: 6px 6px 0 0;
+    box-shadow: var(--shadow-soft);
+    margin-top: 0.9rem;
+    padding: 0.95rem 1rem;
+}
+
+.review-item-topline {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-bottom: 0.45rem;
+}
+
+.review-item-number {
+    align-items: center;
+    background: var(--blue-dark);
+    border-radius: 999px;
+    color: var(--white);
+    display: inline-flex;
+    font-size: 0.72rem;
+    font-weight: 700;
+    height: 1.4rem;
+    justify-content: center;
+    width: 1.4rem;
+}
+
+.priority-pill {
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.22rem 0.55rem;
+}
+
+.priority-high {
+    background: #FFF1E8;
+    border-color: #E7BE9D;
+    color: #7A3B00;
+}
+
+.priority-medium {
+    background: var(--warning-soft);
+    border-color: #E5D7A6;
+    color: #604A00;
+}
+
+.priority-low {
+    background: var(--blue-soft);
+    border-color: var(--border);
+    color: var(--blue-dark);
+}
+
+.review-item-meta {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+}
+
+.review-item-title {
+    color: #1F2D3A;
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.28;
+    margin-bottom: 0.25rem;
+}
+
+.review-item-dimension {
+    color: var(--blue-dark);
+    font-size: 0.8rem;
+    font-weight: 700;
+    margin-bottom: 0.55rem;
+}
+
+.review-item-summary {
+    color: #2F3A45;
+    font-size: 0.92rem;
+    line-height: 1.48;
+}
+
+.review-item-body {
+    background: #FBFCFE;
+    border: 1px solid var(--border);
+    border-top: 0;
+    border-radius: 0 0 6px 6px;
+    margin-bottom: 1rem;
+    padding: 0.95rem 1rem 1rem;
+}
+
+.review-item-body > p,
+.review-item-body li,
+.review-item-body .stMarkdown p {
+    color: #2F3A45;
+    font-size: 0.9rem;
+    line-height: 1.48;
+}
+
+.mitigant-strip {
+    background: #EEF8F3;
+    border: 1px solid #C9E6D7;
+    border-left: 4px solid #3F7D58;
+    border-radius: 4px;
+    color: #234532;
+    font-size: 0.84rem;
+    line-height: 1.4;
+    margin: 0.65rem 0;
+    padding: 0.55rem 0.7rem;
+}
+
+.evidence-detail-box {
+    border-radius: 5px;
+    box-shadow: inset 0 0 0 1px rgba(214, 222, 230, 0.35);
+}
+
+.evidence-detail-box p {
+    background: #F8FAFC;
+    border-left: 3px solid var(--blue-medium);
+    padding: 0.55rem 0.65rem;
+}
+
+[data-testid="stImage"] img {
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    box-shadow: var(--shadow-soft);
+}
+
+.stButton > button,
+.stDownloadButton > button {
+    border-radius: 5px;
+    box-shadow: none;
+    min-height: 2.35rem;
+}
+
+[data-testid="stFileUploader"] {
+    border-radius: 5px;
+}
+
+@media (max-width: 760px) {
+    .section-heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .section-heading p {
+        text-align: left;
+    }
+
+    .setup-hero,
+    .upload-panel,
+    .review-item-card,
+    .review-item-body {
+        padding: 0.85rem;
+    }
+}
