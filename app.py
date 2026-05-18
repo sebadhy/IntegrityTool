@@ -1316,16 +1316,6 @@ def render_setup_panel() -> tuple[object | None, bool, bool, bool]:
         """,
         unsafe_allow_html=True,
     )
-    st.markdown(
-        """
-        <div class="setup-explainability">
-            <p>La herramienta analiza el contenido del pliego, organiza evidencia documental y genera observaciones preliminares para apoyar la revisión humana.</p>
-            <p>El análisis combina extracción documental, reglas de revisión y contextualización asistida para identificar aspectos que podrían requerir validación adicional desde la perspectiva de neutralidad competitiva y proporcionalidad.</p>
-            <p>La herramienta no determina ilegalidad, corrupción ni direccionamiento, y no reemplaza revisión técnica, jurídica o institucional.</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
     with st.expander("Cómo funciona el análisis", expanded=False):
         st.markdown(
             """
