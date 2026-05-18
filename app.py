@@ -458,6 +458,15 @@ def render_document_header(document_name: str, metadata: dict[str, str], signal_
             st.rerun()
     return actions[2]
 
+
+def render_original_document(pdf_bytes: bytes | None) -> None:
+    if not pdf_bytes:
+        return
+    with st.expander("Ver documento original", expanded=False):
+        st.caption("Consulta integral del PDF cargado para auditoría y revisión contextual completa.")
+        render_pdf_viewer(pdf_bytes, 1)
+
+
 def render_pliego_summary(
     metadata: dict[str, str],
     brief: dict,
@@ -929,6 +938,7 @@ def render_executive_overview(
     assisted_summary: list[str] | None = None,
 ) -> None:
     render_document_header(document_name, metadata, signal_count)
+    render_original_document(pdf_bytes)
     render_pliego_summary(metadata, brief, priority_df, document_text, ai_brief=ai_brief, assisted_summary=assisted_summary)
     render_suggested_aspects(priority_df, pages=pages, pdf_bytes=pdf_bytes, corpus_context=corpus_context)
 

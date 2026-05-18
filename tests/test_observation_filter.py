@@ -46,9 +46,9 @@ def _row(**overrides):
 
 def test_semantic_deduplication_consolidates_same_pattern_across_pages():
     df = pd.DataFrame([
-        _row(finding_id="f1", **{"página": 3}),
-        _row(finding_id="f2", **{"página": 4, "fragmento textual": "El plazo de presentación consta en el cronograma del procedimiento."}),
-        _row(finding_id="f3", **{"página": 6, "fragmento textual": "El plazo de presentación será el establecido en el cronograma."}),
+        _row(finding_id="f1", **{"página": 3, "fragmento textual": "El plazo de presentación de ofertas será de 2 días calendario desde la publicación."}),
+        _row(finding_id="f2", **{"página": 4, "fragmento textual": "El plazo de presentación de ofertas será de 2 días calendario desde la publicación del proceso."}),
+        _row(finding_id="f3", **{"página": 6, "fragmento textual": "El plazo de presentación de ofertas será de 2 días hábiles."}),
     ])
     visible = prepare_visible_review_items(df)
     assert len(visible) == 1
@@ -96,6 +96,8 @@ def test_frequent_corpus_with_escalation_remains_visible():
                 "clasificación histórica": "Habitual",
                 "frecuencia en corpus": "24 de 24 procesos",
                 "prioridad de revisión": "revisión prioritaria",
+                "fragmento textual": "Solo se aceptará la presentación de ofertas dentro de 2 días calendario.",
+                "clause_excerpt": "Solo se aceptará la presentación de ofertas dentro de 2 días calendario.",
             },
         )
     ])
@@ -124,3 +126,47 @@ def test_prioritizer_degrades_habitual_without_escalation():
 def test_empty_or_low_information_observations_are_not_visible():
     df = pd.DataFrame([_row(pattern_id="x", **{"fragmento textual": "N/A", "patrón detectado": "No aplica"})])
     assert prepare_visible_review_items(df).empty
+
+
+def test_generic_toc_timeline_reference_is_not_visible():
+    df = pd.DataFrame([
+        _row(
+            pattern_id="cn-short-submission-deadline",
+            pattern_name="Plazo reducido de presentación",
+            **{
+                "patrón detectado": "Plazo reducido de presentación",
+                "fragmento textual": "Índice\n1. Convocatoria 3\n2. Cronograma del procedimiento 4\n3. Presentación de ofertas 5",
+                "clause_excerpt": "Índice\n1. Convocatoria 3\n2. Cronograma del procedimiento 4\n3. Presentación de ofertas 5",
+            },
+        )
+    ])
+    assert prepare_visible_review_items(df).empty
+
+
+def test_generic_cronograma_reference_without_concrete_deadline_is_hidden():
+    df = pd.DataFrame([
+        _row(
+            pattern_id="cn-short-submission-deadline",
+            pattern_name="Plazo reducido de presentación",
+            **{
+                "patrón detectado": "Plazo reducido de presentación",
+                "fragmento textual": "El plazo de presentación de ofertas será conforme al cronograma del procedimiento.",
+                "clause_excerpt": "El plazo de presentación de ofertas será conforme al cronograma del procedimiento.",
+            },
+        )
+    ])
+    assert prepare_visible_review_items(df).empty
+
+
+def test_concrete_deadline_remains_visible():
+    df = pd.DataFrame([
+        _row(
+            pattern_id="cn-short-submission-deadline",
+            pattern_name="Plazo reducido de presentación",
+            **{
+                "fragmento textual": "El plazo de presentación de ofertas será de 2 días calendario desde la publicación.",
+                "clause_excerpt": "El plazo de presentación de ofertas será de 2 días calendario desde la publicación.",
+            },
+        )
+    ])
+    assert len(prepare_visible_review_items(df)) == 1

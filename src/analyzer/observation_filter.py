@@ -16,8 +16,8 @@ BOILERPLATE_EXPRESSIONS = [
     "informacion no disponible",
     "versión",
     "version",
-    "índice",
-    "indice",
+    "tabla de contenido",
+    "sumario",
 ]
 
 LOW_INFORMATION_TERMS = {
@@ -129,13 +129,15 @@ def _visibility_score(row: pd.Series) -> int:
     score += min(_specificity_score(str(row.get("fragmento textual", ""))), 4)
     if _is_low_information_fragment(str(row.get("fragmento textual", ""))):
         score -= 6
+    if _is_structural_or_unsupported_row(row):
+        score -= 10
     if _is_common_context_only(row):
         score -= 6
     return score
 
 
 def _display_mode(row: pd.Series) -> str:
-    if _is_boilerplate_row(row):
+    if _is_boilerplate_row(row) or _is_structural_or_unsupported_row(row):
         return "hidden"
     if _is_common_context_only(row):
         return "context_only"
@@ -159,6 +161,8 @@ def _is_boilerplate_row(row: pd.Series) -> bool:
         return True
     if any(expr in fragment for expr in BOILERPLATE_EXPRESSIONS):
         return True
+    if _is_structural_or_reference_fragment(fragment):
+        return True
     if pattern in {_normalize(expr) for expr in BOILERPLATE_EXPRESSIONS}:
         return True
     return _is_low_information_fragment(fragment)
@@ -178,12 +182,73 @@ def _is_low_information_fragment(fragment: str) -> bool:
     return False
 
 
+
+def _is_structural_or_unsupported_row(row: pd.Series) -> bool:
+    fragment = _normalize(str(row.get("fragmento textual", row.get("clause_excerpt", ""))))
+    pattern_text = _normalize(" ".join(str(row.get(field, "")) for field in ["pattern_id", "pattern_name", "patrón detectado"]))
+    if _is_structural_or_reference_fragment(fragment):
+        return True
+    if _is_generic_timeline_reference(pattern_text, fragment):
+        return True
+    return False
+
+
+def _is_structural_or_reference_fragment(fragment: str) -> bool:
+    text = _normalize(fragment)
+    if not text:
+        return True
+    if _looks_like_index_heading(text):
+        return True
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if len(lines) >= 3:
+        numbered = sum(1 for line in lines if re.match(r"^\d+(\.\d+)*[.)]?\s+", line))
+        dotted = sum(1 for line in lines if re.search(r"\.{2,}\s*\d+\s*$", line))
+        if numbered >= max(3, len(lines) // 2) or dotted >= 2:
+            return True
+    generic_section_terms = [
+        "ver seccion",
+        "ver capitulo",
+        "segun cronograma",
+        "conforme al cronograma",
+        "consta en el cronograma",
+        "establecido en el cronograma",
+        "cronograma del procedimiento",
+    ]
+    return any(term in text for term in generic_section_terms) and not _has_concrete_requirement_detail(text)
+
+
+def _looks_like_index_heading(text: str) -> bool:
+    if "indice financiero" in text:
+        return False
+    if any(term in text for term in ["tabla de contenido", "sumario", "contenido del documento", "portada"]):
+        return True
+    return bool(re.match(r"^(indice|contenido)(\s|:|$)", text))
+
+
+def _is_generic_timeline_reference(pattern_text: str, fragment: str) -> bool:
+    if not any(term in pattern_text for term in ["plazo", "cronograma", "deadline", "timeline"]):
+        return False
+    if not any(term in fragment for term in ["plazo", "cronograma", "presentacion", "oferta"]):
+        return False
+    return not _has_concrete_requirement_detail(fragment)
+
+
+def _has_concrete_requirement_detail(text: str) -> bool:
+    if re.search(r"\b\d+\s*(dias|dia|horas|hora|calendario|laborables|habiles|hábiles)\b", text):
+        return True
+    if re.search(r"\b\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}\b", text):
+        return True
+    if any(term in text for term in ["no se aceptan", "solo se acept", "obligatorio", "debera", "deberá", "se requiere"]):
+        return True
+    return False
+
+
 def _specificity_score(fragment: str) -> int:
     text = _normalize(fragment)
     score = 0
     if any(char.isdigit() for char in text):
         score += 1
-    for term in ("deberá", "debera", "requisito", "certificado", "plazo", "marca", "exclusivo", "experiencia", "índice", "indice"):
+    for term in ("deberá", "debera", "requisito", "certificado", "plazo", "marca", "exclusivo", "experiencia"):
         if term in text:
             score += 1
     if len(text) > 180:

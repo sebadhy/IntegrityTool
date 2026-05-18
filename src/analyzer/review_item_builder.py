@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from typing import Any
 
 import pandas as pd
@@ -25,7 +26,7 @@ ATTENTION_DISPLAY = {"alta": "Alto", "media": "Medio", "baja": "Bajo"}
 
 def build_review_items(findings: list[ConsolidatedFinding], max_items: int = 18) -> list[ReviewItem]:
     items = [_build_item(finding) for finding in findings]
-    items = [item for item in items if item.allowed_language_only]
+    items = [item for item in items if item.allowed_language_only and _has_substantive_item_evidence(item)]
     return items[:max_items]
 
 
@@ -160,6 +161,46 @@ def _item_to_row(item: ReviewItem, document_name: str) -> dict[str, Any]:
         "questions_for_reviewer": questions,
     }
 
+
+
+def _has_substantive_item_evidence(item: ReviewItem) -> bool:
+    return any(_is_substantive_evidence_text(str(evidence.get("text", ""))) for evidence in item.evidence_items)
+
+
+def _is_substantive_evidence_text(text: str) -> bool:
+    normalized = text.lower().translate(str.maketrans("áéíóúñü", "aeiounu"))
+    normalized = " ".join(normalized.split())
+    if not normalized:
+        return False
+    if _looks_like_structural_text(normalized):
+        return False
+    generic_timeline = [
+        "segun cronograma",
+        "conforme al cronograma",
+        "consta en el cronograma",
+        "establecido en el cronograma",
+        "cronograma del procedimiento",
+    ]
+    if any(term in normalized for term in generic_timeline) and not _has_concrete_requirement_detail(normalized):
+        return False
+    if len(normalized.split()) <= 4:
+        return False
+    return True
+
+
+def _looks_like_structural_text(text: str) -> bool:
+    if "indice financiero" in text:
+        return False
+    if any(term in text for term in ["tabla de contenido", "sumario", "portada", "version"]):
+        return True
+    return bool(re.match(r"^(indice|contenido)(\s|:|$)", text))
+
+def _has_concrete_requirement_detail(text: str) -> bool:
+    if re.search(r"\b\d+\s*(dias|dia|horas|hora|calendario|laborables|habiles|habiles)\b", text):
+        return True
+    if re.search(r"\b\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}\b", text):
+        return True
+    return any(term in text for term in ["no se aceptan", "solo se acept", "obligatorio", "debera", "se requiere"])
 
 
 def _combination_note(item: ReviewItem) -> str:

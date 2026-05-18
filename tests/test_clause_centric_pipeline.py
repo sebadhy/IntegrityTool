@@ -209,3 +209,10 @@ def test_streamlit_app_does_not_import_internal_detection_pipeline_modules():
     ]
     for import_path in forbidden:
         assert import_path not in app_source
+
+
+def test_pipeline_does_not_create_review_item_from_index_only_timeline_reference():
+    texts = ["Índice\n1. Convocatoria 3\n2. Cronograma del procedimiento 4\n3. Presentación de ofertas 5"]
+    _, signals, _, _, items = _run_text_pipeline(texts)
+    assert signals == []
+    assert items == []

@@ -19,7 +19,7 @@ IGNORED_EXPRESSIONS = [
 ]
 
 TEMPLATE_HINTS = ["complete", "especificar", "seleccione", "llenar", "campo"]
-INDEX_HINTS = ["índice", "indice", "tabla de contenido", "contenido"]
+INDEX_HINTS = ["índice", "indice", "tabla de contenido", "contenido", "sumario"]
 METADATA_HINTS = ["versión", "version", "fecha de impresión", "codigo", "código"]
 LEGAL_STANDARD_HINTS = ["ley orgánica", "losncp", "reglamento", "normativa aplicable"]
 
@@ -73,12 +73,34 @@ def active_clauses(clauses: list[Clause]) -> list[Clause]:
     return [clause for clause in clauses if not clause.exclude_from_detection]
 
 
+
+def _has_index_heading(text: str) -> bool:
+    if any(hint in text for hint in ["tabla de contenido", "sumario"]):
+        return True
+    if "indice financiero" in text or "índice financiero" in text:
+        return False
+    return bool(re.match(r"^(indice|índice|contenido)(\s|:|$)", text))
+
+
 def _is_index_or_toc(text: str) -> bool:
-    if any(hint in text for hint in INDEX_HINTS) and len(text.split()) <= 30:
+    if _has_index_heading(text) and len(text.split()) <= 45:
         return True
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     numbered = sum(1 for line in lines if re.match(r"^\d+(\.\d+)*\s+", line))
-    return bool(lines and numbered >= max(3, len(lines) // 2))
+    dotted_leaders = sum(1 for line in lines if re.search(r"\.{2,}\s*\d+\s*$", line))
+    section_references = sum(
+        1
+        for line in lines
+        if re.match(r"^\d+(\.\d+)*[.)]?\s+[a-záéíóúñü]", line) or re.search(r"\s\d{1,3}\s*$", line)
+    )
+    return bool(
+        lines
+        and (
+            numbered >= max(3, len(lines) // 2)
+            or dotted_leaders >= 2
+            or (section_references >= 4 and len(text.split()) <= 140)
+        )
+    )
 
 
 def _low_information(text: str) -> bool:
