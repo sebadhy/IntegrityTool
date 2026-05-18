@@ -674,18 +674,21 @@ def render_visual_fragment(row: pd.Series, pdf_bytes: bytes | None) -> None:
 
 
 def render_reasoning_expander(row: pd.Series) -> None:
-    with st.expander("Ver razonamiento", expanded=False):
-        reasoning_items = _reasoning_items(row)
-        st.markdown("<ul>" + "".join(f"<li>{safe_text(item)}</li>" for item in reasoning_items) + "</ul>", unsafe_allow_html=True)
+    with st.expander("Cómo se generó esta observación", expanded=False):
+        for title, items in _methodology_sections(row):
+            st.markdown(f"**{safe_text(title)}**")
+            st.markdown(
+                "<ul>" + "".join(f"<li>{safe_text(item)}</li>" for item in items if str(item).strip()) + "</ul>",
+                unsafe_allow_html=True,
+            )
         st.caption(
-            "Esta observación constituye una lectura preliminar asistida y no debe interpretarse "
-            "como evidencia de corrupción, fraude, ilegalidad ni direccionamiento."
+            "Transparencia: esta sección resume reglas, señales y contexto utilizados. "
+            "No muestra prompts, trazas internas ni razonamiento libre del modelo."
         )
 
 
-def _reasoning_items(row: pd.Series) -> list[str]:
-    items: list[str] = []
-    matched = str(row.get("matched_text") or row.get("patrón detectado") or "").strip()
+def _methodology_sections(row: pd.Series) -> list[tuple[str, list[str]]]:
+    matched = str(row.get("matched_text") or row.get("patrón detectado") or "No disponible").strip()
     pattern = str(row.get("pattern_name") or row.get("patrón detectado") or "No disponible").strip()
     dimension = dimension_label(row.get("competition_dimension", row.get("dimensión competitiva", "No disponible")))
     priority = observation_priority(row)
@@ -694,23 +697,61 @@ def _reasoning_items(row: pd.Series) -> list[str]:
     mitigants = display_list(row.get("mitigating_factors", []))
     ranking = display_list(row.get("criterios_de_priorizacion", row.get("escalation_factors", [])))
     missing = display_list(row.get("missing_information", []))
+    evidence = short_fragment(row.get("fragmento textual", row.get("representative_excerpt", "No disponible")), 260)
+    ai_active = bool(os.getenv("OPENAI_API_KEY"))
 
-    items.append(f"Se identificó una señal textual relacionada con: {matched}.")
-    items.append(f"Se aplicó el patrón documental: {pattern}, asociado a la dimensión {dimension}.")
-    items.append(f"La observación consolida {occurrences} ocurrencia(s) en la(s) página(s) {pages}.")
-    if mitigants:
-        items.append("Mitigantes identificados: " + "; ".join(mitigants[:3]) + ".")
-    else:
-        items.append("No se identificaron mitigantes textuales suficientes en el fragmento representativo.")
+    analytical_dimensions = _analytical_dimensions_for_row(row)
+    logic_items = [
+        "La identificación primaria se basa en taxonomías documentales, reglas y patrones configurados.",
+        "La herramienta revisa si el requisito podría requerir validación desde proporcionalidad, equivalencias y posible efecto sobre concurrencia.",
+        f"La prioridad visible es {priority}; se usa para ordenar revisión humana, no como calificación legal ni determinación automática.",
+    ]
     if ranking:
-        items.append("Factores considerados para priorización: " + "; ".join(ranking[:3]) + ".")
-    else:
-        items.append(f"La prioridad asignada es {priority}, orientada a ordenar qué conviene revisar primero.")
-    items.append("Interpretación contextual aplicada: " + corpus_context_sentence(row))
-    if missing:
-        items.append("Información o mitigantes no observados en el fragmento: " + "; ".join(missing[:3]) + ".")
-    items.append("Limitación: la lectura depende del texto extraído, la taxonomía documental y el corpus disponible; requiere revisión humana significativa.")
-    return items
+        logic_items.append("Factores de priorización considerados: " + "; ".join(ranking[:4]) + ".")
+
+    ai_items = [
+        (
+            "Se utilizó procesamiento asistido por modelos de lenguaje para apoyar resumen, metadata o contextualización narrativa. "
+            "La identificación primaria de señales documentales se mantiene basada en reglas, taxonomía y evidencia textual."
+            if ai_active
+            else "No se utilizó procesamiento asistido por modelos de lenguaje en esta observación porque no hay API key configurada en el entorno."
+        ),
+        "La IA no determina conclusiones, no asigna responsabilidades y no reemplaza revisión humana significativa.",
+    ]
+
+    return [
+        ("A. Señales detectadas", [f"Se identificó una señal textual relacionada con: {matched}.", f"Patrón documental aplicado: {pattern}."]),
+        ("B. Dimensiones analizadas", analytical_dimensions),
+        ("C. Lógica aplicada", logic_items),
+        ("D. Factores mitigantes", mitigants[:4] if mitigants else ["No se identificaron mitigantes textuales suficientes en el fragmento representativo."]),
+        ("E. Evidencia utilizada", [f"Fragmento representativo: {evidence}", f"La observación consolida {occurrences} ocurrencia(s) en la(s) página(s) {pages}.", f"Fuente visible: {observation_source(row)}."]),
+        ("F. Uso de IA", ai_items),
+        ("G. Limitaciones metodológicas", [
+            "La lectura depende de la calidad del texto extraído, la taxonomía configurada y el corpus disponible.",
+            "La ausencia de un mitigante textual no significa que no exista justificación en anexos u otros documentos.",
+            "Esta observación constituye una lectura preliminar asistida y no debe interpretarse como evidencia de corrupción, fraude, ilegalidad ni direccionamiento.",
+            "Requiere revisión humana significativa antes de cualquier conclusión técnica, jurídica o institucional.",
+        ] + (["Información o mitigantes no observados: " + "; ".join(missing[:3]) + "."] if missing else [])),
+    ]
+
+
+def _analytical_dimensions_for_row(row: pd.Series) -> list[str]:
+    dimension = dimension_label(row.get("competition_dimension", row.get("dimensión competitiva", "No disponible")))
+    base = [
+        "Neutralidad competitiva y posible impacto sobre concurrencia.",
+        "Proporcionalidad y relación del requisito con el objeto contractual.",
+        "Condiciones de equivalencia, apertura o mitigantes textuales.",
+    ]
+    if dimension != "No disponible":
+        base.insert(0, dimension + ".")
+    text = " ".join(str(row.get(field, "")) for field in ["patrón detectado", "fragmento textual", "por qué se sugiere revisar"]).lower()
+    if "interoper" in text or "compatible" in text or "plataforma" in text:
+        base.append("Interoperabilidad, compatibilidad y dependencia técnica.")
+    if "certific" in text or "registro" in text or "trazabilidad" in text:
+        base.append("Requisitos regulatorios, certificación, trazabilidad o calidad del bien.")
+    if "experiencia" in text or "capacidad" in text:
+        base.append("Criterios de participación, experiencia o capacidad técnica.")
+    return _unique(base)
 
 
 def render_evidence_panel(row: pd.Series, pages: list | None = None, pdf_bytes: bytes | None = None) -> None:
