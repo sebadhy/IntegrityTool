@@ -140,16 +140,6 @@ def attention_badge(level: str) -> str:
     return f'<span class="attention-badge {css_class}">{level}</span>'
 
 
-def history_badge(label: str) -> str:
-    css_class = {
-        "Poco frecuente": "history-rare",
-        "Habitual": "history-common",
-        "Intermedio": "history-mid",
-        "Sin histórico": "history-mid",
-    }.get(label, "history-mid")
-    return f'<span class="history-badge {css_class}">{label}</span>'
-
-
 def safe_text(value: object) -> str:
     return escape(str(value))
 
@@ -205,7 +195,7 @@ def render_pipeline() -> None:
     steps = [
         "Extracción documental",
         "Identificación de cláusulas",
-        "Comparación histórica",
+        "Contexto documental",
         "Observaciones consolidadas",
         "Resumen preliminar",
     ]
@@ -590,7 +580,7 @@ def corpus_context_sentence(row: pd.Series) -> str:
         return f"Este patrón aparece frecuentemente en procesos comparables ({frequency}); su presencia aislada no debería elevar la prioridad de revisión."
     if classification == "Poco frecuente":
         return f"Este patrón aparece con baja frecuencia en el corpus disponible ({frequency}); conviene revisar su proporcionalidad en contexto."
-    return str(row.get("comentario contextual") or row.get("interpretación_comparativa") or "Comparación histórica no disponible.")
+    return str(row.get("comentario contextual") or row.get("interpretación_comparativa") or "Contexto comparativo no disponible.")
 
 
 def render_human_actions(row: pd.Series, key_prefix: str = "detail") -> None:
@@ -945,8 +935,8 @@ def render_signal_inspector(row: pd.Series, corpus_context: dict | None = None) 
             <p>{safe_text(row["validación sugerida"])}</p>
         </div>
         <div class="inspector-section compact">
-            <strong>Contexto</strong>
-            <p>{safe_text(row["frecuencia en corpus"])} · {safe_text(row["clasificación histórica"])}</p>
+            <strong>Contexto adicional</strong>
+            <p>{safe_text(corpus_context_sentence(row))}</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1060,19 +1050,17 @@ def render_aspect_card(row: pd.Series, corpus_context: dict | None = None) -> No
                     <div class="aspect-title">{safe_text(row["patrón detectado"])}</div>
                     <div class="aspect-subtitle">Página {safe_text(row["página"])} · {safe_text(row["categoría de revisión"])}</div>
                 </div>
-                <div>{attention_badge(row["atención sugerida"])} {history_badge(row["clasificación histórica"])}</div>
+                <div>{attention_badge(row["atención sugerida"])}</div>
             </div>
             <div class="aspect-grid">
-                <div><strong>Frecuencia histórica</strong><br>{safe_text(row["frecuencia en corpus"])}</div>
                 <div><strong>Dimensión competitiva</strong><br>{safe_text(dimension_label(row.get("competition_dimension", "No disponible")))}</div>
                 <div><strong>Prioridad de revisión</strong><br>{safe_text(row.get("prioridad de revisión", "revisión sugerida"))}</div>
-                <div><strong>Comparación histórica</strong><br>{safe_text(row["comentario contextual"])}</div>
-                <div><strong>Posible efecto sobre concurrencia</strong><br>{safe_text(row["posible efecto sobre concurrencia"])}</div>
                 <div><strong>Sección probable</strong><br>{safe_text(row.get("document_section", "No determinada"))}</div>
             </div>
             <div class="aspect-section">
                 <strong>Por qué se sugiere revisar</strong>
                 <p>{safe_text(row["por qué se sugiere revisar"])}</p>
+                <p>{safe_text(corpus_context_sentence(row))}</p>
             </div>
             <div class="aspect-section">
                 <strong>Posible justificación legítima</strong>

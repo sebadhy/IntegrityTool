@@ -369,8 +369,7 @@ h3 {
     margin: 0.2rem 0 0.7rem;
 }
 
-.attention-badge,
-.history-badge {
+.attention-badge {
     border-radius: 3px;
     display: inline-block;
     font-size: 0.78rem;
@@ -395,24 +394,6 @@ h3 {
 .badge-low {
     background: var(--blue-soft);
     color: var(--blue-dark);
-    border: 1px solid var(--border);
-}
-
-.history-rare {
-    background: #F3EAFB;
-    color: #4F2D70;
-    border: 1px solid #DCC8EE;
-}
-
-.history-common {
-    background: #E8F5EE;
-    color: #1D6B45;
-    border: 1px solid #BFE3CF;
-}
-
-.history-mid {
-    background: #EEF2F6;
-    color: #52606D;
     border: 1px solid var(--border);
 }
 
