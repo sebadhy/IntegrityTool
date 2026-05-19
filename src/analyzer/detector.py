@@ -814,6 +814,13 @@ def _context_chars_for_pattern(pattern_id: str, default_chars: int) -> int:
 
 def _category_from_dimension(dimension: str) -> str:
     return {
+        "neutralidad_competitiva": "Referencias a marca, origen o fabricante",
+        "proporcionalidad_de_requisitos": "Experiencia, capacidad o requisitos financieros",
+        "barreras_de_entrada": "Condiciones de participación o acceso",
+        "interoperabilidad_y_compatibilidad": "Requisitos técnicos cerrados",
+        "relacion_con_objeto_contractual": "Requisitos técnicos cerrados",
+        "trazabilidad_documental": "Completitud y trazabilidad documental",
+        "transparencia_y_trazabilidad": "Criterios de evaluación y trazabilidad",
         "barrier_to_entry": "Combinaciones de requisitos potencialmente limitantes",
         "vendor_lock_in": "Referencias a marca, origen o fabricante",
         "reduced_market_access": "Autorizaciones comerciales o de fabricante",
@@ -893,6 +900,9 @@ def _taxonomy_escalation_factors(
         "geographic_restriction",
         "timeline_restriction",
         "financial_restriction",
+        "interoperabilidad_y_compatibilidad",
+        "barreras_de_entrada",
+        "proporcionalidad_de_requisitos",
     }:
         factors.append("No se observa justificación técnica cercana en el fragmento.")
     for indicator in pattern.possible_indicators + pattern.semantic_signals:
@@ -934,6 +944,9 @@ def _missing_information(
         "interoperability_lock_in",
         "financial_restriction",
         "timeline_restriction",
+        "interoperabilidad_y_compatibilidad",
+        "barreras_de_entrada",
+        "proporcionalidad_de_requisitos",
     }:
         missing.append("No se identifica justificación técnica cercana.")
     return missing

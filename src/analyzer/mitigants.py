@@ -43,6 +43,10 @@ def missing_mitigants(signal: Signal, detected: list[str]) -> list[str]:
     if has_strong_mitigant(detected):
         return []
     if signal.competition_dimension in {
+        "neutralidad_competitiva",
+        "proporcionalidad_de_requisitos",
+        "interoperabilidad_y_compatibilidad",
+        "relacion_con_objeto_contractual",
         "vendor_lock_in",
         "technical_restriction",
         "qualification_restriction",

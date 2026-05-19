@@ -1,823 +1,1818 @@
+metadata:
+  name: Integrity Tool - Taxonomía metodológica de señales documentales
+  version: '2026.05'
+  status: curated_initial_framework
+  last_updated: '2026-05-19'
+  purpose: Apoyar revisión humana preventiva de pliegos mediante señales documentales observables, contexto, mitigantes
+    y preguntas de validación.
+  non_purpose:
+  - No detecta corrupción.
+  - No determina ilegalidad.
+  - No automatiza decisiones ni sanciones.
+  - No reemplaza revisión técnica, jurídica o institucional.
+  methodological_principles:
+  - determinístico primero, procesamiento asistido opcional después
+  - señal documental observable separada de interpretación contextual
+  - priorización prudente para revisión humana
+  - trazabilidad de evidencia textual y páginas
+  - mitigación de falsos positivos mediante equivalencias, justificaciones y corpus histórico
+  normative_grounding:
+    ecuador:
+    - Constitución de la República del Ecuador, Art. 288
+    - Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP)
+    - Reglamento General a la LOSNCP
+    - Principios aplicables de concurrencia, igualdad, trato justo, transparencia, calidad y participación nacional
+      según corresponda
+    international:
+    - OECD Recommendation of the Council on Public Procurement
+    - OECD Guidelines for Fighting Bid Rigging in Public Procurement
+    - MAPS Methodology for Assessing Procurement Systems
+    - Open Contracting Global Principles
+    - UNCITRAL Model Law on Public Procurement
+  institutional_dimensions:
+  - neutralidad_competitiva
+  - proporcionalidad_de_requisitos
+  - barreras_de_entrada
+  - interoperabilidad_y_compatibilidad
+  - relacion_con_objeto_contractual
+  - trazabilidad_documental
+  - transparencia_y_trazabilidad
+  governance:
+    human_validation_required: true
+    review_cycle: revisión periódica por especialistas en contratación pública, competencia y análisis documental
+    change_control: todo cambio en patrones debe conservar evidencia observable, mitigantes, preguntas humanas y
+      lenguaje no acusatorio
+    prohibited_use: uso como dictamen legal, sancionatorio o determinación automática de responsabilidad
+patterns:
 - id: cn-brand-model-provider-reference
   name: Requisito de autorización comercial o técnica
-  description: Identifica requisitos de autorización, acreditación de origen o respaldo técnico/comercial del bien que podrían requerir validación solo si operan de forma exclusiva o sin equivalencias.
-  competition_dimension: vendor_lock_in
+  description: Identifica requisitos de autorización, acreditación de origen o respaldo técnico/comercial del bien
+    que podrían requerir validación solo si operan de forma exclusiva o sin equivalencias.
+  competition_dimension: neutralidad_competitiva
   risk_type: requisito de autorización o acreditación sujeto a contexto
   document_sections:
-    - especificaciones técnicas
-    - requisitos técnicos
-    - ficha técnica
+  - especificaciones técnicas
+  - requisitos técnicos
+  - ficha técnica
   textual_signals:
-    - proveedor específico
-    - tecnología propietaria
-    - marca específica
-    - distribuidor autorizado
-    - comercializador autorizado
-    - concesionario
-    - fabricante autorizado
-    - representante autorizado
-    - distribuidor exclusivo
-    - empresa representante
-    - proveedor oficial del fabricante
-    - certificado de distribuidor autorizado
-    - garantía del fabricante
-    - garantia del fabricante
-    - garantía del distribuidor autorizado
-    - garantia del distribuidor autorizado
+  - proveedor específico
+  - tecnología propietaria
+  - marca específica
+  - distribuidor autorizado
+  - comercializador autorizado
+  - concesionario
+  - fabricante autorizado
+  - representante autorizado
+  - distribuidor exclusivo
+  - empresa representante
+  - proveedor oficial del fabricante
+  - certificado de distribuidor autorizado
+  - garantía del fabricante
+  - garantia del fabricante
+  - garantía del distribuidor autorizado
+  - garantia del distribuidor autorizado
   semantic_signals:
-    - referencia a una solución comercial particular
-    - dependencia de fabricante o proveedor
-    - denominación técnica que podría cerrar alternativas
+  - referencia a una solución comercial particular
+  - dependencia de fabricante o proveedor
+  - denominación técnica que podría cerrar alternativas
   possible_indicators:
-    - Se exige autorización o respaldo comercial/técnico sin aclarar equivalencia.
-    - El requisito aparece como condición obligatoria y no solo como acreditación de calidad, garantía o trazabilidad.
+  - Se exige autorización o respaldo comercial/técnico sin aclarar equivalencia.
+  - El requisito aparece como condición obligatoria y no solo como acreditación de calidad, garantía o trazabilidad.
   mitigating_factors:
-    - o equivalente
-    - equivalente funcional
-    - referencial
-    - marcas equivalentes
-    - se aceptarán equivalentes
-    - o superior
-    - garantía técnica
-    - trazabilidad
-    - calidad del bien
-    - soporte técnico
-    - mantenimiento
-    - cumplimiento de normativa aplicable
+  - o equivalente
+  - equivalente funcional
+  - referencial
+  - marcas equivalentes
+  - se aceptarán equivalentes
+  - o superior
+  - garantía técnica
+  - trazabilidad
+  - calidad del bien
+  - soporte técnico
+  - mantenimiento
+  - cumplimiento de normativa aplicable
   possible_legitimate_justifications:
-    - Garantía, trazabilidad, soporte técnico o control de calidad del bien.
-    - Compatibilidad técnica con infraestructura existente.
-    - Continuidad operativa o estandarización técnicamente justificada.
+  - Garantía, trazabilidad, soporte técnico o control de calidad del bien.
+  - Compatibilidad técnica con infraestructura existente.
+  - Continuidad operativa o estandarización técnicamente justificada.
   human_review_questions:
-    - ¿El requisito de autorización, acreditación o respaldo admite alternativas equivalentes?
-    - ¿La exigencia se justifica por garantía, trazabilidad, soporte, regulación o calidad del bien?
+  - ¿El requisito de autorización, acreditación o respaldo admite alternativas equivalentes?
+  - ¿La exigencia se justifica por garantía, trazabilidad, soporte, regulación o calidad del bien?
   recommended_language:
-    - revisión general si se trata de acreditación habitual del bien
-    - validar proporcionalidad, equivalencias y necesidad técnica
+  - revisión general si se trata de acreditación habitual del bien
+  - validar proporcionalidad, equivalencias y necesidad técnica
   prohibited_language:
-    - corrupción
-    - fraude
-    - direccionamiento
-    - ilegalidad detectada
+  - corrupción
+  - fraude
+  - direccionamiento
+  - ilegalidad detectada
   severity_guidance: suggested
   confidence_guidance: medium
   related_patterns:
-    - cn-weak-equivalence-clause
-    - cn-technical-closed-requirement
-    - cn-interoperability-lock-in
-
+  - cn-weak-equivalence-clause
+  - cn-technical-closed-requirement
+  - cn-interoperability-lock-in
+  taxonomy_version: '2026.05'
+  technical_dimension: vendor_lock_in
+  institutional_dimension: neutralidad competitiva
+  document_signal:
+  - proveedor específico
+  - tecnología propietaria
+  - marca específica
+  - distribuidor autorizado
+  - comercializador autorizado
+  - concesionario
+  - fabricante autorizado
+  - representante autorizado
+  - distribuidor exclusivo
+  - empresa representante
+  - proveedor oficial del fabricante
+  - certificado de distribuidor autorizado
+  - garantía del fabricante
+  - garantia del fabricante
+  - garantía del distribuidor autorizado
+  - garantia del distribuidor autorizado
+  possible_competition_effect:
+  - Podría reducir alternativas disponibles si la condición opera de forma exclusiva o sin equivalencias verificables.
+  normative_basis:
+  - libre concurrencia
+  - igualdad y no discriminación
+  - trato justo
+  - neutralidad competitiva
+  procurement_principle:
+  - libre concurrencia
+  - igualdad y no discriminación
+  - trato justo
+  - neutralidad competitiva
+  ecuador_legal_reference:
+  - Constitución de la República del Ecuador, Art. 288
+  - Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP)
+  - Reglamento General a la LOSNCP
+  - Principios aplicables de concurrencia, igualdad, trato justo, transparencia, calidad y participación nacional
+    según corresponda
+  international_reference:
+  - OECD Recommendation of the Council on Public Procurement
+  - OECD Guidelines for Fighting Bid Rigging in Public Procurement
+  - MAPS Methodology for Assessing Procurement Systems
+  - Open Contracting Global Principles
+  - UNCITRAL Model Law on Public Procurement
+  human_validation_required: true
+  review_status: curated_initial_framework
+  confidence_level: medium
+  severity_rationale: 'Revisión sugerida: la señal podría requerir validación de proporcionalidad, equivalencias
+    o justificación técnica.'
+  evidence_type:
+  - señal textual observable
+  - fragmento documental
+  - contexto cercano de cláusula
+  - mitigantes o equivalencias cercanas si existen
+  limitations:
+  - La señal se basa en texto disponible y puede requerir revisión de anexos, aclaraciones o expediente completo.
+  - La presencia de una señal no implica invalidez del requisito ni determina responsabilidad.
+  - La prioridad orienta revisión humana y no constituye calificación jurídica automática.
+  disclaimer: Mecanismo de apoyo analítico preventivo. No determina corrupción, ilegalidad, direccionamiento ni
+    responsabilidad administrativa.
+  interpretive_indicators:
+  - Se exige autorización o respaldo comercial/técnico sin aclarar equivalencia.
+  - El requisito aparece como condición obligatoria y no solo como acreditación de calidad, garantía o trazabilidad.
 - id: cn-weak-equivalence-clause
   name: Ausencia o debilidad de cláusula de equivalencia
-  description: Identifica condiciones que podrían operar de forma cerrada cuando no se observan cláusulas claras de equivalencia funcional.
-  competition_dimension: low_competitive_neutrality
+  description: Identifica condiciones que podrían operar de forma cerrada cuando no se observan cláusulas claras
+    de equivalencia funcional.
+  competition_dimension: neutralidad_competitiva
   risk_type: ausencia de mitigante competitivo
   document_sections:
-    - especificaciones técnicas
-    - requisitos mínimos
+  - especificaciones técnicas
+  - requisitos mínimos
   textual_signals:
-    - deberá ser exactamente
-    - características exactas
-    - medidas exactas
-    - sin equivalente
-    - sin equivalentes
-    - solo se aceptará
-    - sólo se aceptará
-    - solo se aceptan
-    - marca X
-    - marca específica
-    - no se aceptan equivalentes
+  - deberá ser exactamente
+  - características exactas
+  - medidas exactas
+  - sin equivalente
+  - sin equivalentes
+  - solo se aceptará
+  - sólo se aceptará
+  - solo se aceptan
+  - marca X
+  - marca específica
+  - no se aceptan equivalentes
   semantic_signals:
-    - falta de alternativa funcional
-    - requisito formulado como condición única
+  - falta de alternativa funcional
+  - requisito formulado como condición única
   possible_indicators:
-    - La cláusula exige cumplimiento exacto sin fórmula de equivalencia.
-    - La equivalencia aparece negada o no resulta verificable.
+  - La cláusula exige cumplimiento exacto sin fórmula de equivalencia.
+  - La equivalencia aparece negada o no resulta verificable.
   mitigating_factors:
-    - o equivalente
-    - se aceptarán equivalentes
-    - o superior
-    - equivalente funcional
+  - o equivalente
+  - se aceptarán equivalentes
+  - o superior
+  - equivalente funcional
   possible_legitimate_justifications:
-    - Requisito mínimo necesario para desempeño, seguridad o compatibilidad.
+  - Requisito mínimo necesario para desempeño, seguridad o compatibilidad.
   human_review_questions:
-    - ¿La equivalencia está permitida de forma clara y verificable?
-    - ¿La exigencia exacta responde a una necesidad técnica documentada?
+  - ¿La equivalencia está permitida de forma clara y verificable?
+  - ¿La exigencia exacta responde a una necesidad técnica documentada?
   recommended_language:
-    - convendría validar si se aceptan alternativas equivalentes
+  - convendría validar si se aceptan alternativas equivalentes
   prohibited_language:
-    - corrupción
-    - fraude
-    - direccionamiento
-    - ilegalidad detectada
+  - corrupción
+  - fraude
+  - direccionamiento
+  - ilegalidad detectada
   severity_guidance: suggested
   confidence_guidance: medium
   related_patterns:
-    - cn-brand-model-provider-reference
-    - cn-technical-closed-requirement
-
+  - cn-brand-model-provider-reference
+  - cn-technical-closed-requirement
+  taxonomy_version: '2026.05'
+  technical_dimension: low_competitive_neutrality
+  institutional_dimension: neutralidad competitiva
+  document_signal:
+  - deberá ser exactamente
+  - características exactas
+  - medidas exactas
+  - sin equivalente
+  - sin equivalentes
+  - solo se aceptará
+  - sólo se aceptará
+  - solo se aceptan
+  - marca X
+  - marca específica
+  - no se aceptan equivalentes
+  possible_competition_effect:
+  - Podría reducir alternativas disponibles si la condición opera de forma exclusiva o sin equivalencias verificables.
+  normative_basis:
+  - libre concurrencia
+  - igualdad y no discriminación
+  - trato justo
+  - neutralidad competitiva
+  procurement_principle:
+  - libre concurrencia
+  - igualdad y no discriminación
+  - trato justo
+  - neutralidad competitiva
+  ecuador_legal_reference:
+  - Constitución de la República del Ecuador, Art. 288
+  - Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP)
+  - Reglamento General a la LOSNCP
+  - Principios aplicables de concurrencia, igualdad, trato justo, transparencia, calidad y participación nacional
+    según corresponda
+  international_reference:
+  - OECD Recommendation of the Council on Public Procurement
+  - OECD Guidelines for Fighting Bid Rigging in Public Procurement
+  - MAPS Methodology for Assessing Procurement Systems
+  - Open Contracting Global Principles
+  - UNCITRAL Model Law on Public Procurement
+  human_validation_required: true
+  review_status: curated_initial_framework
+  confidence_level: medium
+  severity_rationale: 'Revisión sugerida: la señal podría requerir validación de proporcionalidad, equivalencias
+    o justificación técnica.'
+  evidence_type:
+  - señal textual observable
+  - fragmento documental
+  - contexto cercano de cláusula
+  - mitigantes o equivalencias cercanas si existen
+  limitations:
+  - La señal se basa en texto disponible y puede requerir revisión de anexos, aclaraciones o expediente completo.
+  - La presencia de una señal no implica invalidez del requisito ni determina responsabilidad.
+  - La prioridad orienta revisión humana y no constituye calificación jurídica automática.
+  disclaimer: Mecanismo de apoyo analítico preventivo. No determina corrupción, ilegalidad, direccionamiento ni
+    responsabilidad administrativa.
+  interpretive_indicators:
+  - La cláusula exige cumplimiento exacto sin fórmula de equivalencia.
+  - La equivalencia aparece negada o no resulta verificable.
 - id: cn-specific-experience
   name: Experiencia previa potencialmente desproporcionada
-  description: Identifica experiencia solicitada de forma muy específica, idéntica o acumulativa respecto del objeto contractual.
-  competition_dimension: qualification_restriction
+  description: Identifica experiencia solicitada de forma muy específica, idéntica o acumulativa respecto del objeto
+    contractual.
+  competition_dimension: proporcionalidad_de_requisitos
   risk_type: requisito de calificación potencialmente limitante
   document_sections:
-    - experiencia
-    - requisitos mínimos
-    - evaluación
+  - experiencia
+  - requisitos mínimos
+  - evaluación
   textual_signals:
-    - experiencia específica
-    - contratos idénticos
-    - mismo objeto
-    - experiencia exclusiva
-    - experiencia en el mismo objeto
+  - experiencia específica
+  - contratos idénticos
+  - mismo objeto
+  - experiencia exclusiva
+  - experiencia en el mismo objeto
   semantic_signals:
-    - requisito de experiencia exacta
-    - umbral de experiencia acumulado con otros requisitos
+  - requisito de experiencia exacta
+  - umbral de experiencia acumulado con otros requisitos
   possible_indicators:
-    - Se exige experiencia idéntica en lugar de experiencia similar.
-    - La experiencia se combina con montos, plazos o tecnologías muy específicas.
+  - Se exige experiencia idéntica en lugar de experiencia similar.
+  - La experiencia se combina con montos, plazos o tecnologías muy específicas.
   mitigating_factors:
-    - experiencia similar
-    - experiencia relacionada
-    - equivalente
-    - consorcios
-    - asociaciones
+  - experiencia similar
+  - experiencia relacionada
+  - equivalente
+  - consorcios
+  - asociaciones
   possible_legitimate_justifications:
-    - Complejidad técnica del objeto contractual.
-    - Necesidad de asegurar capacidad de ejecución verificable.
+  - Complejidad técnica del objeto contractual.
+  - Necesidad de asegurar capacidad de ejecución verificable.
   human_review_questions:
-    - ¿La experiencia solicitada es proporcional al objeto contractual?
-    - ¿Se aceptan experiencias similares o capacidades equivalentes?
+  - ¿La experiencia solicitada es proporcional al objeto contractual?
+  - ¿Se aceptan experiencias similares o capacidades equivalentes?
   recommended_language:
-    - revisar proporcionalidad de la experiencia exigida
+  - revisar proporcionalidad de la experiencia exigida
   prohibited_language:
-    - corrupción
-    - fraude
-    - direccionamiento
-    - ilegalidad detectada
+  - corrupción
+  - fraude
+  - direccionamiento
+  - ilegalidad detectada
   severity_guidance: suggested
   confidence_guidance: medium
   related_patterns:
-    - cn-cumulative-requirements
-    - cn-financial-restrictive
-
+  - cn-cumulative-requirements
+  - cn-financial-restrictive
+  taxonomy_version: '2026.05'
+  technical_dimension: qualification_restriction
+  institutional_dimension: proporcionalidad de requisitos
+  document_signal:
+  - experiencia específica
+  - contratos idénticos
+  - mismo objeto
+  - experiencia exclusiva
+  - experiencia en el mismo objeto
+  possible_competition_effect:
+  - Podría elevar barreras de participación si el requisito no guarda proporción con el objeto, monto o complejidad
+    del procedimiento.
+  normative_basis:
+  - proporcionalidad
+  - relación con el objeto contractual
+  - mejor valor por dinero
+  procurement_principle:
+  - proporcionalidad
+  - relación con el objeto contractual
+  - mejor valor por dinero
+  ecuador_legal_reference:
+  - Constitución de la República del Ecuador, Art. 288
+  - Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP)
+  - Reglamento General a la LOSNCP
+  - Principios aplicables de concurrencia, igualdad, trato justo, transparencia, calidad y participación nacional
+    según corresponda
+  international_reference:
+  - OECD Recommendation of the Council on Public Procurement
+  - OECD Guidelines for Fighting Bid Rigging in Public Procurement
+  - MAPS Methodology for Assessing Procurement Systems
+  - Open Contracting Global Principles
+  - UNCITRAL Model Law on Public Procurement
+  human_validation_required: true
+  review_status: curated_initial_framework
+  confidence_level: medium
+  severity_rationale: 'Revisión sugerida: la señal podría requerir validación de proporcionalidad, equivalencias
+    o justificación técnica.'
+  evidence_type:
+  - señal textual observable
+  - fragmento documental
+  - contexto cercano de cláusula
+  - mitigantes o equivalencias cercanas si existen
+  limitations:
+  - La señal se basa en texto disponible y puede requerir revisión de anexos, aclaraciones o expediente completo.
+  - La presencia de una señal no implica invalidez del requisito ni determina responsabilidad.
+  - La prioridad orienta revisión humana y no constituye calificación jurídica automática.
+  disclaimer: Mecanismo de apoyo analítico preventivo. No determina corrupción, ilegalidad, direccionamiento ni
+    responsabilidad administrativa.
+  interpretive_indicators:
+  - Se exige experiencia idéntica en lugar de experiencia similar.
+  - La experiencia se combina con montos, plazos o tecnologías muy específicas.
 - id: cn-financial-restrictive
   name: Requisito financiero potencialmente restrictivo
-  description: Identifica umbrales financieros que podrían elevar barreras de entrada si no guardan proporción con el objeto contractual.
-  competition_dimension: financial_restriction
+  description: Identifica umbrales financieros que podrían elevar barreras de entrada si no guardan proporción con
+    el objeto contractual.
+  competition_dimension: proporcionalidad_de_requisitos
   risk_type: barrera financiera potencial
   document_sections:
-    - requisitos financieros
-    - capacidad económica
-    - evaluación
+  - requisitos financieros
+  - capacidad económica
+  - evaluación
   textual_signals:
-    - patrimonio mínimo
-    - capital mínimo
-    - índice financiero
-    - liquidez
-    - solvencia
+  - patrimonio mínimo
+  - capital mínimo
+  - índice financiero
+  - liquidez
+  - solvencia
   semantic_signals:
-    - umbral financiero elevado
-    - acumulación de requisitos económicos
+  - umbral financiero elevado
+  - acumulación de requisitos económicos
   possible_indicators:
-    - El requisito financiero no explica relación con presupuesto o complejidad.
-    - El umbral se combina con experiencia específica.
+  - El requisito financiero no explica relación con presupuesto o complejidad.
+  - El umbral se combina con experiencia específica.
   mitigating_factors:
-    - proporcional
-    - según presupuesto referencial
-    - debidamente justificado
-    - consorcios
+  - proporcional
+  - según presupuesto referencial
+  - debidamente justificado
+  - consorcios
   possible_legitimate_justifications:
-    - Necesidad de asegurar capacidad financiera durante la ejecución.
+  - Necesidad de asegurar capacidad financiera durante la ejecución.
   human_review_questions:
-    - ¿El umbral financiero está justificado y es proporcional?
-    - ¿Se permite cumplir mediante consorcio u otra figura admisible?
+  - ¿El umbral financiero está justificado y es proporcional?
+  - ¿Se permite cumplir mediante consorcio u otra figura admisible?
   recommended_language:
-    - validación de proporcionalidad financiera sugerida
+  - validación de proporcionalidad financiera sugerida
   prohibited_language:
-    - corrupción
-    - fraude
-    - direccionamiento
-    - ilegalidad detectada
+  - corrupción
+  - fraude
+  - direccionamiento
+  - ilegalidad detectada
   severity_guidance: suggested
   confidence_guidance: medium
   related_patterns:
-    - cn-specific-experience
-    - cn-cumulative-requirements
-
+  - cn-specific-experience
+  - cn-cumulative-requirements
+  taxonomy_version: '2026.05'
+  technical_dimension: financial_restriction
+  institutional_dimension: proporcionalidad de requisitos
+  document_signal:
+  - patrimonio mínimo
+  - capital mínimo
+  - índice financiero
+  - liquidez
+  - solvencia
+  possible_competition_effect:
+  - Podría elevar barreras de participación si el requisito no guarda proporción con el objeto, monto o complejidad
+    del procedimiento.
+  normative_basis:
+  - proporcionalidad
+  - relación con el objeto contractual
+  - mejor valor por dinero
+  procurement_principle:
+  - proporcionalidad
+  - relación con el objeto contractual
+  - mejor valor por dinero
+  ecuador_legal_reference:
+  - Constitución de la República del Ecuador, Art. 288
+  - Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP)
+  - Reglamento General a la LOSNCP
+  - Principios aplicables de concurrencia, igualdad, trato justo, transparencia, calidad y participación nacional
+    según corresponda
+  international_reference:
+  - OECD Recommendation of the Council on Public Procurement
+  - OECD Guidelines for Fighting Bid Rigging in Public Procurement
+  - MAPS Methodology for Assessing Procurement Systems
+  - Open Contracting Global Principles
+  - UNCITRAL Model Law on Public Procurement
+  human_validation_required: true
+  review_status: curated_initial_framework
+  confidence_level: medium
+  severity_rationale: 'Revisión sugerida: la señal podría requerir validación de proporcionalidad, equivalencias
+    o justificación técnica.'
+  evidence_type:
+  - señal textual observable
+  - fragmento documental
+  - contexto cercano de cláusula
+  - mitigantes o equivalencias cercanas si existen
+  limitations:
+  - La señal se basa en texto disponible y puede requerir revisión de anexos, aclaraciones o expediente completo.
+  - La presencia de una señal no implica invalidez del requisito ni determina responsabilidad.
+  - La prioridad orienta revisión humana y no constituye calificación jurídica automática.
+  disclaimer: Mecanismo de apoyo analítico preventivo. No determina corrupción, ilegalidad, direccionamiento ni
+    responsabilidad administrativa.
+  interpretive_indicators:
+  - El requisito financiero no explica relación con presupuesto o complejidad.
+  - El umbral se combina con experiencia específica.
 - id: cn-specific-certification
   name: Requisito de certificación, trazabilidad o garantía del bien
-  description: Identifica requisitos de certificación, registro, trazabilidad o garantía del bien que pueden ser habituales en bienes regulados y solo deben escalar cuando no admiten equivalencias o no se relacionan claramente con el objeto contractual.
-  competition_dimension: qualification_restriction
+  description: Identifica requisitos de certificación, registro, trazabilidad o garantía del bien que pueden ser
+    habituales en bienes regulados y solo deben escalar cuando no admiten equivalencias o no se relacionan claramente
+    con el objeto contractual.
+  competition_dimension: proporcionalidad_de_requisitos
   risk_type: requisito de certificación o trazabilidad sujeto a contexto
   document_sections:
-    - certificaciones
-    - requisitos técnicos
-    - evaluación
+  - certificaciones
+  - requisitos técnicos
+  - evaluación
   textual_signals:
-    - certificación ISO
-    - ISO 9001
-    - ISO 14001
-    - certificación específica
-    - certificado del fabricante
-    - certificado
-    - acreditación
-    - registro sanitario
-    - BPM
-    - buenas prácticas de manufactura
-    - trazabilidad
-    - certificación ISO
+  - certificación ISO
+  - ISO 9001
+  - ISO 14001
+  - certificación específica
+  - certificado del fabricante
+  - certificado
+  - acreditación
+  - registro sanitario
+  - BPM
+  - buenas prácticas de manufactura
+  - trazabilidad
+  - certificación ISO
   semantic_signals:
-    - certificación como requisito habilitante
-    - estándar específico sin equivalentes
+  - certificación como requisito habilitante
+  - estándar específico sin equivalentes
   possible_indicators:
-    - La certificación se exige sin justificar relación con el objeto.
-    - No se aceptan certificaciones, registros o estándares equivalentes.
+  - La certificación se exige sin justificar relación con el objeto.
+  - No se aceptan certificaciones, registros o estándares equivalentes.
   mitigating_factors:
-    - equivalente
-    - certificación equivalente
-    - registro sanitario o equivalente
-    - estándares equivalentes
-    - debidamente justificado
-    - según normativa aplicable
-    - cumplimiento de normativa aplicable
-    - calidad del bien
-    - seguridad
-    - trazabilidad
+  - equivalente
+  - certificación equivalente
+  - registro sanitario o equivalente
+  - estándares equivalentes
+  - debidamente justificado
+  - según normativa aplicable
+  - cumplimiento de normativa aplicable
+  - calidad del bien
+  - seguridad
+  - trazabilidad
   possible_legitimate_justifications:
-    - Seguridad, calidad, trazabilidad, garantía o cumplimiento normativo aplicable al bien.
+  - Seguridad, calidad, trazabilidad, garantía o cumplimiento normativo aplicable al bien.
   human_review_questions:
-    - ¿La certificación es necesaria y proporcional al objeto contractual?
-    - ¿Se aceptan certificaciones o estándares equivalentes?
+  - ¿La certificación es necesaria y proporcional al objeto contractual?
+  - ¿Se aceptan certificaciones o estándares equivalentes?
   recommended_language:
-    - revisión general cuando el requisito responde a calidad, trazabilidad o regulación del bien
-    - validar proporcionalidad y equivalencias aceptables
+  - revisión general cuando el requisito responde a calidad, trazabilidad o regulación del bien
+  - validar proporcionalidad y equivalencias aceptables
   prohibited_language:
-    - corrupción
-    - fraude
-    - direccionamiento
-    - ilegalidad detectada
+  - corrupción
+  - fraude
+  - direccionamiento
+  - ilegalidad detectada
   severity_guidance: suggested
   confidence_guidance: medium
   related_patterns:
-    - cn-brand-model-provider-reference
-    - cn-cumulative-requirements
-
+  - cn-brand-model-provider-reference
+  - cn-cumulative-requirements
+  taxonomy_version: '2026.05'
+  technical_dimension: qualification_restriction
+  institutional_dimension: proporcionalidad de requisitos
+  document_signal:
+  - certificación ISO
+  - ISO 9001
+  - ISO 14001
+  - certificación específica
+  - certificado del fabricante
+  - certificado
+  - acreditación
+  - registro sanitario
+  - BPM
+  - buenas prácticas de manufactura
+  - trazabilidad
+  - certificación ISO
+  possible_competition_effect:
+  - Podría elevar barreras de participación si el requisito no guarda proporción con el objeto, monto o complejidad
+    del procedimiento.
+  normative_basis:
+  - proporcionalidad
+  - relación con el objeto contractual
+  - mejor valor por dinero
+  procurement_principle:
+  - proporcionalidad
+  - relación con el objeto contractual
+  - mejor valor por dinero
+  ecuador_legal_reference:
+  - Constitución de la República del Ecuador, Art. 288
+  - Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP)
+  - Reglamento General a la LOSNCP
+  - Principios aplicables de concurrencia, igualdad, trato justo, transparencia, calidad y participación nacional
+    según corresponda
+  international_reference:
+  - OECD Recommendation of the Council on Public Procurement
+  - OECD Guidelines for Fighting Bid Rigging in Public Procurement
+  - MAPS Methodology for Assessing Procurement Systems
+  - Open Contracting Global Principles
+  - UNCITRAL Model Law on Public Procurement
+  human_validation_required: true
+  review_status: curated_initial_framework
+  confidence_level: medium
+  severity_rationale: 'Revisión sugerida: la señal podría requerir validación de proporcionalidad, equivalencias
+    o justificación técnica.'
+  evidence_type:
+  - señal textual observable
+  - fragmento documental
+  - contexto cercano de cláusula
+  - mitigantes o equivalencias cercanas si existen
+  limitations:
+  - La señal se basa en texto disponible y puede requerir revisión de anexos, aclaraciones o expediente completo.
+  - La presencia de una señal no implica invalidez del requisito ni determina responsabilidad.
+  - La prioridad orienta revisión humana y no constituye calificación jurídica automática.
+  disclaimer: Mecanismo de apoyo analítico preventivo. No determina corrupción, ilegalidad, direccionamiento ni
+    responsabilidad administrativa.
+  interpretive_indicators:
+  - La certificación se exige sin justificar relación con el objeto.
+  - No se aceptan certificaciones, registros o estándares equivalentes.
 - id: cn-short-submission-deadline
   name: Plazo reducido de presentación
-  description: Identifica plazos que podrían limitar preparación de ofertas cuando son breves respecto de la carga documental o complejidad técnica.
-  competition_dimension: timeline_restriction
+  description: Identifica plazos que podrían limitar preparación de ofertas cuando son breves respecto de la carga
+    documental o complejidad técnica.
+  competition_dimension: barreras_de_entrada
   risk_type: restricción temporal potencial
   document_sections:
-    - cronograma
-    - presentación de ofertas
+  - cronograma
+  - presentación de ofertas
   textual_signals:
-    - plazo de presentación
-    - entrega de ofertas
-    - término de
-    - plazo máximo
-    - cronograma
+  - plazo de presentación
+  - entrega de ofertas
+  - término de
+  - plazo máximo
+  - cronograma
   semantic_signals:
-    - plazo breve para preparar oferta
-    - acumulación de documentación y visitas en poco tiempo
+  - plazo breve para preparar oferta
+  - acumulación de documentación y visitas en poco tiempo
   possible_indicators:
-    - El plazo se combina con visita obligatoria o documentación extensa.
+  - El plazo se combina con visita obligatoria o documentación extensa.
   mitigating_factors:
-    - prórroga
-    - ampliación de plazo
-    - cronograma actualizado
+  - prórroga
+  - ampliación de plazo
+  - cronograma actualizado
   possible_legitimate_justifications:
-    - Necesidad operativa documentada o procedimiento con plazos normativos aplicables.
+  - Necesidad operativa documentada o procedimiento con plazos normativos aplicables.
   human_review_questions:
-    - ¿El plazo permite preparar ofertas de forma razonable?
-    - ¿La complejidad del proceso justifica ampliar el plazo?
+  - ¿El plazo permite preparar ofertas de forma razonable?
+  - ¿La complejidad del proceso justifica ampliar el plazo?
   recommended_language:
-    - convendría revisar suficiencia del plazo en contexto
+  - convendría revisar suficiencia del plazo en contexto
   prohibited_language:
-    - corrupción
-    - fraude
-    - direccionamiento
-    - ilegalidad detectada
+  - corrupción
+  - fraude
+  - direccionamiento
+  - ilegalidad detectada
   severity_guidance: general
   confidence_guidance: low
   related_patterns:
-    - cn-mandatory-technical-visit
-    - cn-excessive-administrative-documentation
-
+  - cn-mandatory-technical-visit
+  - cn-excessive-administrative-documentation
+  taxonomy_version: '2026.05'
+  technical_dimension: timeline_restriction
+  institutional_dimension: barreras de entrada
+  document_signal:
+  - plazo de presentación
+  - entrega de ofertas
+  - término de
+  - plazo máximo
+  - cronograma
+  possible_competition_effect:
+  - Podría dificultar la participación de oferentes potenciales si exige condiciones logísticas, temporales o territoriales
+    no justificadas.
+  normative_basis:
+  - libre concurrencia
+  - acceso amplio al mercado
+  - proporcionalidad
+  procurement_principle:
+  - libre concurrencia
+  - acceso amplio al mercado
+  - proporcionalidad
+  ecuador_legal_reference:
+  - Constitución de la República del Ecuador, Art. 288
+  - Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP)
+  - Reglamento General a la LOSNCP
+  - Principios aplicables de concurrencia, igualdad, trato justo, transparencia, calidad y participación nacional
+    según corresponda
+  international_reference:
+  - OECD Recommendation of the Council on Public Procurement
+  - OECD Guidelines for Fighting Bid Rigging in Public Procurement
+  - MAPS Methodology for Assessing Procurement Systems
+  - Open Contracting Global Principles
+  - UNCITRAL Model Law on Public Procurement
+  human_validation_required: true
+  review_status: curated_initial_framework
+  confidence_level: low
+  severity_rationale: 'Prioridad general: la señal puede ser habitual o requerir solo contextualización salvo acumulación
+    con otros factores.'
+  evidence_type:
+  - señal textual observable
+  - fragmento documental
+  - contexto cercano de cláusula
+  - mitigantes o equivalencias cercanas si existen
+  limitations:
+  - La señal se basa en texto disponible y puede requerir revisión de anexos, aclaraciones o expediente completo.
+  - La presencia de una señal no implica invalidez del requisito ni determina responsabilidad.
+  - La prioridad orienta revisión humana y no constituye calificación jurídica automática.
+  disclaimer: Mecanismo de apoyo analítico preventivo. No determina corrupción, ilegalidad, direccionamiento ni
+    responsabilidad administrativa.
+  interpretive_indicators:
+  - El plazo se combina con visita obligatoria o documentación extensa.
 - id: cn-limited-execution-delivery-deadline
   name: Plazo de ejecución o entrega potencialmente limitante
   description: Identifica plazos de ejecución o entrega que podrían requerir validación de factibilidad y proporcionalidad.
-  competition_dimension: timeline_restriction
+  competition_dimension: barreras_de_entrada
   risk_type: restricción temporal potencial
   document_sections:
-    - plazo de entrega
-    - plazo de ejecución
-    - condiciones contractuales
+  - plazo de entrega
+  - plazo de ejecución
+  - condiciones contractuales
   textual_signals:
-    - entrega inmediata
-    - plazo de entrega
-    - plazo de ejecución
-    - en 24 horas
-    - en 48 horas
-    - máximo 5 días
+  - entrega inmediata
+  - plazo de entrega
+  - plazo de ejecución
+  - en 24 horas
+  - en 48 horas
+  - máximo 5 días
   semantic_signals:
-    - plazo operativo exigente
-    - plazo compatible solo con inventario local
+  - plazo operativo exigente
+  - plazo compatible solo con inventario local
   possible_indicators:
-    - El plazo podría favorecer oferentes con stock o presencia previa.
+  - El plazo podría favorecer oferentes con stock o presencia previa.
   mitigating_factors:
-    - plazo prorrogable
-    - justificado por emergencia
-    - disponibilidad progresiva
+  - plazo prorrogable
+  - justificado por emergencia
+  - disponibilidad progresiva
   possible_legitimate_justifications:
-    - Urgencia operativa, continuidad del servicio o necesidad pública documentada.
+  - Urgencia operativa, continuidad del servicio o necesidad pública documentada.
   human_review_questions:
-    - ¿El plazo de entrega es técnicamente factible para oferentes diversos?
-    - ¿La urgencia o continuidad operativa está justificada?
+  - ¿El plazo de entrega es técnicamente factible para oferentes diversos?
+  - ¿La urgencia o continuidad operativa está justificada?
   recommended_language:
-    - validación de factibilidad y proporcionalidad del plazo
+  - validación de factibilidad y proporcionalidad del plazo
   prohibited_language:
-    - corrupción
-    - fraude
-    - direccionamiento
-    - ilegalidad detectada
+  - corrupción
+  - fraude
+  - direccionamiento
+  - ilegalidad detectada
   severity_guidance: suggested
   confidence_guidance: medium
   related_patterns:
-    - cn-local-presence-requirement
-
+  - cn-local-presence-requirement
+  taxonomy_version: '2026.05'
+  technical_dimension: timeline_restriction
+  institutional_dimension: barreras de entrada
+  document_signal:
+  - entrega inmediata
+  - plazo de entrega
+  - plazo de ejecución
+  - en 24 horas
+  - en 48 horas
+  - máximo 5 días
+  possible_competition_effect:
+  - Podría dificultar la participación de oferentes potenciales si exige condiciones logísticas, temporales o territoriales
+    no justificadas.
+  normative_basis:
+  - libre concurrencia
+  - acceso amplio al mercado
+  - proporcionalidad
+  procurement_principle:
+  - libre concurrencia
+  - acceso amplio al mercado
+  - proporcionalidad
+  ecuador_legal_reference:
+  - Constitución de la República del Ecuador, Art. 288
+  - Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP)
+  - Reglamento General a la LOSNCP
+  - Principios aplicables de concurrencia, igualdad, trato justo, transparencia, calidad y participación nacional
+    según corresponda
+  international_reference:
+  - OECD Recommendation of the Council on Public Procurement
+  - OECD Guidelines for Fighting Bid Rigging in Public Procurement
+  - MAPS Methodology for Assessing Procurement Systems
+  - Open Contracting Global Principles
+  - UNCITRAL Model Law on Public Procurement
+  human_validation_required: true
+  review_status: curated_initial_framework
+  confidence_level: medium
+  severity_rationale: 'Revisión sugerida: la señal podría requerir validación de proporcionalidad, equivalencias
+    o justificación técnica.'
+  evidence_type:
+  - señal textual observable
+  - fragmento documental
+  - contexto cercano de cláusula
+  - mitigantes o equivalencias cercanas si existen
+  limitations:
+  - La señal se basa en texto disponible y puede requerir revisión de anexos, aclaraciones o expediente completo.
+  - La presencia de una señal no implica invalidez del requisito ni determina responsabilidad.
+  - La prioridad orienta revisión humana y no constituye calificación jurídica automática.
+  disclaimer: Mecanismo de apoyo analítico preventivo. No determina corrupción, ilegalidad, direccionamiento ni
+    responsabilidad administrativa.
+  interpretive_indicators:
+  - El plazo podría favorecer oferentes con stock o presencia previa.
 - id: cn-mandatory-technical-visit
   name: Visita técnica obligatoria
-  description: Identifica visitas obligatorias que podrían limitar participación si exigen presencia física, fecha única o plazo breve.
-  competition_dimension: geographic_restriction
+  description: Identifica visitas obligatorias que podrían limitar participación si exigen presencia física, fecha
+    única o plazo breve.
+  competition_dimension: barreras_de_entrada
   risk_type: condición logística potencialmente limitante
   document_sections:
-    - visita técnica
-    - cronograma
-    - requisitos de participación
+  - visita técnica
+  - cronograma
+  - requisitos de participación
   textual_signals:
-    - visita técnica obligatoria
-    - visita obligatoria
-    - asistencia obligatoria
-    - visita al sitio
+  - visita técnica obligatoria
+  - visita obligatoria
+  - asistencia obligatoria
+  - visita al sitio
   semantic_signals:
-    - presencia física como requisito habilitante
-    - única fecha disponible para visita
+  - presencia física como requisito habilitante
+  - única fecha disponible para visita
   possible_indicators:
-    - La visita es obligatoria y no admite mecanismos alternativos.
+  - La visita es obligatoria y no admite mecanismos alternativos.
   mitigating_factors:
-    - visita opcional
-    - registro virtual
-    - acta disponible
-    - más de una fecha
+  - visita opcional
+  - registro virtual
+  - acta disponible
+  - más de una fecha
   possible_legitimate_justifications:
-    - Necesidad de conocer condiciones físicas no reproducibles documentalmente.
+  - Necesidad de conocer condiciones físicas no reproducibles documentalmente.
   human_review_questions:
-    - ¿La visita obligatoria está justificada por el objeto contractual?
-    - ¿Existen alternativas documentales o virtuales para no limitar concurrencia?
+  - ¿La visita obligatoria está justificada por el objeto contractual?
+  - ¿Existen alternativas documentales o virtuales para no limitar concurrencia?
   recommended_language:
-    - revisión sugerida de proporcionalidad logística
+  - revisión sugerida de proporcionalidad logística
   prohibited_language:
-    - corrupción
-    - fraude
-    - direccionamiento
-    - ilegalidad detectada
+  - corrupción
+  - fraude
+  - direccionamiento
+  - ilegalidad detectada
   severity_guidance: suggested
   confidence_guidance: medium
   related_patterns:
-    - cn-short-submission-deadline
-    - cn-local-presence-requirement
-
+  - cn-short-submission-deadline
+  - cn-local-presence-requirement
+  taxonomy_version: '2026.05'
+  technical_dimension: geographic_restriction
+  institutional_dimension: barreras de entrada
+  document_signal:
+  - visita técnica obligatoria
+  - visita obligatoria
+  - asistencia obligatoria
+  - visita al sitio
+  possible_competition_effect:
+  - Podría dificultar la participación de oferentes potenciales si exige condiciones logísticas, temporales o territoriales
+    no justificadas.
+  normative_basis:
+  - libre concurrencia
+  - acceso amplio al mercado
+  - proporcionalidad
+  procurement_principle:
+  - libre concurrencia
+  - acceso amplio al mercado
+  - proporcionalidad
+  ecuador_legal_reference:
+  - Constitución de la República del Ecuador, Art. 288
+  - Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP)
+  - Reglamento General a la LOSNCP
+  - Principios aplicables de concurrencia, igualdad, trato justo, transparencia, calidad y participación nacional
+    según corresponda
+  international_reference:
+  - OECD Recommendation of the Council on Public Procurement
+  - OECD Guidelines for Fighting Bid Rigging in Public Procurement
+  - MAPS Methodology for Assessing Procurement Systems
+  - Open Contracting Global Principles
+  - UNCITRAL Model Law on Public Procurement
+  human_validation_required: true
+  review_status: curated_initial_framework
+  confidence_level: medium
+  severity_rationale: 'Revisión sugerida: la señal podría requerir validación de proporcionalidad, equivalencias
+    o justificación técnica.'
+  evidence_type:
+  - señal textual observable
+  - fragmento documental
+  - contexto cercano de cláusula
+  - mitigantes o equivalencias cercanas si existen
+  limitations:
+  - La señal se basa en texto disponible y puede requerir revisión de anexos, aclaraciones o expediente completo.
+  - La presencia de una señal no implica invalidez del requisito ni determina responsabilidad.
+  - La prioridad orienta revisión humana y no constituye calificación jurídica automática.
+  disclaimer: Mecanismo de apoyo analítico preventivo. No determina corrupción, ilegalidad, direccionamiento ni
+    responsabilidad administrativa.
+  interpretive_indicators:
+  - La visita es obligatoria y no admite mecanismos alternativos.
 - id: cn-local-presence-requirement
   name: Exigencia de presencia local
-  description: Identifica domicilio, oficina, sucursal o presencia local previa que podría requerir justificación técnica.
-  competition_dimension: geographic_restriction
+  description: Identifica domicilio, oficina, sucursal o presencia local previa que podría requerir justificación
+    técnica.
+  competition_dimension: barreras_de_entrada
   risk_type: restricción geográfica potencial
   document_sections:
-    - requisitos de participación
-    - soporte técnico
-    - postventa
+  - requisitos de participación
+  - soporte técnico
+  - postventa
   textual_signals:
-    - presencia local
-    - oficina local
-    - sucursal en
-    - domicilio en
-    - taller autorizado local
-    - representante local
-    - distribuidor local
-    - empresa distribuidora
-    - representantes locales autorizados
+  - presencia local
+  - oficina local
+  - sucursal en
+  - domicilio en
+  - taller autorizado local
+  - representante local
+  - distribuidor local
+  - empresa distribuidora
+  - representantes locales autorizados
   semantic_signals:
-    - obligación de infraestructura local previa
-    - soporte condicionado a ubicación territorial
+  - obligación de infraestructura local previa
+  - soporte condicionado a ubicación territorial
   possible_indicators:
-    - Se exige presencia antes de adjudicación o sin alternativas de cobertura.
+  - Se exige presencia antes de adjudicación o sin alternativas de cobertura.
   mitigating_factors:
-    - cobertura nacional
-    - atención remota
-    - durante ejecución
-    - instalación posterior
+  - cobertura nacional
+  - atención remota
+  - durante ejecución
+  - instalación posterior
   possible_legitimate_justifications:
-    - Necesidad de atención rápida, soporte presencial o continuidad operativa.
+  - Necesidad de atención rápida, soporte presencial o continuidad operativa.
   human_review_questions:
-    - ¿La presencia local previa es necesaria o basta con capacidad de atención?
-    - ¿Se aceptan alternativas logísticas o remotas equivalentes?
+  - ¿La presencia local previa es necesaria o basta con capacidad de atención?
+  - ¿Se aceptan alternativas logísticas o remotas equivalentes?
   recommended_language:
-    - validar necesidad y proporcionalidad de presencia local
+  - validar necesidad y proporcionalidad de presencia local
   prohibited_language:
-    - corrupción
-    - fraude
-    - direccionamiento
-    - ilegalidad detectada
+  - corrupción
+  - fraude
+  - direccionamiento
+  - ilegalidad detectada
   severity_guidance: suggested
   confidence_guidance: medium
   related_patterns:
-    - cn-limited-execution-delivery-deadline
-    - cn-mandatory-technical-visit
-
+  - cn-limited-execution-delivery-deadline
+  - cn-mandatory-technical-visit
+  taxonomy_version: '2026.05'
+  technical_dimension: geographic_restriction
+  institutional_dimension: barreras de entrada
+  document_signal:
+  - presencia local
+  - oficina local
+  - sucursal en
+  - domicilio en
+  - taller autorizado local
+  - representante local
+  - distribuidor local
+  - empresa distribuidora
+  - representantes locales autorizados
+  possible_competition_effect:
+  - Podría dificultar la participación de oferentes potenciales si exige condiciones logísticas, temporales o territoriales
+    no justificadas.
+  normative_basis:
+  - libre concurrencia
+  - acceso amplio al mercado
+  - proporcionalidad
+  procurement_principle:
+  - libre concurrencia
+  - acceso amplio al mercado
+  - proporcionalidad
+  ecuador_legal_reference:
+  - Constitución de la República del Ecuador, Art. 288
+  - Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP)
+  - Reglamento General a la LOSNCP
+  - Principios aplicables de concurrencia, igualdad, trato justo, transparencia, calidad y participación nacional
+    según corresponda
+  international_reference:
+  - OECD Recommendation of the Council on Public Procurement
+  - OECD Guidelines for Fighting Bid Rigging in Public Procurement
+  - MAPS Methodology for Assessing Procurement Systems
+  - Open Contracting Global Principles
+  - UNCITRAL Model Law on Public Procurement
+  human_validation_required: true
+  review_status: curated_initial_framework
+  confidence_level: medium
+  severity_rationale: 'Revisión sugerida: la señal podría requerir validación de proporcionalidad, equivalencias
+    o justificación técnica.'
+  evidence_type:
+  - señal textual observable
+  - fragmento documental
+  - contexto cercano de cláusula
+  - mitigantes o equivalencias cercanas si existen
+  limitations:
+  - La señal se basa en texto disponible y puede requerir revisión de anexos, aclaraciones o expediente completo.
+  - La presencia de una señal no implica invalidez del requisito ni determina responsabilidad.
+  - La prioridad orienta revisión humana y no constituye calificación jurídica automática.
+  disclaimer: Mecanismo de apoyo analítico preventivo. No determina corrupción, ilegalidad, direccionamiento ni
+    responsabilidad administrativa.
+  interpretive_indicators:
+  - Se exige presencia antes de adjudicación o sin alternativas de cobertura.
 - id: cn-cumulative-requirements
   name: Requisitos acumulativos que podrían reducir concurrencia
-  description: Identifica coexistencia de requisitos de autorización, certificación, experiencia, soporte o presencia que podrían elevar barreras de entrada en conjunto.
-  competition_dimension: low_competitive_neutrality
+  description: Identifica coexistencia de requisitos de autorización, certificación, experiencia, soporte o presencia
+    que podrían elevar barreras de entrada en conjunto.
+  competition_dimension: neutralidad_competitiva
   risk_type: acumulación de condiciones potencialmente limitantes
   document_sections:
-    - requisitos mínimos
-    - especificaciones técnicas
-    - evaluación
+  - requisitos mínimos
+  - especificaciones técnicas
+  - evaluación
   textual_signals:
-    - deberá cumplir con todos los
-    - cumplir con todos los siguientes requisitos
-    - deberá cumplir todos los requisitos
-    - requisitos acumulativos
+  - deberá cumplir con todos los
+  - cumplir con todos los siguientes requisitos
+  - deberá cumplir todos los requisitos
+  - requisitos acumulativos
   semantic_signals:
-    - acumulación de condiciones habilitantes
-    - requisitos técnicos y comerciales simultáneos
+  - acumulación de condiciones habilitantes
+  - requisitos técnicos y comerciales simultáneos
   possible_indicators:
-    - Varias condiciones potencialmente limitantes aparecen en una misma cláusula o página.
+  - Varias condiciones potencialmente limitantes aparecen en una misma cláusula o página.
   mitigating_factors:
-    - alternativas equivalentes
-    - cumplimiento por consorcio
-    - criterios funcionales
+  - alternativas equivalentes
+  - cumplimiento por consorcio
+  - criterios funcionales
   possible_legitimate_justifications:
-    - Complejidad del objeto contractual y necesidad de asegurar cumplimiento integral.
+  - Complejidad del objeto contractual y necesidad de asegurar cumplimiento integral.
   human_review_questions:
-    - ¿La combinación completa de requisitos es necesaria y proporcional?
-    - ¿Puede acreditarse cumplimiento por medios alternativos o complementarios?
+  - ¿La combinación completa de requisitos es necesaria y proporcional?
+  - ¿Puede acreditarse cumplimiento por medios alternativos o complementarios?
   recommended_language:
-    - revisar efecto acumulativo de requisitos
+  - revisar efecto acumulativo de requisitos
   prohibited_language:
-    - corrupción
-    - fraude
-    - direccionamiento
-    - ilegalidad detectada
+  - corrupción
+  - fraude
+  - direccionamiento
+  - ilegalidad detectada
   severity_guidance: priority
   confidence_guidance: medium
   related_patterns:
-    - cn-specific-certification
-    - cn-specific-experience
-    - cn-local-presence-requirement
-
+  - cn-specific-certification
+  - cn-specific-experience
+  - cn-local-presence-requirement
+  taxonomy_version: '2026.05'
+  technical_dimension: low_competitive_neutrality
+  institutional_dimension: neutralidad competitiva
+  document_signal:
+  - deberá cumplir con todos los
+  - cumplir con todos los siguientes requisitos
+  - deberá cumplir todos los requisitos
+  - requisitos acumulativos
+  possible_competition_effect:
+  - Podría reducir alternativas disponibles si la condición opera de forma exclusiva o sin equivalencias verificables.
+  normative_basis:
+  - libre concurrencia
+  - igualdad y no discriminación
+  - trato justo
+  - neutralidad competitiva
+  procurement_principle:
+  - libre concurrencia
+  - igualdad y no discriminación
+  - trato justo
+  - neutralidad competitiva
+  ecuador_legal_reference:
+  - Constitución de la República del Ecuador, Art. 288
+  - Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP)
+  - Reglamento General a la LOSNCP
+  - Principios aplicables de concurrencia, igualdad, trato justo, transparencia, calidad y participación nacional
+    según corresponda
+  international_reference:
+  - OECD Recommendation of the Council on Public Procurement
+  - OECD Guidelines for Fighting Bid Rigging in Public Procurement
+  - MAPS Methodology for Assessing Procurement Systems
+  - Open Contracting Global Principles
+  - UNCITRAL Model Law on Public Procurement
+  human_validation_required: true
+  review_status: curated_initial_framework
+  confidence_level: medium
+  severity_rationale: 'Revisión prioritaria: la señal combina condiciones que podrían afectar concurrencia o neutralidad
+    competitiva si no están justificadas.'
+  evidence_type:
+  - señal textual observable
+  - fragmento documental
+  - contexto cercano de cláusula
+  - mitigantes o equivalencias cercanas si existen
+  limitations:
+  - La señal se basa en texto disponible y puede requerir revisión de anexos, aclaraciones o expediente completo.
+  - La presencia de una señal no implica invalidez del requisito ni determina responsabilidad.
+  - La prioridad orienta revisión humana y no constituye calificación jurídica automática.
+  disclaimer: Mecanismo de apoyo analítico preventivo. No determina corrupción, ilegalidad, direccionamiento ni
+    responsabilidad administrativa.
+  interpretive_indicators:
+  - Varias condiciones potencialmente limitantes aparecen en una misma cláusula o página.
 - id: cn-subjective-evaluation-criteria
   name: Criterio de evaluación subjetivo o poco trazable
   description: Identifica criterios de evaluación que podrían requerir parámetros objetivos, trazables y comparables.
-  competition_dimension: evaluation_discretion
+  competition_dimension: transparencia_y_trazabilidad
   risk_type: discrecionalidad evaluativa potencial
   document_sections:
-    - evaluación
-    - metodología
-    - calificación
+  - evaluación
+  - metodología
+  - calificación
   textual_signals:
-    - a criterio de la entidad
-    - a satisfacción
-    - mejor criterio
-    - idoneidad
-    - se valorará subjetivamente
+  - a criterio de la entidad
+  - a satisfacción
+  - mejor criterio
+  - idoneidad
+  - se valorará subjetivamente
   semantic_signals:
-    - falta de metodología objetiva
-    - ponderación no verificable
+  - falta de metodología objetiva
+  - ponderación no verificable
   possible_indicators:
-    - El criterio no detalla parámetros verificables.
+  - El criterio no detalla parámetros verificables.
   mitigating_factors:
-    - matriz objetiva
-    - parámetros verificables
-    - metodología
-    - criterios objetivos
+  - matriz objetiva
+  - parámetros verificables
+  - metodología
+  - criterios objetivos
   possible_legitimate_justifications:
-    - Evaluación técnica cualitativa con metodología documentada y verificable.
+  - Evaluación técnica cualitativa con metodología documentada y verificable.
   human_review_questions:
-    - ¿El criterio cuenta con parámetros verificables?
-    - ¿La evaluación permite comparación objetiva entre ofertas?
+  - ¿El criterio cuenta con parámetros verificables?
+  - ¿La evaluación permite comparación objetiva entre ofertas?
   recommended_language:
-    - revisar trazabilidad y objetividad del criterio de evaluación
+  - revisar trazabilidad y objetividad del criterio de evaluación
   prohibited_language:
-    - corrupción
-    - fraude
-    - direccionamiento
-    - ilegalidad detectada
+  - corrupción
+  - fraude
+  - direccionamiento
+  - ilegalidad detectada
   severity_guidance: suggested
   confidence_guidance: medium
   related_patterns:
-    - cn-excessive-administrative-documentation
-
+  - cn-excessive-administrative-documentation
+  taxonomy_version: '2026.05'
+  technical_dimension: evaluation_discretion
+  institutional_dimension: transparencia y trazabilidad
+  document_signal:
+  - a criterio de la entidad
+  - a satisfacción
+  - mejor criterio
+  - idoneidad
+  - se valorará subjetivamente
+  possible_competition_effect:
+  - Podría reducir comparabilidad entre ofertas si los criterios no son verificables, objetivos o trazables.
+  normative_basis:
+  - transparencia
+  - trato justo
+  - objetividad de evaluación
+  procurement_principle:
+  - transparencia
+  - trato justo
+  - objetividad de evaluación
+  ecuador_legal_reference:
+  - Constitución de la República del Ecuador, Art. 288
+  - Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP)
+  - Reglamento General a la LOSNCP
+  - Principios aplicables de concurrencia, igualdad, trato justo, transparencia, calidad y participación nacional
+    según corresponda
+  international_reference:
+  - OECD Recommendation of the Council on Public Procurement
+  - OECD Guidelines for Fighting Bid Rigging in Public Procurement
+  - MAPS Methodology for Assessing Procurement Systems
+  - Open Contracting Global Principles
+  - UNCITRAL Model Law on Public Procurement
+  human_validation_required: true
+  review_status: curated_initial_framework
+  confidence_level: medium
+  severity_rationale: 'Revisión sugerida: la señal podría requerir validación de proporcionalidad, equivalencias
+    o justificación técnica.'
+  evidence_type:
+  - señal textual observable
+  - fragmento documental
+  - contexto cercano de cláusula
+  - mitigantes o equivalencias cercanas si existen
+  limitations:
+  - La señal se basa en texto disponible y puede requerir revisión de anexos, aclaraciones o expediente completo.
+  - La presencia de una señal no implica invalidez del requisito ni determina responsabilidad.
+  - La prioridad orienta revisión humana y no constituye calificación jurídica automática.
+  disclaimer: Mecanismo de apoyo analítico preventivo. No determina corrupción, ilegalidad, direccionamiento ni
+    responsabilidad administrativa.
+  interpretive_indicators:
+  - El criterio no detalla parámetros verificables.
 - id: cn-interoperability-lock-in
   name: Compatibilidad técnica o interoperabilidad con posible lock-in
-  description: Identifica requisitos de compatibilidad que podrían ser legítimos, pero requieren revisar si cierran innecesariamente alternativas.
-  competition_dimension: interoperability_lock_in
+  description: Identifica requisitos de compatibilidad que podrían ser legítimos, pero requieren revisar si cierran
+    innecesariamente alternativas.
+  competition_dimension: interoperabilidad_y_compatibilidad
   risk_type: dependencia técnica potencial
   document_sections:
-    - especificaciones técnicas
-    - interoperabilidad
-    - compatibilidad
+  - especificaciones técnicas
+  - interoperabilidad
+  - compatibilidad
   textual_signals:
-    - compatible con
-    - interoperabilidad
-    - integración con
-    - infraestructura existente
-    - sistema existente
-    - plataforma compatible de energía
-    - para utilizar con plataforma
-    - compatible con el generador
-    - compatible con la plataforma de energía
-    - equipo existente en la institución
+  - compatible con
+  - interoperabilidad
+  - integración con
+  - infraestructura existente
+  - sistema existente
+  - plataforma compatible de energía
+  - para utilizar con plataforma
+  - compatible con el generador
+  - compatible con la plataforma de energía
+  - equipo existente en la institución
   semantic_signals:
-    - dependencia de sistema instalado
-    - compatibilidad como condición de admisibilidad
+  - dependencia de sistema instalado
+  - compatibilidad como condición de admisibilidad
   possible_indicators:
-    - La compatibilidad se formula sin estándares abiertos o equivalentes.
+  - La compatibilidad se formula sin estándares abiertos o equivalentes.
   mitigating_factors:
-    - estándares abiertos
-    - por razones de interoperabilidad
-    - por compatibilidad con infraestructura existente
-    - debidamente justificado
+  - estándares abiertos
+  - por razones de interoperabilidad
+  - por compatibilidad con infraestructura existente
+  - debidamente justificado
   possible_legitimate_justifications:
-    - Continuidad operativa, seguridad, integración y reducción de costos de transición.
+  - Continuidad operativa, seguridad, integración y reducción de costos de transición.
   human_review_questions:
-    - ¿La compatibilidad está justificada y se basa en estándares verificables?
-    - ¿Se permiten soluciones equivalentes que garanticen interoperabilidad?
+  - ¿La compatibilidad está justificada y se basa en estándares verificables?
+  - ¿Se permiten soluciones equivalentes que garanticen interoperabilidad?
   recommended_language:
-    - revisar justificación técnica de interoperabilidad y alternativas equivalentes
+  - revisar justificación técnica de interoperabilidad y alternativas equivalentes
   prohibited_language:
-    - corrupción
-    - fraude
-    - direccionamiento
-    - ilegalidad detectada
+  - corrupción
+  - fraude
+  - direccionamiento
+  - ilegalidad detectada
   severity_guidance: suggested
   confidence_guidance: high
   related_patterns:
-    - cn-brand-model-provider-reference
-    - cn-technical-closed-requirement
-
+  - cn-brand-model-provider-reference
+  - cn-technical-closed-requirement
+  taxonomy_version: '2026.05'
+  technical_dimension: interoperability_lock_in
+  institutional_dimension: interoperabilidad y compatibilidad
+  document_signal:
+  - compatible con
+  - interoperabilidad
+  - integración con
+  - infraestructura existente
+  - sistema existente
+  - plataforma compatible de energía
+  - para utilizar con plataforma
+  - compatible con el generador
+  - compatible con la plataforma de energía
+  - equipo existente en la institución
+  possible_competition_effect:
+  - Podría generar dependencia técnica si la compatibilidad se formula sin estándares abiertos, equivalencias o
+    justificación documentada.
+  normative_basis:
+  - eficiencia
+  - mejor valor por dinero
+  - justificación técnica
+  - neutralidad tecnológica
+  procurement_principle:
+  - eficiencia
+  - mejor valor por dinero
+  - justificación técnica
+  - neutralidad tecnológica
+  ecuador_legal_reference:
+  - Constitución de la República del Ecuador, Art. 288
+  - Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP)
+  - Reglamento General a la LOSNCP
+  - Principios aplicables de concurrencia, igualdad, trato justo, transparencia, calidad y participación nacional
+    según corresponda
+  international_reference:
+  - OECD Recommendation of the Council on Public Procurement
+  - OECD Guidelines for Fighting Bid Rigging in Public Procurement
+  - MAPS Methodology for Assessing Procurement Systems
+  - Open Contracting Global Principles
+  - UNCITRAL Model Law on Public Procurement
+  human_validation_required: true
+  review_status: curated_initial_framework
+  confidence_level: high
+  severity_rationale: 'Revisión sugerida: la señal podría requerir validación de proporcionalidad, equivalencias
+    o justificación técnica.'
+  evidence_type:
+  - señal textual observable
+  - fragmento documental
+  - contexto cercano de cláusula
+  - mitigantes o equivalencias cercanas si existen
+  limitations:
+  - La señal se basa en texto disponible y puede requerir revisión de anexos, aclaraciones o expediente completo.
+  - La presencia de una señal no implica invalidez del requisito ni determina responsabilidad.
+  - La prioridad orienta revisión humana y no constituye calificación jurídica automática.
+  disclaimer: Mecanismo de apoyo analítico preventivo. No determina corrupción, ilegalidad, direccionamiento ni
+    responsabilidad administrativa.
+  interpretive_indicators:
+  - La compatibilidad se formula sin estándares abiertos o equivalentes.
 - id: cn-substantive-amendments
   name: Adendas que modifican requisitos sustantivos
-  description: Identifica adendas o reformas que podrían afectar trazabilidad, plazo disponible o condiciones de preparación de oferta.
-  competition_dimension: administrative_burden
+  description: Identifica adendas o reformas que podrían afectar trazabilidad, plazo disponible o condiciones de
+    preparación de oferta.
+  competition_dimension: trazabilidad_documental
   risk_type: trazabilidad documental potencial
   document_sections:
-    - adendas
-    - reformas
-    - cronograma
+  - adendas
+  - reformas
+  - cronograma
   textual_signals:
-    - adenda
-    - modificación del pliego
-    - reforma al pliego
-    - alcance modificado
-    - cambio sustantivo
+  - adenda
+  - modificación del pliego
+  - reforma al pliego
+  - alcance modificado
+  - cambio sustantivo
   semantic_signals:
-    - modificación de requisitos luego de publicado el pliego
-    - necesidad de ampliar plazo ante cambios sustantivos
+  - modificación de requisitos luego de publicado el pliego
+  - necesidad de ampliar plazo ante cambios sustantivos
   possible_indicators:
-    - Se modifican requisitos sin claridad sobre comunicación o plazo.
+  - Se modifican requisitos sin claridad sobre comunicación o plazo.
   mitigating_factors:
-    - ampliación de plazo
-    - publicado para todos
-    - notificado
-    - cronograma actualizado
+  - ampliación de plazo
+  - publicado para todos
+  - notificado
+  - cronograma actualizado
   possible_legitimate_justifications:
-    - Corrección, aclaración o mejora de especificaciones comunicada oportunamente.
+  - Corrección, aclaración o mejora de especificaciones comunicada oportunamente.
   human_review_questions:
-    - ¿La modificación fue comunicada y trazable para todos los oferentes?
-    - ¿El cambio sustantivo dio tiempo suficiente para ajustar ofertas?
+  - ¿La modificación fue comunicada y trazable para todos los oferentes?
+  - ¿El cambio sustantivo dio tiempo suficiente para ajustar ofertas?
   recommended_language:
-    - validar trazabilidad de adendas y suficiencia de plazo
+  - validar trazabilidad de adendas y suficiencia de plazo
   prohibited_language:
-    - corrupción
-    - fraude
-    - direccionamiento
-    - ilegalidad detectada
+  - corrupción
+  - fraude
+  - direccionamiento
+  - ilegalidad detectada
   severity_guidance: general
   confidence_guidance: medium
   related_patterns:
-    - cn-short-submission-deadline
-
+  - cn-short-submission-deadline
+  taxonomy_version: '2026.05'
+  technical_dimension: administrative_burden
+  institutional_dimension: trazabilidad documental
+  document_signal:
+  - adenda
+  - modificación del pliego
+  - reforma al pliego
+  - alcance modificado
+  - cambio sustantivo
+  possible_competition_effect:
+  - Podría afectar la trazabilidad de la revisión si la información depende de anexos, adendas o cargas documentales
+    poco claras.
+  normative_basis:
+  - transparencia
+  - trazabilidad
+  - claridad documental
+  procurement_principle:
+  - transparencia
+  - trazabilidad
+  - claridad documental
+  ecuador_legal_reference:
+  - Constitución de la República del Ecuador, Art. 288
+  - Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP)
+  - Reglamento General a la LOSNCP
+  - Principios aplicables de concurrencia, igualdad, trato justo, transparencia, calidad y participación nacional
+    según corresponda
+  international_reference:
+  - OECD Recommendation of the Council on Public Procurement
+  - OECD Guidelines for Fighting Bid Rigging in Public Procurement
+  - MAPS Methodology for Assessing Procurement Systems
+  - Open Contracting Global Principles
+  - UNCITRAL Model Law on Public Procurement
+  human_validation_required: true
+  review_status: curated_initial_framework
+  confidence_level: medium
+  severity_rationale: 'Prioridad general: la señal puede ser habitual o requerir solo contextualización salvo acumulación
+    con otros factores.'
+  evidence_type:
+  - señal textual observable
+  - fragmento documental
+  - contexto cercano de cláusula
+  - mitigantes o equivalencias cercanas si existen
+  limitations:
+  - La señal se basa en texto disponible y puede requerir revisión de anexos, aclaraciones o expediente completo.
+  - La presencia de una señal no implica invalidez del requisito ni determina responsabilidad.
+  - La prioridad orienta revisión humana y no constituye calificación jurídica automática.
+  disclaimer: Mecanismo de apoyo analítico preventivo. No determina corrupción, ilegalidad, direccionamiento ni
+    responsabilidad administrativa.
+  interpretive_indicators:
+  - Se modifican requisitos sin claridad sobre comunicación o plazo.
 - id: cn-excessive-administrative-documentation
   name: Documentación administrativa excesiva
-  description: Identifica cargas documentales que podrían requerir revisión si exceden requisitos habituales o se acumulan con plazos breves.
-  competition_dimension: administrative_burden
+  description: Identifica cargas documentales que podrían requerir revisión si exceden requisitos habituales o se
+    acumulan con plazos breves.
+  competition_dimension: trazabilidad_documental
   risk_type: carga administrativa potencial
   document_sections:
-    - requisitos administrativos
-    - documentación
-    - presentación de ofertas
+  - requisitos administrativos
+  - documentación
+  - presentación de ofertas
   textual_signals:
-    - documentación administrativa
-    - certificados notarizados
-    - copias certificadas
-    - apostillado
-    - legalizado
+  - documentación administrativa
+  - certificados notarizados
+  - copias certificadas
+  - apostillado
+  - legalizado
   semantic_signals:
-    - carga documental elevada
-    - formalidades acumuladas con plazo breve
+  - carga documental elevada
+  - formalidades acumuladas con plazo breve
   possible_indicators:
-    - Se exigen múltiples documentos formales sin explicación clara.
+  - Se exigen múltiples documentos formales sin explicación clara.
   mitigating_factors:
-    - según normativa aplicable
-    - subsanable
-    - formato digital
-    - documentación estándar
+  - según normativa aplicable
+  - subsanable
+  - formato digital
+  - documentación estándar
   possible_legitimate_justifications:
-    - Verificación administrativa exigida por normativa o control documental.
+  - Verificación administrativa exigida por normativa o control documental.
   human_review_questions:
-    - ¿La documentación solicitada es estándar y proporcional?
-    - ¿La carga documental puede cumplirse dentro del plazo establecido?
+  - ¿La documentación solicitada es estándar y proporcional?
+  - ¿La carga documental puede cumplirse dentro del plazo establecido?
   recommended_language:
-    - revisar carga administrativa y proporcionalidad documental
+  - revisar carga administrativa y proporcionalidad documental
   prohibited_language:
-    - corrupción
-    - fraude
-    - direccionamiento
-    - ilegalidad detectada
+  - corrupción
+  - fraude
+  - direccionamiento
+  - ilegalidad detectada
   severity_guidance: general
   confidence_guidance: low
   related_patterns:
-    - cn-short-submission-deadline
-
+  - cn-short-submission-deadline
+  taxonomy_version: '2026.05'
+  technical_dimension: administrative_burden
+  institutional_dimension: trazabilidad documental
+  document_signal:
+  - documentación administrativa
+  - certificados notarizados
+  - copias certificadas
+  - apostillado
+  - legalizado
+  possible_competition_effect:
+  - Podría afectar la trazabilidad de la revisión si la información depende de anexos, adendas o cargas documentales
+    poco claras.
+  normative_basis:
+  - transparencia
+  - trazabilidad
+  - claridad documental
+  procurement_principle:
+  - transparencia
+  - trazabilidad
+  - claridad documental
+  ecuador_legal_reference:
+  - Constitución de la República del Ecuador, Art. 288
+  - Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP)
+  - Reglamento General a la LOSNCP
+  - Principios aplicables de concurrencia, igualdad, trato justo, transparencia, calidad y participación nacional
+    según corresponda
+  international_reference:
+  - OECD Recommendation of the Council on Public Procurement
+  - OECD Guidelines for Fighting Bid Rigging in Public Procurement
+  - MAPS Methodology for Assessing Procurement Systems
+  - Open Contracting Global Principles
+  - UNCITRAL Model Law on Public Procurement
+  human_validation_required: true
+  review_status: curated_initial_framework
+  confidence_level: low
+  severity_rationale: 'Prioridad general: la señal puede ser habitual o requerir solo contextualización salvo acumulación
+    con otros factores.'
+  evidence_type:
+  - señal textual observable
+  - fragmento documental
+  - contexto cercano de cláusula
+  - mitigantes o equivalencias cercanas si existen
+  limitations:
+  - La señal se basa en texto disponible y puede requerir revisión de anexos, aclaraciones o expediente completo.
+  - La presencia de una señal no implica invalidez del requisito ni determina responsabilidad.
+  - La prioridad orienta revisión humana y no constituye calificación jurídica automática.
+  disclaimer: Mecanismo de apoyo analítico preventivo. No determina corrupción, ilegalidad, direccionamiento ni
+    responsabilidad administrativa.
+  interpretive_indicators:
+  - Se exigen múltiples documentos formales sin explicación clara.
 - id: cn-technical-closed-requirement
   name: Requisito técnico cerrado
-  description: Identifica especificaciones técnicas formuladas con rasgos exactos o prescriptivos que podrían requerir validación de equivalencia.
-  competition_dimension: technical_restriction
+  description: Identifica especificaciones técnicas formuladas con rasgos exactos o prescriptivos que podrían requerir
+    validación de equivalencia.
+  competition_dimension: relacion_con_objeto_contractual
   risk_type: especificación técnica potencialmente cerrada
   document_sections:
-    - especificaciones técnicas
-    - ficha técnica
-    - requisitos mínimos
+  - especificaciones técnicas
+  - ficha técnica
+  - requisitos mínimos
   textual_signals:
-    - ficha técnica
-    - característica exacta
-    - medidas exactas
-    - deberá ser exactamente
-    - especificaciones cerradas
-    - manuales técnicos
+  - ficha técnica
+  - característica exacta
+  - medidas exactas
+  - deberá ser exactamente
+  - especificaciones cerradas
+  - manuales técnicos
   semantic_signals:
-    - descripción prescriptiva en vez de funcional
-    - parámetros que podrían corresponder a una solución particular
+  - descripción prescriptiva en vez de funcional
+  - parámetros que podrían corresponder a una solución particular
   possible_indicators:
-    - Las características se expresan como exactas y sin equivalencia funcional.
+  - Las características se expresan como exactas y sin equivalencia funcional.
   mitigating_factors:
-    - mínimo requerido
-    - o superior
-    - o equivalente
-    - criterios funcionales
+  - mínimo requerido
+  - o superior
+  - o equivalente
+  - criterios funcionales
   possible_legitimate_justifications:
-    - Necesidad técnica, seguridad, desempeño mínimo o compatibilidad documentada.
+  - Necesidad técnica, seguridad, desempeño mínimo o compatibilidad documentada.
   human_review_questions:
-    - ¿La especificación describe una necesidad funcional o una solución específica?
-    - ¿Existen parámetros de equivalencia verificables?
+  - ¿La especificación describe una necesidad funcional o una solución específica?
+  - ¿Existen parámetros de equivalencia verificables?
   recommended_language:
-    - validar apertura técnica y equivalencias funcionales
+  - validar apertura técnica y equivalencias funcionales
   prohibited_language:
-    - corrupción
-    - fraude
-    - direccionamiento
-    - ilegalidad detectada
+  - corrupción
+  - fraude
+  - direccionamiento
+  - ilegalidad detectada
   severity_guidance: suggested
   confidence_guidance: medium
   related_patterns:
-    - cn-brand-model-provider-reference
-    - cn-weak-equivalence-clause
-
+  - cn-brand-model-provider-reference
+  - cn-weak-equivalence-clause
+  taxonomy_version: '2026.05'
+  technical_dimension: technical_restriction
+  institutional_dimension: relacion con objeto contractual
+  document_signal:
+  - ficha técnica
+  - característica exacta
+  - medidas exactas
+  - deberá ser exactamente
+  - especificaciones cerradas
+  - manuales técnicos
+  possible_competition_effect:
+  - Podría limitar concurrencia si la especificación describe una solución específica en lugar de una necesidad
+    funcional.
+  normative_basis:
+  - claridad de especificaciones
+  - relación con el objeto contractual
+  - proporcionalidad
+  procurement_principle:
+  - claridad de especificaciones
+  - relación con el objeto contractual
+  - proporcionalidad
+  ecuador_legal_reference:
+  - Constitución de la República del Ecuador, Art. 288
+  - Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP)
+  - Reglamento General a la LOSNCP
+  - Principios aplicables de concurrencia, igualdad, trato justo, transparencia, calidad y participación nacional
+    según corresponda
+  international_reference:
+  - OECD Recommendation of the Council on Public Procurement
+  - OECD Guidelines for Fighting Bid Rigging in Public Procurement
+  - MAPS Methodology for Assessing Procurement Systems
+  - Open Contracting Global Principles
+  - UNCITRAL Model Law on Public Procurement
+  human_validation_required: true
+  review_status: curated_initial_framework
+  confidence_level: medium
+  severity_rationale: 'Revisión sugerida: la señal podría requerir validación de proporcionalidad, equivalencias
+    o justificación técnica.'
+  evidence_type:
+  - señal textual observable
+  - fragmento documental
+  - contexto cercano de cláusula
+  - mitigantes o equivalencias cercanas si existen
+  limitations:
+  - La señal se basa en texto disponible y puede requerir revisión de anexos, aclaraciones o expediente completo.
+  - La presencia de una señal no implica invalidez del requisito ni determina responsabilidad.
+  - La prioridad orienta revisión humana y no constituye calificación jurídica automática.
+  disclaimer: Mecanismo de apoyo analítico preventivo. No determina corrupción, ilegalidad, direccionamiento ni
+    responsabilidad administrativa.
+  interpretive_indicators:
+  - Las características se expresan como exactas y sin equivalencia funcional.
 - id: cn-medical-device-platform-lock-in
   name: Compatibilidad con plataforma médica instalada
-  description: Identifica consumibles o dispositivos que exigen compatibilidad con una plataforma médica o generador existente, condición que puede ser legítima pero requiere revisar alternativas equivalentes.
-  competition_dimension: interoperability_lock_in
+  description: Identifica consumibles o dispositivos que exigen compatibilidad con una plataforma médica o generador
+    existente, condición que puede ser legítima pero requiere revisar alternativas equivalentes.
+  competition_dimension: interoperabilidad_y_compatibilidad
   risk_type: dependencia técnica potencial
   document_sections:
-    - especificaciones técnicas
-    - ficha técnica
+  - especificaciones técnicas
+  - ficha técnica
   textual_signals:
-    - plataforma compatible de energía
-    - compatible con el generador
-    - compatible con la plataforma de energía
-    - para utilizar con plataforma
-    - generador ultrasónico
-    - generador ultrasonico
+  - plataforma compatible de energía
+  - compatible con el generador
+  - compatible con la plataforma de energía
+  - para utilizar con plataforma
+  - generador ultrasónico
+  - generador ultrasonico
   semantic_signals:
-    - consumible dependiente de equipo instalado
-    - compatibilidad con plataforma médica específica
+  - consumible dependiente de equipo instalado
+  - compatibilidad con plataforma médica específica
   possible_indicators:
-    - El requisito puede depender de una plataforma o generador existente en la entidad.
+  - El requisito puede depender de una plataforma o generador existente en la entidad.
   mitigating_factors:
-    - compatible con equipos equivalentes
-    - estándares abiertos
-    - por compatibilidad con infraestructura existente
-    - debidamente justificado
+  - compatible con equipos equivalentes
+  - estándares abiertos
+  - por compatibilidad con infraestructura existente
+  - debidamente justificado
   possible_legitimate_justifications:
-    - Continuidad operativa, seguridad clínica o compatibilidad con equipos existentes.
+  - Continuidad operativa, seguridad clínica o compatibilidad con equipos existentes.
   human_review_questions:
-    - ¿La compatibilidad se justifica por equipos existentes y está documentada?
-    - ¿Se aceptan soluciones equivalentes compatibles con la infraestructura instalada?
+  - ¿La compatibilidad se justifica por equipos existentes y está documentada?
+  - ¿Se aceptan soluciones equivalentes compatibles con la infraestructura instalada?
   recommended_language:
-    - validar interoperabilidad y equivalencias técnicas
+  - validar interoperabilidad y equivalencias técnicas
   prohibited_language:
-    - corrupción
-    - fraude
-    - direccionamiento
-    - ilegalidad detectada
+  - corrupción
+  - fraude
+  - direccionamiento
+  - ilegalidad detectada
   severity_guidance: priority
   confidence_guidance: high
   related_patterns:
-    - cn-interoperability-lock-in
-    - cn-brand-model-provider-reference
-
+  - cn-interoperability-lock-in
+  - cn-brand-model-provider-reference
+  taxonomy_version: '2026.05'
+  technical_dimension: interoperability_lock_in
+  institutional_dimension: interoperabilidad y compatibilidad
+  document_signal:
+  - plataforma compatible de energía
+  - compatible con el generador
+  - compatible con la plataforma de energía
+  - para utilizar con plataforma
+  - generador ultrasónico
+  - generador ultrasonico
+  possible_competition_effect:
+  - Podría generar dependencia técnica si la compatibilidad se formula sin estándares abiertos, equivalencias o
+    justificación documentada.
+  normative_basis:
+  - eficiencia
+  - mejor valor por dinero
+  - justificación técnica
+  - neutralidad tecnológica
+  procurement_principle:
+  - eficiencia
+  - mejor valor por dinero
+  - justificación técnica
+  - neutralidad tecnológica
+  ecuador_legal_reference:
+  - Constitución de la República del Ecuador, Art. 288
+  - Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP)
+  - Reglamento General a la LOSNCP
+  - Principios aplicables de concurrencia, igualdad, trato justo, transparencia, calidad y participación nacional
+    según corresponda
+  international_reference:
+  - OECD Recommendation of the Council on Public Procurement
+  - OECD Guidelines for Fighting Bid Rigging in Public Procurement
+  - MAPS Methodology for Assessing Procurement Systems
+  - Open Contracting Global Principles
+  - UNCITRAL Model Law on Public Procurement
+  human_validation_required: true
+  review_status: curated_initial_framework
+  confidence_level: high
+  severity_rationale: 'Revisión prioritaria: la señal combina condiciones que podrían afectar concurrencia o neutralidad
+    competitiva si no están justificadas.'
+  evidence_type:
+  - señal textual observable
+  - fragmento documental
+  - contexto cercano de cláusula
+  - mitigantes o equivalencias cercanas si existen
+  limitations:
+  - La señal se basa en texto disponible y puede requerir revisión de anexos, aclaraciones o expediente completo.
+  - La presencia de una señal no implica invalidez del requisito ni determina responsabilidad.
+  - La prioridad orienta revisión humana y no constituye calificación jurídica automática.
+  disclaimer: Mecanismo de apoyo analítico preventivo. No determina corrupción, ilegalidad, direccionamiento ni
+    responsabilidad administrativa.
+  interpretive_indicators:
+  - El requisito puede depender de una plataforma o generador existente en la entidad.
 - id: cn-equipment-series-specific-reference
   name: Referencia a serie o código específico de equipo
-  description: Identifica series, códigos o modelos de equipo instalado usados como especificación implícita que podría limitar alternativas si no se aceptan equivalentes.
-  competition_dimension: vendor_lock_in
+  description: Identifica series, códigos o modelos de equipo instalado usados como especificación implícita que
+    podría limitar alternativas si no se aceptan equivalentes.
+  competition_dimension: neutralidad_competitiva
   risk_type: referencia técnica potencialmente cerrada
   document_sections:
-    - especificaciones técnicas
-    - ficha técnica
+  - especificaciones técnicas
+  - ficha técnica
   textual_signals:
-    - serie específica
-    - serie especifica
-    - código de equipo
-    - codigo de equipo
-    - modelo de equipo existente
-    - equipo instalado
+  - serie específica
+  - serie especifica
+  - código de equipo
+  - codigo de equipo
+  - modelo de equipo existente
+  - equipo instalado
   semantic_signals:
-    - referencia a código de equipo como requisito técnico
+  - referencia a código de equipo como requisito técnico
   possible_indicators:
-    - La especificación remite a una serie o modelo de equipo sin equivalencia clara.
+  - La especificación remite a una serie o modelo de equipo sin equivalencia clara.
   mitigating_factors:
-    - o equivalente
-    - compatible con equipos equivalentes
-    - referencial
+  - o equivalente
+  - compatible con equipos equivalentes
+  - referencial
   possible_legitimate_justifications:
-    - Compatibilidad con infraestructura existente o continuidad operativa.
+  - Compatibilidad con infraestructura existente o continuidad operativa.
   human_review_questions:
-    - ¿La serie o código se usa solo como referencia técnica?
-    - ¿Se aceptan alternativas compatibles y verificables?
+  - ¿La serie o código se usa solo como referencia técnica?
+  - ¿Se aceptan alternativas compatibles y verificables?
   recommended_language:
-    - revisar si la referencia admite equivalentes funcionales
+  - revisar si la referencia admite equivalentes funcionales
   prohibited_language:
-    - corrupción
-    - fraude
-    - direccionamiento
-    - ilegalidad detectada
+  - corrupción
+  - fraude
+  - direccionamiento
+  - ilegalidad detectada
   severity_guidance: priority
   confidence_guidance: medium
   related_patterns:
-    - cn-interoperability-lock-in
-    - cn-technical-closed-requirement
-
+  - cn-interoperability-lock-in
+  - cn-technical-closed-requirement
+  taxonomy_version: '2026.05'
+  technical_dimension: vendor_lock_in
+  institutional_dimension: neutralidad competitiva
+  document_signal:
+  - serie específica
+  - serie especifica
+  - código de equipo
+  - codigo de equipo
+  - modelo de equipo existente
+  - equipo instalado
+  possible_competition_effect:
+  - Podría reducir alternativas disponibles si la condición opera de forma exclusiva o sin equivalencias verificables.
+  normative_basis:
+  - libre concurrencia
+  - igualdad y no discriminación
+  - trato justo
+  - neutralidad competitiva
+  procurement_principle:
+  - libre concurrencia
+  - igualdad y no discriminación
+  - trato justo
+  - neutralidad competitiva
+  ecuador_legal_reference:
+  - Constitución de la República del Ecuador, Art. 288
+  - Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP)
+  - Reglamento General a la LOSNCP
+  - Principios aplicables de concurrencia, igualdad, trato justo, transparencia, calidad y participación nacional
+    según corresponda
+  international_reference:
+  - OECD Recommendation of the Council on Public Procurement
+  - OECD Guidelines for Fighting Bid Rigging in Public Procurement
+  - MAPS Methodology for Assessing Procurement Systems
+  - Open Contracting Global Principles
+  - UNCITRAL Model Law on Public Procurement
+  human_validation_required: true
+  review_status: curated_initial_framework
+  confidence_level: medium
+  severity_rationale: 'Revisión prioritaria: la señal combina condiciones que podrían afectar concurrencia o neutralidad
+    competitiva si no están justificadas.'
+  evidence_type:
+  - señal textual observable
+  - fragmento documental
+  - contexto cercano de cláusula
+  - mitigantes o equivalencias cercanas si existen
+  limitations:
+  - La señal se basa en texto disponible y puede requerir revisión de anexos, aclaraciones o expediente completo.
+  - La presencia de una señal no implica invalidez del requisito ni determina responsabilidad.
+  - La prioridad orienta revisión humana y no constituye calificación jurídica automática.
+  disclaimer: Mecanismo de apoyo analítico preventivo. No determina corrupción, ilegalidad, direccionamiento ni
+    responsabilidad administrativa.
+  interpretive_indicators:
+  - La especificación remite a una serie o modelo de equipo sin equivalencia clara.
 - id: cn-consignment-delivery-model
   name: Modelo de entrega por consignación o uso efectivo
-  description: Identifica condiciones de entrega, stock o pago por uso efectivo que podrían requerir revisión si implican disponibilidad previa en la institución.
-  competition_dimension: barrier_to_entry
+  description: Identifica condiciones de entrega, stock o pago por uso efectivo que podrían requerir revisión si
+    implican disponibilidad previa en la institución.
+  competition_dimension: barreras_de_entrada
   risk_type: modelo operativo potencialmente limitante
   document_sections:
-    - especificaciones técnicas
-    - condiciones contractuales
+  - especificaciones técnicas
+  - condiciones contractuales
   textual_signals:
-    - pago por lo efectivamente utilizado
-    - por lo efectivamente utilizado
-    - stock en la institución
-    - stock en la institucion
-    - modalidad de consignación
-    - modalidad de consignacion
-    - implantes en consignación
+  - pago por lo efectivamente utilizado
+  - por lo efectivamente utilizado
+  - stock en la institución
+  - stock en la institucion
+  - modalidad de consignación
+  - modalidad de consignacion
+  - implantes en consignación
   semantic_signals:
-    - exigencia de disponibilidad previa de inventario
-    - pago condicionado al uso efectivo
+  - exigencia de disponibilidad previa de inventario
+  - pago condicionado al uso efectivo
   possible_indicators:
-    - El modelo puede favorecer oferentes con stock o logística previa instalada.
+  - El modelo puede favorecer oferentes con stock o logística previa instalada.
   mitigating_factors:
-    - plazo razonable de entrega
-    - entrega programada
-    - justificado por continuidad operativa
+  - plazo razonable de entrega
+  - entrega programada
+  - justificado por continuidad operativa
   possible_legitimate_justifications:
-    - Necesidad clínica, continuidad operativa o reducción de desperdicio.
+  - Necesidad clínica, continuidad operativa o reducción de desperdicio.
   human_review_questions:
-    - ¿El modelo operativo está justificado por necesidades clínicas o logísticas?
-    - ¿El plazo permite participación de oferentes sin stock previo en la institución?
+  - ¿El modelo operativo está justificado por necesidades clínicas o logísticas?
+  - ¿El plazo permite participación de oferentes sin stock previo en la institución?
   recommended_language:
-    - validar proporcionalidad del modelo de entrega y stock
+  - validar proporcionalidad del modelo de entrega y stock
   prohibited_language:
-    - corrupción
-    - fraude
-    - direccionamiento
-    - ilegalidad detectada
+  - corrupción
+  - fraude
+  - direccionamiento
+  - ilegalidad detectada
   severity_guidance: suggested
   confidence_guidance: medium
   related_patterns:
-    - cn-local-presence-requirement
-    - cn-limited-execution-delivery-deadline
+  - cn-local-presence-requirement
+  - cn-limited-execution-delivery-deadline
+  taxonomy_version: '2026.05'
+  technical_dimension: barrier_to_entry
+  institutional_dimension: barreras de entrada
+  document_signal:
+  - pago por lo efectivamente utilizado
+  - por lo efectivamente utilizado
+  - stock en la institución
+  - stock en la institucion
+  - modalidad de consignación
+  - modalidad de consignacion
+  - implantes en consignación
+  possible_competition_effect:
+  - Podría dificultar la participación de oferentes potenciales si exige condiciones logísticas, temporales o territoriales
+    no justificadas.
+  normative_basis:
+  - libre concurrencia
+  - acceso amplio al mercado
+  - proporcionalidad
+  procurement_principle:
+  - libre concurrencia
+  - acceso amplio al mercado
+  - proporcionalidad
+  ecuador_legal_reference:
+  - Constitución de la República del Ecuador, Art. 288
+  - Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP)
+  - Reglamento General a la LOSNCP
+  - Principios aplicables de concurrencia, igualdad, trato justo, transparencia, calidad y participación nacional
+    según corresponda
+  international_reference:
+  - OECD Recommendation of the Council on Public Procurement
+  - OECD Guidelines for Fighting Bid Rigging in Public Procurement
+  - MAPS Methodology for Assessing Procurement Systems
+  - Open Contracting Global Principles
+  - UNCITRAL Model Law on Public Procurement
+  human_validation_required: true
+  review_status: curated_initial_framework
+  confidence_level: medium
+  severity_rationale: 'Revisión sugerida: la señal podría requerir validación de proporcionalidad, equivalencias
+    o justificación técnica.'
+  evidence_type:
+  - señal textual observable
+  - fragmento documental
+  - contexto cercano de cláusula
+  - mitigantes o equivalencias cercanas si existen
+  limitations:
+  - La señal se basa en texto disponible y puede requerir revisión de anexos, aclaraciones o expediente completo.
+  - La presencia de una señal no implica invalidez del requisito ni determina responsabilidad.
+  - La prioridad orienta revisión humana y no constituye calificación jurídica automática.
+  disclaimer: Mecanismo de apoyo analítico preventivo. No determina corrupción, ilegalidad, direccionamiento ni
+    responsabilidad administrativa.
+  interpretive_indicators:
+  - El modelo puede favorecer oferentes con stock o logística previa instalada.

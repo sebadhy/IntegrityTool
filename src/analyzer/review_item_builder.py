@@ -294,6 +294,13 @@ def _questions(finding: ConsolidatedFinding) -> list[str]:
 
 def _display_group(dimension: str) -> str:
     return {
+        "neutralidad_competitiva": "Neutralidad competitiva",
+        "proporcionalidad_de_requisitos": "Proporcionalidad de requisitos",
+        "barreras_de_entrada": "Barreras de entrada",
+        "interoperabilidad_y_compatibilidad": "Compatibilidad e interoperabilidad",
+        "relacion_con_objeto_contractual": "Requisitos técnicos",
+        "trazabilidad_documental": "Trazabilidad documental",
+        "transparencia_y_trazabilidad": "Criterios de evaluación",
         "vendor_lock_in": "Autorizaciones, marca u origen",
         "technical_restriction": "Requisitos técnicos",
         "qualification_restriction": "Experiencia o capacidad",

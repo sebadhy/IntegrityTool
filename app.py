@@ -41,6 +41,13 @@ APP_DIR = Path(__file__).parent
 STYLE_PATH = APP_DIR / "assets" / "styles.css"
 
 DIMENSION_LABELS = {
+    "neutralidad_competitiva": "Neutralidad competitiva",
+    "proporcionalidad_de_requisitos": "Proporcionalidad de requisitos",
+    "barreras_de_entrada": "Barreras de entrada",
+    "interoperabilidad_y_compatibilidad": "Interoperabilidad y compatibilidad",
+    "relacion_con_objeto_contractual": "Relación con el objeto contractual",
+    "trazabilidad_documental": "Trazabilidad documental",
+    "transparencia_y_trazabilidad": "Transparencia y trazabilidad",
     "barrier_to_entry": "Barreras de entrada",
     "vendor_lock_in": "Dependencia de proveedor o fabricante",
     "reduced_market_access": "Acceso reducido al mercado",

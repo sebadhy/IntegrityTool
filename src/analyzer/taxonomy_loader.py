@@ -60,6 +60,22 @@ class TaxonomyPattern:
     severity_guidance: str
     confidence_guidance: str
     related_patterns: list[str]
+    document_signal: list[str] = field(default_factory=list)
+    possible_competition_effect: list[str] = field(default_factory=list)
+    normative_basis: list[str] = field(default_factory=list)
+    ecuador_legal_reference: list[str] = field(default_factory=list)
+    international_reference: list[str] = field(default_factory=list)
+    procurement_principle: list[str] = field(default_factory=list)
+    institutional_dimension: str = ""
+    technical_dimension: str = ""
+    taxonomy_version: str = ""
+    confidence_level: str = "medium"
+    review_status: str = "draft"
+    human_validation_required: bool = True
+    severity_rationale: str = ""
+    evidence_type: list[str] = field(default_factory=list)
+    limitations: list[str] = field(default_factory=list)
+    disclaimer: str = ""
     validation_messages: list[str] = field(default_factory=list)
 
     @classmethod
@@ -110,6 +126,22 @@ class TaxonomyPattern:
             severity_guidance=severity,
             confidence_guidance=confidence,
             related_patterns=_as_list(normalized.get("related_patterns")),
+            document_signal=_as_list(normalized.get("document_signal")),
+            possible_competition_effect=_as_list(normalized.get("possible_competition_effect")),
+            normative_basis=_as_list(normalized.get("normative_basis")),
+            ecuador_legal_reference=_as_list(normalized.get("ecuador_legal_reference")),
+            international_reference=_as_list(normalized.get("international_reference")),
+            procurement_principle=_as_list(normalized.get("procurement_principle")),
+            institutional_dimension=str(normalized.get("institutional_dimension") or "").strip(),
+            technical_dimension=str(normalized.get("technical_dimension") or normalized.get("competition_dimension") or "").strip(),
+            taxonomy_version=str(normalized.get("taxonomy_version") or "").strip(),
+            confidence_level=str(normalized.get("confidence_level") or confidence).strip(),
+            review_status=str(normalized.get("review_status") or "draft").strip(),
+            human_validation_required=bool(normalized.get("human_validation_required", True)),
+            severity_rationale=str(normalized.get("severity_rationale") or "").strip(),
+            evidence_type=_as_list(normalized.get("evidence_type")),
+            limitations=_as_list(normalized.get("limitations")),
+            disclaimer=str(normalized.get("disclaimer") or "").strip(),
             validation_messages=messages,
         )
 
@@ -132,6 +164,22 @@ class TaxonomyPattern:
             "severity_guidance": self.severity_guidance,
             "confidence_guidance": self.confidence_guidance,
             "related_patterns": self.related_patterns,
+            "document_signal": self.document_signal,
+            "possible_competition_effect": self.possible_competition_effect,
+            "normative_basis": self.normative_basis,
+            "ecuador_legal_reference": self.ecuador_legal_reference,
+            "international_reference": self.international_reference,
+            "procurement_principle": self.procurement_principle,
+            "institutional_dimension": self.institutional_dimension,
+            "technical_dimension": self.technical_dimension,
+            "taxonomy_version": self.taxonomy_version,
+            "confidence_level": self.confidence_level,
+            "review_status": self.review_status,
+            "human_validation_required": self.human_validation_required,
+            "severity_rationale": self.severity_rationale,
+            "evidence_type": self.evidence_type,
+            "limitations": self.limitations,
+            "disclaimer": self.disclaimer,
             "validation_messages": self.validation_messages,
         }
 
@@ -141,6 +189,7 @@ class TaxonomyLoadResult:
     patterns: list[TaxonomyPattern]
     messages: list[str]
     loaded: bool
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 def taxonomy_sha256(path: Path | None = None) -> str:
@@ -175,16 +224,24 @@ def load_taxonomy(path: Path | None = None) -> TaxonomyLoadResult:
             loaded=False,
         )
 
-    if not isinstance(raw_data, list):
+    metadata: dict[str, Any] = {}
+    if isinstance(raw_data, dict):
+        metadata = raw_data.get("metadata") if isinstance(raw_data.get("metadata"), dict) else {}
+        raw_patterns = raw_data.get("patterns")
+    else:
+        raw_patterns = raw_data
+
+    if not isinstance(raw_patterns, list):
         return TaxonomyLoadResult(
             patterns=[],
-            messages=["La taxonomía debe ser una lista de patrones."],
+            messages=["La taxonomía debe ser una lista de patrones o un objeto con clave 'patterns'."],
             loaded=False,
+            metadata=metadata,
         )
 
     patterns: list[TaxonomyPattern] = []
     seen_ids: set[str] = set()
-    for index, raw_pattern in enumerate(raw_data, start=1):
+    for index, raw_pattern in enumerate(raw_patterns, start=1):
         if not isinstance(raw_pattern, dict):
             messages.append(f"Patrón #{index}: formato inválido, se omite.")
             continue
@@ -199,7 +256,7 @@ def load_taxonomy(path: Path | None = None) -> TaxonomyLoadResult:
         messages.extend(f"{pattern.id}: {message}" for message in pattern.validation_messages)
         patterns.append(pattern)
 
-    return TaxonomyLoadResult(patterns=patterns, messages=messages, loaded=bool(patterns))
+    return TaxonomyLoadResult(patterns=patterns, messages=messages, loaded=bool(patterns), metadata=metadata)
 
 
 def taxonomy_context(limit: int = 12) -> dict[str, Any]:
@@ -207,6 +264,7 @@ def taxonomy_context(limit: int = 12) -> dict[str, Any]:
     return {
         "loaded": result.loaded,
         "messages": result.messages[:8],
+        "metadata": result.metadata,
         "patterns": [pattern.to_dict() for pattern in result.patterns[:limit]],
     }
 
