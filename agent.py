@@ -20,17 +20,14 @@ from typing import Any
 from groq import Groq
 from dotenv import load_dotenv
 
+from src.config import GROQ_MODEL
 from tools import TOOL_DEFINITIONS, dispatch_tool
 
 load_dotenv()
 
 LOGGER = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Configuración
-# ---------------------------------------------------------------------------
-
-MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+MODEL = GROQ_MODEL
 MAX_ITERATIONS = int(os.getenv("AGENT_MAX_ITERATIONS", "20"))
 TEMPERATURE = 0.1  # bajo para análisis documental consistente
 
@@ -276,7 +273,7 @@ class PligoAgent:
 
     def _build_initial_message(self, proceso: dict) -> str:
         lines = [
-            f"Analiza el siguiente proceso de contratación:",
+            "Analiza el siguiente proceso de contratación:",
             f"- process_id: {proceso['process_id']}",
             f"- entidad: {proceso.get('entidad', 'No especificada')}",
             f"- objeto: {proceso.get('objeto', 'No especificado')}",

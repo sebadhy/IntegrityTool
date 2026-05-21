@@ -78,15 +78,14 @@ def _use_openai() -> bool:
     return bool(os.getenv("OPENAI_API_KEY"))
 
 
+_NO_LLM_REASON = (
+    "Sin LLM configurado. Define OPENAI_API_KEY (Azure/OpenAI), "
+    "GROQ_API_KEY (Groq) u OLLAMA_BASE_URL (Ollama) en .env"
+)
+
+
 def _llm_available() -> bool:
     return _use_azure() or _use_groq() or _use_ollama() or _use_openai()
-
-
-def _no_llm_reason() -> str:
-    return (
-        "Sin LLM configurado. Define OPENAI_API_KEY (Azure/OpenAI), "
-        "GROQ_API_KEY (Groq) u OLLAMA_BASE_URL (Ollama) en .env"
-    )
 
 
 def _provider_name() -> str:
@@ -372,12 +371,17 @@ def extract_pliego_metadata_assisted(
 ) -> dict:
     """Validate and complete pliego metadata using optional assisted processing."""
     if not _llm_available():
-        return _unavailable_pliego_metadata(_no_llm_reason())
+        return _unavailable_pliego_metadata(_NO_LLM_REASON)
 
     try:
+        client = _client()
+        model = _model()
+        fmt = _response_format(PLIEGO_METADATA_SCHEMA)
+        prompt = _build_pliego_metadata_prompt(document_text, heuristic_candidates, first_pages)
+
         def _call():
-            return _client().chat.completions.create(
-                model=_model(),
+            return client.chat.completions.create(
+                model=model,
                 messages=[
                     {
                         "role": "system",
@@ -388,12 +392,9 @@ def extract_pliego_metadata_assisted(
                             "usa 'No identificado'. Responde solo JSON estricto."
                         ),
                     },
-                    {
-                        "role": "user",
-                        "content": _build_pliego_metadata_prompt(document_text, heuristic_candidates, first_pages),
-                    },
+                    {"role": "user", "content": prompt},
                 ],
-                response_format=_response_format(PLIEGO_METADATA_SCHEMA),
+                response_format=fmt,
             )
         response = _call_with_retry(_call)
         content = response.choices[0].message.content or "{}"
@@ -411,25 +412,27 @@ def generate_document_brief(
 ) -> dict:
     """Generate a cautious executive brief from document text and prior rule findings."""
     if not _llm_available():
-        return _unavailable_document_brief(_no_llm_reason())
+        return _unavailable_document_brief(_NO_LLM_REASON)
 
     try:
+        client = _client()
+        model = _model()
+        fmt = _response_format(DOCUMENT_BRIEF_SCHEMA)
+        prompt = _build_document_brief_prompt(
+            document_text=document_text,
+            findings=prioritized_findings,
+            corpus_context=corpus_context,
+            normative_context=normative_context,
+        )
+
         def _call():
-            return _client().chat.completions.create(
-                model=_model(),
+            return client.chat.completions.create(
+                model=model,
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
-                    {
-                        "role": "user",
-                        "content": _build_document_brief_prompt(
-                            document_text=document_text,
-                            findings=prioritized_findings,
-                            corpus_context=corpus_context,
-                            normative_context=normative_context,
-                        ),
-                    },
+                    {"role": "user", "content": prompt},
                 ],
-                response_format=_response_format(DOCUMENT_BRIEF_SCHEMA),
+                response_format=fmt,
             )
         response = _call_with_retry(_call)
         content = response.choices[0].message.content or "{}"
@@ -445,23 +448,22 @@ def explain_priority_with_llm(
 ) -> dict:
     """Explain one prioritized signal in plain language."""
     if not _llm_available():
-        return _unavailable_finding_explanation(_no_llm_reason())
+        return _unavailable_finding_explanation(_NO_LLM_REASON)
 
     try:
+        client = _client()
+        model = _model()
+        fmt = _response_format(FINDING_EXPLANATION_SCHEMA)
+        prompt = _build_finding_prompt(finding=priority, corpus_context=corpus_context)
+
         def _call():
-            return _client().chat.completions.create(
-                model=_model(),
+            return client.chat.completions.create(
+                model=model,
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
-                    {
-                        "role": "user",
-                        "content": _build_finding_prompt(
-                            finding=priority,
-                            corpus_context=corpus_context,
-                        ),
-                    },
+                    {"role": "user", "content": prompt},
                 ],
-                response_format=_response_format(FINDING_EXPLANATION_SCHEMA),
+                response_format=fmt,
             )
         response = _call_with_retry(_call)
         content = response.choices[0].message.content or "{}"
@@ -493,12 +495,15 @@ def review_detection_with_llm(detection: dict) -> dict:
 def test_llm_connection() -> tuple[bool, str]:
     """Check LLM availability and perform a minimal model call."""
     if not _llm_available():
-        return False, _no_llm_reason()
+        return False, _NO_LLM_REASON
 
     try:
+        client = _client()
+        model = _model()
+
         def _call():
-            return _client().chat.completions.create(
-                model=_model(),
+            return client.chat.completions.create(
+                model=model,
                 messages=[
                     {"role": "system", "content": "Responde de forma breve y técnica."},
                     {"role": "user", "content": "Responde exactamente: OK"},

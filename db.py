@@ -7,6 +7,7 @@ Configuración via variables de entorno o .env
 
 from __future__ import annotations
 
+import json
 import os
 import logging
 from contextlib import contextmanager
@@ -318,7 +319,16 @@ def insert_run(conn: pyodbc.Connection, run: dict) -> None:
     )
 
 
+_AGENT_RUN_UPDATABLE_FIELDS = frozenset({
+    "status", "total_tokens", "tool_calls", "duration_secs",
+    "error_message", "completed_at", "model_used",
+})
+
+
 def update_run(conn: pyodbc.Connection, run_id: str, update: dict) -> None:
+    unknown = set(update) - _AGENT_RUN_UPDATABLE_FIELDS
+    if unknown:
+        raise ValueError(f"Campos no permitidos en update_run: {unknown}")
     fields = ", ".join(f"{k} = ?" for k in update)
     values = list(update.values()) + [run_id]
     conn.cursor().execute(
@@ -327,7 +337,6 @@ def update_run(conn: pyodbc.Connection, run_id: str, update: dict) -> None:
 
 
 def insert_tool_call(conn: pyodbc.Connection, call: dict) -> None:
-    import json
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO tool_calls (
@@ -343,7 +352,6 @@ def insert_tool_call(conn: pyodbc.Connection, call: dict) -> None:
 
 
 def insert_finding(conn: pyodbc.Connection, run_id: str, process_id: str, finding: dict) -> None:
-    import json
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO findings (
@@ -380,7 +388,6 @@ def insert_finding(conn: pyodbc.Connection, run_id: str, process_id: str, findin
 
 
 def insert_brief(conn: pyodbc.Connection, run_id: str, process_id: str, brief: dict) -> None:
-    import json
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO agent_briefs (
@@ -633,7 +640,6 @@ def upsert_corpus_documento(
     Inserta o actualiza un documento en el corpus histórico.
     Guarda solo los campos mínimos necesarios para comparación de patrones.
     """
-    import json
 
     # Compactar hallazgos: solo lo necesario para frecuencia de patrones
     hallazgos: list[dict] = []
@@ -684,7 +690,6 @@ def get_corpus_analysis_from_db(conn: pyodbc.Connection) -> dict:
         "source": "db",
       }
     """
-    import json
     from collections import Counter
 
     cursor = conn.cursor()
