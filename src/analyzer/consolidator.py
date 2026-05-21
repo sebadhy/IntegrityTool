@@ -5,6 +5,7 @@ import re
 from collections import defaultdict
 
 from .domain_models import Clause, ConsolidatedFinding, FindingCandidate, Signal
+from .text_utils import unique_strings
 
 
 def consolidate_candidates(
@@ -22,8 +23,8 @@ def consolidate_candidates(
         signals = [signal for candidate in group for signal in candidate.signals]
         group_clauses = [clause_lookup[signal.clause_id] for signal in signals if signal.clause_id in clause_lookup]
         evidence_items = _dedupe_evidence([item for candidate in group for item in candidate.evidence])
-        mitigants = _unique([item for candidate in group for item in candidate.detected_mitigants])
-        missing = _unique([item for candidate in group for item in candidate.missing_mitigants])
+        mitigants = unique_strings([item for candidate in group for item in candidate.detected_mitigants])
+        missing = unique_strings([item for candidate in group for item in candidate.missing_mitigants])
         historical = _choose_historical(group)
         score, factors = _ranking_score(group, mitigants, missing, historical, group_clauses)
         representative = group[0]
@@ -47,7 +48,7 @@ def consolidate_candidates(
                 title=_finding_title(representative, len(signals)),
                 missing_mitigants=missing,
                 candidate_rationale=representative.candidate_rationale,
-                limitations=_unique([item for candidate in group for item in candidate.limitations]),
+                limitations=unique_strings([item for candidate in group for item in candidate.limitations]),
             )
         )
     return findings
@@ -168,12 +169,3 @@ def _finding_title(candidate: FindingCandidate, count: int) -> str:
         return "Consideraciones sobre cronograma y plazos"
     return str(name or "Aspecto sugerido para revisión")
 
-
-def _unique(values: list[str]) -> list[str]:
-    seen = set()
-    output = []
-    for value in values:
-        if value and value not in seen:
-            output.append(value)
-            seen.add(value)
-    return output

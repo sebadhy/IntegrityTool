@@ -58,7 +58,14 @@ BASE_DELAY = 2.0
 # Detección de proveedor LLM
 # ---------------------------------------------------------------------------
 
+def _forced_provider() -> str:
+    """LLM_PROVIDER env var fuerza un proveedor específico, ignorando auto-detección."""
+    return os.getenv("LLM_PROVIDER", "").lower().strip()
+
+
 def _use_azure() -> bool:
+    if _forced_provider() and _forced_provider() != "azure":
+        return False
     return bool(
         os.getenv("OPENAI_API_KEY")
         and os.getenv("OPENAI_BASE_URL")
@@ -67,14 +74,22 @@ def _use_azure() -> bool:
 
 
 def _use_groq() -> bool:
+    if _forced_provider() and _forced_provider() != "groq":
+        return False
     return bool(os.getenv("GROQ_API_KEY"))
 
 
 def _use_ollama() -> bool:
+    if _forced_provider() == "ollama":
+        return True
+    if _forced_provider() and _forced_provider() != "ollama":
+        return False
     return bool(os.getenv("OLLAMA_BASE_URL") or os.getenv("OLLAMA_MODEL"))
 
 
 def _use_openai() -> bool:
+    if _forced_provider() and _forced_provider() != "openai":
+        return False
     return bool(os.getenv("OPENAI_API_KEY"))
 
 

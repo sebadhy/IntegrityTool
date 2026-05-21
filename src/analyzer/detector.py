@@ -16,6 +16,7 @@ from .finding_model import (
     SEVERITY_MEDIUM,
 )
 from .patterns.competitive_neutrality_patterns import PATTERNS
+from .text_utils import unique_strings
 from src.config import APP_DEFAULT_CONTEXT_CHARS
 
 from .document_segmenter import DocumentSection, section_for_page
@@ -640,6 +641,25 @@ def detect_patterns(
     pages: list[PageText],
     sections: list[DocumentSection] | None = None,
 ) -> list[Detection]:
+    """Page-level detection using both RULES and taxonomy patterns.
+
+    This function runs two complementary engines:
+
+    - **RULES** (PatternRule list): hardcoded business rules that classify
+      signals as review (``señal_revision``), mitigant (``mitigante_concurrencia``),
+      or routine requirement (``requisito_habitual``). These are valid domain
+      knowledge — mitigant and habitual rules help contextualize findings.
+
+    - **Taxonomy patterns** (YAML): editable patterns with richer structure
+      (escalation factors, mitigating factors, competition dimensions).
+
+    When a RULES term overlaps with a taxonomy textual_signal, the RULE is
+    skipped to avoid double-counting (L654).
+
+    For the clause-centric pipeline (Streamlit UI, agent), prefer
+    :func:`detect_signals` which operates on pre-classified Clause objects.
+    Mitigant detection is handled downstream by :mod:`mitigants` in that path.
+    """
     raw_detections: list[Detection] = []
 
     for page in pages:
@@ -691,7 +711,7 @@ def detect_patterns(
                 mitigating_factors = _contextual_mitigating_factors(fragment, pattern)
                 possible_justifications = _contextual_justifications(fragment, pattern)
                 if is_common_goods_signal:
-                    possible_justifications = _unique(possible_justifications + [GOODS_COMMON_RATIONALE])
+                    possible_justifications = unique_strings(possible_justifications + [GOODS_COMMON_RATIONALE])
                 escalation_factors = _taxonomy_escalation_factors(
                     fragment=fragment,
                     pattern=pattern,
@@ -837,14 +857,14 @@ def _category_from_dimension(dimension: str) -> str:
 
 
 def _contextual_mitigating_factors(fragment: str, pattern: TaxonomyPattern) -> list[str]:
-    return _unique(
+    return unique_strings(
         _matched_terms(fragment, pattern.mitigating_factors)
         + _matched_terms(fragment, GLOBAL_MITIGATING_TERMS)
     )
 
 
 def _contextual_justifications(fragment: str, pattern: TaxonomyPattern) -> list[str]:
-    return _unique(
+    return unique_strings(
         _matched_terms(fragment, GLOBAL_JUSTIFICATION_TERMS)
         + [
             justification
@@ -914,7 +934,7 @@ def _taxonomy_escalation_factors(
         factors.append("Coexistencia con patrones relacionados en la misma página.")
     if normalize_text(term) in {"adicionalmente", "además deberá", "conjuntamente"}:
         factors.append("Lenguaje acumulativo de requisitos.")
-    return _unique(factors)
+    return unique_strings(factors)
 
 
 def _document_section(fragment: str, pattern: TaxonomyPattern) -> str:
@@ -1200,28 +1220,6 @@ def _has_negated_equivalence(text: str) -> bool:
     return any(pattern in text for pattern in negated_patterns)
 
 
-def _escalation_factors(fragment: str, pattern: dict, mitigating_factors: list[str]) -> list[str]:
-    normalized_fragment = normalize_text(fragment)
-    factors = []
-    for condition in pattern["escalation_conditions"]:
-        condition_text = normalize_text(condition)
-        if "ausencia" in condition_text and not mitigating_factors:
-            factors.append(condition)
-        elif condition_text in normalized_fragment:
-            factors.append(condition)
-    return factors
-
-
-def _catalog_severity(mitigating_factors: list[str], escalation_factors: list[str]) -> str:
-    if len(escalation_factors) >= 2:
-        return "contextual"
-    if escalation_factors:
-        return "medium"
-    if mitigating_factors:
-        return "low"
-    return "medium"
-
-
 def _finding_id(pattern_id: str, page: int, fragment: str) -> str:
     digest = hashlib.sha1(f"{pattern_id}|{page}|{fragment[:240]}".encode("utf-8")).hexdigest()
     return f"finding-{digest[:12]}"
@@ -1229,17 +1227,6 @@ def _finding_id(pattern_id: str, page: int, fragment: str) -> str:
 
 def _slug(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", normalize_text(value)).strip("-")
-
-
-def _unique(values: list[str]) -> list[str]:
-    seen = set()
-    result = []
-    for value in values:
-        clean_value = value.strip()
-        if clean_value and clean_value not in seen:
-            result.append(clean_value)
-            seen.add(clean_value)
-    return result
 
 # --- Clause-centric signal extraction -------------------------------------------------
 # This deterministic API is the preferred pipeline entry point. The legacy detect_patterns

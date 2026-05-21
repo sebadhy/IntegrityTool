@@ -444,7 +444,7 @@ def set_review_status(row: pd.Series, status: str, note: str = "") -> None:
 
 
 
-def render_document_header(document_name: str, metadata: dict[str, str], signal_count: int) -> object:
+def render_document_header(document_name: str, metadata: dict[str, str], signal_count: int) -> None:
     st.markdown(
         f"""
         <div class="document-header-simple">
@@ -470,19 +470,30 @@ def render_document_header(document_name: str, metadata: dict[str, str], signal_
             </div>
             <div>
                 <div class="doc-label">Estado</div>
-                <div class="doc-value">Revisión preliminar · {signal_count} observaciones</div>
+                <div class="doc-value">Revisión preliminar</div>
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
-    actions = st.columns([0.78, 0.12, 0.10])
-    with actions[1]:
-        if st.button("Nueva revisión", width="stretch"):
+
+
+def render_review_nav(document_name: str, signal_count: int) -> None:
+    """Horizontal nav bar shown during document review — includes the 'Nueva revisión' action."""
+    nav_col, btn_col = st.columns([0.80, 0.20])
+    with nav_col:
+        st.markdown(
+            f'<div class="review-nav-bar">'
+            f'<div class="review-nav-title">{safe_text(short_fragment(document_name, 70))}</div>'
+            f'<div class="review-nav-sub">Revisión preliminar · {signal_count} observaciones</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    with btn_col:
+        if st.button("← Nueva revisión", key="nav_new_review", use_container_width=True, type="secondary"):
             for key in ["document_processed", "uploaded_file_bytes", "uploaded_file_name", "selected_signal_id", "review_workspace_open", review_timeline_key()]:
                 st.session_state.pop(key, None)
             st.rerun()
-    return actions[2]
 
 
 def render_original_document(pdf_bytes: bytes | None) -> None:
@@ -689,7 +700,7 @@ def corpus_context_sentence(row: pd.Series) -> str:
 
 def integrated_contextual_explanation(row: pd.Series, corpus_context: dict | None = None) -> str:
     fallback = _deterministic_contextual_explanation(row)
-    if not os.getenv("OPENAI_API_KEY"):
+    if not test_llm_connection()[0]:
         return fallback
     explanation = cached_explain_priority_with_llm(
         row.to_dict(),
@@ -893,7 +904,7 @@ def _methodology_sections(row: pd.Series) -> list[tuple[str, list[str]]]:
     mitigants = display_list(row.get("mitigating_factors", []))
     missing = display_list(row.get("missing_information", []))
     evidence = short_fragment(row.get("fragmento textual", row.get("representative_excerpt", "No disponible")), 240)
-    ai_active = bool(os.getenv("OPENAI_API_KEY"))
+    ai_active = test_llm_connection()[0]
 
     basis = [
         f"Patrón aplicado: {pattern}.",
@@ -1024,7 +1035,7 @@ def render_suggested_aspects(
                 <div class="section-eyebrow">Revisión humana</div>
                 <h2>Aspectos sugeridos para revisión</h2>
             </div>
-            <p>Observaciones consolidadas, ordenadas para revisar primero lo más accionable.</p>
+            <p>Observaciones consolidadas, ordenadas para revisar primero lo más accionable. <strong>Alto</strong>: requiere atención prioritaria · <strong>Medio</strong>: revisión sugerida · <strong>Bajo</strong>: contexto general.</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1101,10 +1112,13 @@ def render_executive_overview(
     pdf_bytes: bytes | None = None,
     corpus_context: dict | None = None,
     assisted_summary: list[str] | None = None,
+    validation_messages: list[str] | None = None,
 ) -> None:
+    render_review_nav(document_name, signal_count)
     render_document_header(document_name, metadata, signal_count)
     render_original_document(pdf_bytes)
     render_pliego_summary(metadata, brief, priority_df, document_text, ai_brief=ai_brief, assisted_summary=assisted_summary)
+    render_methodological_limitations(validation_messages or [])
     render_suggested_aspects(priority_df, pages=pages, pdf_bytes=pdf_bytes, corpus_context=corpus_context)
 
 
@@ -1321,7 +1335,7 @@ def render_signal_inspector(row: pd.Series, corpus_context: dict | None = None) 
         st.markdown(f"**Criterio:** {safe_text(row['criterio_normativo_de_revision'])}")
         st.markdown(f"**Pregunta:** {safe_text(row['pregunta_normativa_sugerida'])}")
 
-    st.caption("La revisión humana se registra fuera de esta PoC. Esta pantalla solo orienta lectura y validación documental.")
+    st.caption("La revisión humana se registra en la herramienta. Esta pantalla orienta lectura y validación documental.")
 
 
 def render_review_workbench(
@@ -1559,7 +1573,7 @@ def render_setup_panel() -> tuple[object | None, bool, bool, bool]:
         """,
         unsafe_allow_html=True,
     )
-    with st.expander("Qué revisa la herramienta", expanded=False):
+    with st.expander("Qué revisa la herramienta", expanded=True):
         st.markdown(
             """
 <div class="methodology-brief">
@@ -1594,32 +1608,7 @@ def render_setup_panel() -> tuple[object | None, bool, bool, bool]:
     return uploaded_file, True, bool(os.getenv("OPENAI_API_KEY")), process_document
 
 def render_review_top_bar(document_name: str, signal_count: int) -> None:
-    st.markdown(
-        f"""
-        <div class="review-topbar">
-            <div>
-                <div class="review-topbar-label">Documento</div>
-                <div class="review-topbar-title">{safe_text(document_name)}</div>
-            </div>
-            <div>
-                <div class="review-topbar-label">Estado</div>
-                <div class="review-topbar-value">Revisión preliminar</div>
-            </div>
-            <div>
-                <div class="review-topbar-label">Observaciones priorizadas</div>
-                <div class="review-topbar-value">{signal_count}</div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    actions = st.columns([0.68, 0.16, 0.16])
-    with actions[1]:
-        if st.button("Nueva revisión", width="stretch"):
-            for key in ["document_processed", "uploaded_file_bytes", "uploaded_file_name", "selected_signal_id", "review_workspace_open", review_timeline_key()]:
-                st.session_state.pop(key, None)
-            st.rerun()
-    return actions[2]
+    render_review_nav(document_name, signal_count)
 
 
 def render_technical_details(corpus_payload: dict, validation_messages: list[str]) -> None:
@@ -1708,7 +1697,7 @@ def render_review_flow() -> None:
     if review_result.results_df.empty or visible_df.empty:
         render_document_header(uploaded_file_name, metadata, 0)
         render_pliego_summary(metadata, {"top_themes": []}, pd.DataFrame(), document_text)
-        st.success("No se identificaron observaciones preliminares priorizadas con las reglas actuales. Puede continuar con revisión manual del documento.")
+        st.info("No se identificaron observaciones preliminares priorizadas con las reglas actuales. Puede continuar con revisión manual del documento.")
         render_technical_details(corpus_payload, validation_messages)
         return
 
@@ -1741,11 +1730,10 @@ def render_review_flow() -> None:
         pdf_bytes=uploaded_file_bytes,
         corpus_context=corpus_payload["context"],
         assisted_summary=assisted_summary,
+        validation_messages=validation_messages,
     )
 
     filtered_df = visible_df
-
-    render_methodological_limitations(validation_messages)
 
     with st.expander("Exportar resultados", expanded=False):
         st.caption("Exporta los aspectos sugeridos para revisión en formato tabular.")

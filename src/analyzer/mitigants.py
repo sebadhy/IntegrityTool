@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import re
-
 from .domain_models import Clause, Signal
 from .taxonomy_loader import TaxonomyPattern
+from .text_utils import normalize_text_es, unique_strings
 
 GLOBAL_MITIGANTS = [
     "o equivalente",
@@ -36,7 +35,7 @@ STRONG_MITIGANTS = [
 def detect_mitigants(signal: Signal, clause: Clause, pattern: TaxonomyPattern) -> list[str]:
     text = f"{clause.normalized_text} {signal.evidence_text.lower()}"
     terms = GLOBAL_MITIGANTS + pattern.mitigating_factors
-    return _unique([term for term in terms if _contains(text, term)])
+    return unique_strings([term for term in terms if _contains(text, term)])
 
 
 def missing_mitigants(signal: Signal, detected: list[str]) -> list[str]:
@@ -58,24 +57,10 @@ def missing_mitigants(signal: Signal, detected: list[str]) -> list[str]:
 
 
 def has_strong_mitigant(mitigants: list[str]) -> bool:
-    normalized = [_normalize(item) for item in mitigants]
-    return any(_normalize(term) in normalized for term in STRONG_MITIGANTS)
+    normalized = [normalize_text_es(item) for item in mitigants]
+    return any(normalize_text_es(term) in normalized for term in STRONG_MITIGANTS)
 
 
 def _contains(text: str, term: str) -> bool:
-    return _normalize(term) in _normalize(text)
+    return normalize_text_es(term) in normalize_text_es(text)
 
-
-def _normalize(text: str) -> str:
-    replacements = str.maketrans("áéíóúñü", "aeiounu")
-    return re.sub(r"\s+", " ", text.lower().translate(replacements)).strip()
-
-
-def _unique(values: list[str]) -> list[str]:
-    seen = set()
-    output = []
-    for value in values:
-        if value not in seen:
-            output.append(value)
-            seen.add(value)
-    return output

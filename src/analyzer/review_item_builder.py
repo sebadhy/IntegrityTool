@@ -8,6 +8,7 @@ import pandas as pd
 
 from .domain_models import ConsolidatedFinding, ReviewItem
 from .prioritizer import review_priority_from_score
+from .text_utils import unique_strings
 
 PROHIBITED_VISIBLE_TERMS = [
     "corrupción",
@@ -289,7 +290,7 @@ def _questions(finding: ConsolidatedFinding) -> list[str]:
         questions.extend(signal.metadata.get("taxonomy_pattern", {}).get("human_review_questions", []))
     if not questions:
         questions = ["¿El requisito es proporcional al objeto contractual?", "¿Se admiten alternativas equivalentes?"]
-    return _unique(questions)[:4]
+    return unique_strings(questions)[:4]
 
 
 def _display_group(dimension: str) -> str:
@@ -332,11 +333,3 @@ def _allowed_language(*values: str) -> bool:
     return not any(term in text for term in PROHIBITED_VISIBLE_TERMS)
 
 
-def _unique(values: list[str]) -> list[str]:
-    seen = set()
-    output = []
-    for value in values:
-        if value and value not in seen:
-            output.append(value)
-            seen.add(value)
-    return output

@@ -8,6 +8,8 @@ from typing import Any
 import pandas as pd
 
 from .taxonomy_loader import taxonomy_sha256
+from .text_utils import unique_strings, list_field
+from .review_row_schema import REVIEW_PRIORITY_LABELS as _SHARED_PRIORITY_LABELS
 
 
 ENGINE_VERSION = "0.4.0"
@@ -16,11 +18,7 @@ RULE_VERSION = "neutralidad-competitiva-v1"
 ATTENTION_SCORE = {"Bajo": 1, "Medio": 2, "Alto": 3}
 RELEVANCE_SCORE = {"Bajo": 1, "Medio": 2, "Alto": 3}
 REVIEW_PRIORITY_SCORE = {"general": 1, "suggested": 2, "priority": 3}
-REVIEW_PRIORITY_LABEL = {
-    "general": "revisión general",
-    "suggested": "revisión sugerida",
-    "priority": "revisión prioritaria",
-}
+REVIEW_PRIORITY_LABEL = _SHARED_PRIORITY_LABELS  # alias for backward compat
 RARE_LABELS = {"Poco frecuente", "Sin histórico"}
 COMMON_LABELS = {"Habitual"}
 STRUCTURED_SEVERITY_SCORE = {"low": 0, "medium": 1, "contextual": 2}
@@ -122,11 +120,11 @@ def top_priorities(prioritized_df: pd.DataFrame, limit: int = 3) -> pd.DataFrame
         errors="coerce",
     ).fillna(1)
     sort_df["_escalation_order"] = sort_df.apply(
-        lambda row: len(_list_field(row.get("escalation_factors", []))),
+        lambda row: len(list_field(row.get("escalation_factors", []))),
         axis=1,
     )
     sort_df["_mitigation_order"] = sort_df.apply(
-        lambda row: len(_list_field(row.get("mitigating_factors", []))),
+        lambda row: len(list_field(row.get("mitigating_factors", []))),
         axis=1,
     )
 
@@ -168,8 +166,8 @@ def _criteria_for_row(row: pd.Series, related_count: int) -> list[str]:
             "Elemento que favorece concurrencia y reduce atención contextual sobre requisitos cerrados."
         ]
 
-    mitigating_factors = _list_field(row.get("mitigating_factors", []))
-    escalation_factors = _list_field(row.get("escalation_factors", []))
+    mitigating_factors = list_field(row.get("mitigating_factors", []))
+    escalation_factors = list_field(row.get("escalation_factors", []))
 
     for factor in escalation_factors:
         criteria.append(f"Condición de escalamiento contextual: {factor}.")
@@ -183,7 +181,7 @@ def _criteria_for_row(row: pd.Series, related_count: int) -> list[str]:
     if dimension:
         criteria.append(f"Dimensión competitiva asociada: {dimension}.")
 
-    missing_information = _list_field(row.get("missing_information", []))
+    missing_information = list_field(row.get("missing_information", []))
     for item in missing_information:
         criteria.append(f"Información faltante para validar contexto: {item}.")
 
@@ -229,7 +227,7 @@ def _criteria_for_row(row: pd.Series, related_count: int) -> list[str]:
     if mitigants:
         criteria.append(f"Mitigantes identificados en el documento: {mitigants}.")
 
-    return _unique(criteria) or ["Señal consolidada por reglas textuales para revisión humana."]
+    return unique_strings(criteria) or ["Señal consolidada por reglas textuales para revisión humana."]
 
 
 def _relevance_from_criteria(row: pd.Series, criteria: list[str]) -> str:
@@ -239,14 +237,14 @@ def _relevance_from_criteria(row: pd.Series, criteria: list[str]) -> str:
     }:
         return "Bajo"
 
-    if str(row.get("clasificación histórica")) in COMMON_LABELS and not _list_field(row.get("escalation_factors", [])):
+    if str(row.get("clasificación histórica")) in COMMON_LABELS and not list_field(row.get("escalation_factors", [])):
         return "Bajo"
 
     score = 0
     score += STRUCTURED_SEVERITY_SCORE.get(str(row.get("severity", "")).lower(), 0)
     score += ATTENTION_SCORE.get(str(row.get("atención sugerida") or row.get("nivel de atención")), 1)
-    score += min(len(_list_field(row.get("escalation_factors", []))), 3)
-    score -= min(len(_list_field(row.get("mitigating_factors", []))), 2)
+    score += min(len(list_field(row.get("escalation_factors", []))), 3)
+    score -= min(len(list_field(row.get("mitigating_factors", []))), 2)
     if str(row.get("clasificación histórica")) in RARE_LABELS:
         score += 2
     if any("combinación" in item.lower() for item in criteria):
@@ -275,13 +273,13 @@ def _attention_from_relevance(row: pd.Series, relevance: str, criteria: list[str
     }:
         return "Bajo"
 
-    if str(row.get("clasificación histórica")) in COMMON_LABELS and not _list_field(row.get("escalation_factors", [])):
+    if str(row.get("clasificación histórica")) in COMMON_LABELS and not list_field(row.get("escalation_factors", [])):
         return "Bajo"
 
     score = ATTENTION_SCORE.get(str(row.get("nivel de atención")), 1)
     score = max(score, RELEVANCE_SCORE.get(relevance, 1))
-    score += min(len(_list_field(row.get("escalation_factors", []))), 2)
-    score -= min(len(_list_field(row.get("mitigating_factors", []))), 2)
+    score += min(len(list_field(row.get("escalation_factors", []))), 2)
+    score -= min(len(list_field(row.get("mitigating_factors", []))), 2)
     if str(row.get("clasificación histórica")) == "Poco frecuente":
         score += 1
     if any("combinación" in item.lower() for item in criteria):
@@ -302,7 +300,7 @@ def _review_priority_from_context(row: pd.Series, criteria: list[str], relevance
         "mitigante_concurrencia",
     }:
         return "general"
-    if str(row.get("clasificación histórica")) in COMMON_LABELS and not _list_field(row.get("escalation_factors", [])):
+    if str(row.get("clasificación histórica")) in COMMON_LABELS and not list_field(row.get("escalation_factors", [])):
         return "general"
 
     existing = str(row.get("review_priority", "")).strip()
@@ -310,8 +308,8 @@ def _review_priority_from_context(row: pd.Series, criteria: list[str], relevance
         base = REVIEW_PRIORITY_SCORE[existing]
     else:
         base = 2
-    base += min(len(_list_field(row.get("escalation_factors", []))), 2)
-    base -= min(len(_list_field(row.get("mitigating_factors", []))), 1)
+    base += min(len(list_field(row.get("escalation_factors", []))), 2)
+    base -= min(len(list_field(row.get("mitigating_factors", []))), 1)
     if str(row.get("clasificación histórica")) in RARE_LABELS:
         base += 1
     if relevance == "Alto":
@@ -375,36 +373,6 @@ def _normalized_text(value: str) -> str:
     for source, target in replacements.items():
         text = text.replace(source, target)
     return text
-
-
-def _list_field(value: Any) -> list[str]:
-    if isinstance(value, list):
-        return [str(item).strip() for item in value if str(item).strip()]
-    if isinstance(value, tuple):
-        return [str(item).strip() for item in value if str(item).strip()]
-    if isinstance(value, str):
-        stripped = value.strip()
-        if not stripped:
-            return []
-        try:
-            parsed = json.loads(stripped)
-        except json.JSONDecodeError:
-            return [stripped]
-        if isinstance(parsed, list):
-            return [str(item).strip() for item in parsed if str(item).strip()]
-        return [str(parsed).strip()] if str(parsed).strip() else []
-    return []
-
-
-def _unique(values: list[str]) -> list[str]:
-    seen: set[str] = set()
-    unique_values: list[str] = []
-    for value in values:
-        normalized = value.strip()
-        if normalized and normalized not in seen:
-            unique_values.append(normalized)
-            seen.add(normalized)
-    return unique_values
 
 
 def prioritize_consolidated_findings(findings: list) -> list:

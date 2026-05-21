@@ -4,12 +4,13 @@
     --blue-soft: #EAF3FA;
     --gray-light: #F5F7FA;
     --text-gray: #333333;
-    --text-muted: #6B7A8D;
+    --text-muted: #5F6B76;
     --border: #D6DEE6;
     --warning-soft: #FFF8E5;
     --white: #FFFFFF;
     --surface: #FFFFFF;
-    --shadow-soft: 0 1px 4px rgba(0, 59, 112, 0.07);
+    --surface-muted: #F8FAFC;
+    --shadow-soft: 0 1px 2px rgba(31, 45, 58, 0.04), 0 8px 24px rgba(31, 45, 58, 0.06);
 }
 
 #MainMenu,
@@ -31,8 +32,8 @@ body,
 }
 
 .block-container {
-    max-width: 1240px;
-    padding: 1.25rem 2rem 3rem;
+    max-width: 1180px;
+    padding: 0.85rem 2rem 3rem;
 }
 
 [data-testid="stSidebar"] {
@@ -62,9 +63,9 @@ h2,
 h3 {
     font-size: 1.12rem;
     font-weight: 700;
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 0.45rem;
-    margin-top: 1.35rem;
+    border-bottom: 0;
+    padding-bottom: 0.15rem;
+    margin-top: 1.15rem;
 }
 
 .institutional-shell {
@@ -625,8 +626,8 @@ textarea {
 }
 
 .doc-label {
-    color: #66727F;
-    font-size: 0.68rem;
+    color: #6C7782;
+    font-size: 0.67rem;
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -636,9 +637,9 @@ textarea {
 .doc-value,
 .doc-count {
     color: #1F2D3A;
-    font-size: 0.88rem;
+    font-size: 0.9rem;
     font-weight: 700;
-    line-height: 1.25;
+    line-height: 1.35;
     margin-top: 0.2rem;
     overflow-wrap: anywhere;
 }
@@ -788,12 +789,13 @@ textarea {
 .document-header-simple {
     background: var(--white);
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: 6px;
+    box-shadow: var(--shadow-soft);
     display: grid;
-    gap: 0.75rem 1rem;
-    grid-template-columns: 1fr 1fr;
+    gap: 0.95rem 1.15rem;
+    grid-template-columns: 1.15fr 1fr;
     margin: 0.25rem 0 0.9rem;
-    padding: 0.95rem 1rem;
+    padding: 1rem 1.1rem;
 }
 
 .document-header-simple .doc-object-full {
@@ -803,21 +805,6 @@ textarea {
 .document-header-simple .doc-value {
     font-weight: 600;
     white-space: normal;
-}
-
-.top-finding-card {
-    border-top: 1px solid var(--border);
-    min-height: 220px;
-}
-
-.pdf-frame {
-    height: 760px;
-}
-
-.evidence-snippet {
-    background: #FBFCFE;
-    border-left-color: var(--blue-medium);
-    margin-top: 0.7rem;
 }
 
 @media (max-width: 900px) {
@@ -981,25 +968,6 @@ textarea {
 
 
 /* Enterprise UX refinement pass */
-:root {
-    --surface: #FFFFFF;
-    --surface-muted: #F8FAFC;
-    --text-muted: #5F6B76;
-    --shadow-soft: 0 1px 2px rgba(31, 45, 58, 0.04), 0 8px 24px rgba(31, 45, 58, 0.06);
-}
-
-.block-container {
-    max-width: 1180px;
-    padding-top: 0.85rem;
-}
-
-h2,
-h3 {
-    border-bottom: 0;
-    margin-top: 1.15rem;
-    padding-bottom: 0.15rem;
-}
-
 [data-testid="stExpander"] {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -1068,26 +1036,6 @@ h3 {
     font-size: 0.84rem;
     line-height: 1.35;
     margin-bottom: 0.6rem;
-}
-
-.document-header-simple {
-    border-radius: 6px;
-    box-shadow: var(--shadow-soft);
-    gap: 0.95rem 1.15rem;
-    grid-template-columns: 1.15fr 1fr;
-    padding: 1rem 1.1rem;
-}
-
-.doc-label {
-    color: #6C7782;
-    font-size: 0.67rem;
-}
-
-.doc-title,
-.doc-value {
-    color: #1F2D3A;
-    font-size: 0.9rem;
-    line-height: 1.35;
 }
 
 .pliego-summary {
@@ -1328,6 +1276,37 @@ h3 {
     .methodology-brief {
         grid-template-columns: 1fr;
     }
+}
+
+/* Review mode navigation bar */
+.review-nav-bar {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: var(--shadow-soft);
+    margin-bottom: 0.5rem;
+    padding: 0.6rem 1rem;
+}
+
+.review-nav-title {
+    color: #1F2D3A;
+    font-size: 0.92rem;
+    font-weight: 700;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.review-nav-sub {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    margin-top: 0.12rem;
+}
+
+/* Align the "Nueva revisión" button to match the nav bar height */
+[data-testid="column"]:has(.review-nav-bar) + [data-testid="column"] > div:first-child {
+    padding-top: 0.2rem;
 }
 
 /* ============================================================

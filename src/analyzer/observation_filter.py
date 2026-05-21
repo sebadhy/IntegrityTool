@@ -1,10 +1,21 @@
 from __future__ import annotations
 
-import ast
 import re
 from typing import Any
 
 import pandas as pd
+
+from .text_utils import (
+    list_field,
+    normalize_text_es,
+    has_concrete_requirement_detail,
+    looks_like_structural_text,
+)
+from .review_row_schema import (
+    REVIEW_PRIORITY_ORDER,
+    REVIEW_PRIORITY_LABELS,
+    HISTORY_ORDER,
+)
 
 
 BOILERPLATE_EXPRESSIONS = [
@@ -29,13 +40,9 @@ LOW_INFORMATION_TERMS = {
     "adjunto",
 }
 
-REVIEW_PRIORITY_ORDER = {"priority": 0, "suggested": 1, "general": 2}
-REVIEW_PRIORITY_LABEL = {
-    "general": "revisión general",
-    "suggested": "revisión sugerida",
-    "priority": "revisión prioritaria",
-}
-HISTORY_ORDER = {"Poco frecuente": 0, "Sin histórico": 1, "Intermedio": 2, "Habitual": 3}
+# REVIEW_PRIORITY_ORDER, REVIEW_PRIORITY_LABELS and HISTORY_ORDER now imported from review_row_schema
+
+REVIEW_PRIORITY_LABEL = REVIEW_PRIORITY_LABELS  # backward compat alias
 
 
 def prepare_visible_review_items(enriched_df: pd.DataFrame, max_items: int = 18) -> pd.DataFrame:
@@ -115,8 +122,8 @@ def _visibility_score(row: pd.Series) -> int:
     score = 0
     review_priority = str(row.get("review_priority", "suggested"))
     score += {"priority": 8, "suggested": 5, "general": 2}.get(review_priority, 4)
-    score += min(len(_list_field(row.get("escalation_factors", []))) * 3, 6)
-    score -= min(len(_list_field(row.get("mitigating_factors", []))) * 2, 4)
+    score += min(len(list_field(row.get("escalation_factors", []))) * 3, 6)
+    score -= min(len(list_field(row.get("mitigating_factors", []))) * 2, 4)
 
     classification = str(row.get("clasificación histórica", ""))
     if classification == "Poco frecuente":
@@ -149,27 +156,27 @@ def _display_mode(row: pd.Series) -> str:
 def _is_common_context_only(row: pd.Series) -> bool:
     return (
         str(row.get("clasificación histórica", "")) == "Habitual"
-        and not _list_field(row.get("escalation_factors", []))
+        and not list_field(row.get("escalation_factors", []))
         and str(row.get("review_priority", "general")) == "general"
     )
 
 
 def _is_boilerplate_row(row: pd.Series) -> bool:
-    fragment = _normalize(str(row.get("fragmento textual", row.get("clause_excerpt", ""))))
-    pattern = _normalize(str(row.get("patrón detectado", row.get("pattern_name", ""))))
+    fragment = _local_normalize(str(row.get("fragmento textual", row.get("clause_excerpt", ""))))
+    pattern = _local_normalize(str(row.get("patrón detectado", row.get("pattern_name", ""))))
     if not fragment and not pattern:
         return True
     if any(expr in fragment for expr in BOILERPLATE_EXPRESSIONS):
         return True
     if _is_structural_or_reference_fragment(fragment):
         return True
-    if pattern in {_normalize(expr) for expr in BOILERPLATE_EXPRESSIONS}:
+    if pattern in {_local_normalize(expr) for expr in BOILERPLATE_EXPRESSIONS}:
         return True
     return _is_low_information_fragment(fragment)
 
 
 def _is_low_information_fragment(fragment: str) -> bool:
-    text = _normalize(fragment)
+    text = _local_normalize(fragment)
     if not text:
         return True
     if text in LOW_INFORMATION_TERMS:
@@ -184,8 +191,8 @@ def _is_low_information_fragment(fragment: str) -> bool:
 
 
 def _is_structural_or_unsupported_row(row: pd.Series) -> bool:
-    fragment = _normalize(str(row.get("fragmento textual", row.get("clause_excerpt", ""))))
-    pattern_text = _normalize(" ".join(str(row.get(field, "")) for field in ["pattern_id", "pattern_name", "patrón detectado"]))
+    fragment = _local_normalize(str(row.get("fragmento textual", row.get("clause_excerpt", ""))))
+    pattern_text = _local_normalize(" ".join(str(row.get(field, "")) for field in ["pattern_id", "pattern_name", "patrón detectado"]))
     if _is_structural_or_reference_fragment(fragment):
         return True
     if _is_generic_timeline_reference(pattern_text, fragment):
@@ -194,10 +201,10 @@ def _is_structural_or_unsupported_row(row: pd.Series) -> bool:
 
 
 def _is_structural_or_reference_fragment(fragment: str) -> bool:
-    text = _normalize(fragment)
+    text = _local_normalize(fragment)
     if not text:
         return True
-    if _looks_like_index_heading(text):
+    if looks_like_structural_text(text):
         return True
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     if len(lines) >= 3:
@@ -214,15 +221,10 @@ def _is_structural_or_reference_fragment(fragment: str) -> bool:
         "establecido en el cronograma",
         "cronograma del procedimiento",
     ]
-    return any(term in text for term in generic_section_terms) and not _has_concrete_requirement_detail(text)
+    return any(term in text for term in generic_section_terms) and not has_concrete_requirement_detail(text)
 
 
-def _looks_like_index_heading(text: str) -> bool:
-    if "indice financiero" in text:
-        return False
-    if any(term in text for term in ["tabla de contenido", "sumario", "contenido del documento", "portada"]):
-        return True
-    return bool(re.match(r"^(indice|contenido)(\s|:|$)", text))
+# _looks_like_index_heading replaced by text_utils.looks_like_structural_text
 
 
 def _is_generic_timeline_reference(pattern_text: str, fragment: str) -> bool:
@@ -230,21 +232,14 @@ def _is_generic_timeline_reference(pattern_text: str, fragment: str) -> bool:
         return False
     if not any(term in fragment for term in ["plazo", "cronograma", "presentacion", "oferta"]):
         return False
-    return not _has_concrete_requirement_detail(fragment)
+    return not has_concrete_requirement_detail(fragment)
 
 
-def _has_concrete_requirement_detail(text: str) -> bool:
-    if re.search(r"\b\d+\s*(dias|dia|horas|hora|calendario|laborables|habiles|hábiles)\b", text):
-        return True
-    if re.search(r"\b\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}\b", text):
-        return True
-    if any(term in text for term in ["no se aceptan", "solo se acept", "obligatorio", "debera", "deberá", "se requiere"]):
-        return True
-    return False
+# _has_concrete_requirement_detail consolidated in text_utils.has_concrete_requirement_detail
 
 
 def _specificity_score(fragment: str) -> int:
-    text = _normalize(fragment)
+    text = _local_normalize(fragment)
     score = 0
     if any(char.isdigit() for char in text):
         score += 1
@@ -266,7 +261,7 @@ def _representative_excerpt(group: pd.DataFrame) -> str:
 
 
 def _consolidated_title(title: str) -> str:
-    normalized = _normalize(title)
+    normalized = _local_normalize(title)
     if "plazo" in normalized or "cronograma" in normalized:
         return "Consideraciones sobre cronograma y plazos"
     if "certificación" in normalized or "certificacion" in normalized or "autorización" in normalized or "autorizacion" in normalized:
@@ -305,25 +300,8 @@ def _safe_int(value: Any) -> int:
         return 1
 
 
-def _list_field(value: Any) -> list[str]:
-    if isinstance(value, list):
-        return [str(item).strip() for item in value if str(item).strip()]
-    if isinstance(value, tuple):
-        return [str(item).strip() for item in value if str(item).strip()]
-    if isinstance(value, str):
-        stripped = value.strip()
-        if not stripped:
-            return []
-        try:
-            parsed = ast.literal_eval(stripped)
-        except (ValueError, SyntaxError):
-            return [stripped]
-        if isinstance(parsed, list):
-            return [str(item).strip() for item in parsed if str(item).strip()]
-        return [str(parsed).strip()] if str(parsed).strip() else []
-    return []
 
 
-def _normalize(value: str) -> str:
-    replacements = str.maketrans("áéíóúñü", "aeiounu")
-    return re.sub(r"\s+", " ", value.lower().translate(replacements)).strip(" .,:;-")
+def _local_normalize(value: str) -> str:
+    """Module-local normalize alias — delegates to shared normalize_text_es."""
+    return normalize_text_es(value)

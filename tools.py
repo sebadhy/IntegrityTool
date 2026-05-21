@@ -270,17 +270,41 @@ def extract_pdf_pages(pdf_path: str, pages: list[int] | None = None) -> dict:
 
 
 def detect_patterns(text: str, page_number: int) -> dict:
-    """Aplica el motor de detección de patrones sobre un fragmento."""
+    """Aplica el motor de detección clause-centric sobre un fragmento.
+
+    Uses the same detect_signals pipeline as the Streamlit UI, ensuring
+    consistent results between agent and interactive analysis.
+    """
     try:
         from src.analyzer.pdf_extractor import PageText
-        from src.analyzer.detector import detect_patterns as run_detection
+        from src.analyzer.document_segmenter import segment_document
+        from src.analyzer.clause_extractor import extract_clauses
+        from src.analyzer.boilerplate_filter import active_clauses, classify_clauses
+        from src.analyzer.detector import detect_signals
 
         pages = [PageText(page_number=page_number, text=text)]
-        detections = run_detection(pages)
+        sections = segment_document(pages)
+        document_id = f"agent-page-{page_number}"
+        clauses = classify_clauses(extract_clauses(pages, sections, document_id))
+        signals = detect_signals(active_clauses(clauses))
 
         return {
-            "total_findings": len(detections),
-            "findings": [d.to_dict() for d in detections],
+            "total_findings": len(signals),
+            "findings": [
+                {
+                    "signal_id": signal.signal_id,
+                    "pattern_id": signal.pattern_id,
+                    "pattern_name": signal.metadata.get("pattern_name", ""),
+                    "matched_text": signal.matched_text,
+                    "evidence_text": signal.evidence_text,
+                    "page": signal.page,
+                    "section": signal.section_title,
+                    "competition_dimension": signal.competition_dimension,
+                    "confidence": signal.confidence,
+                    "family": signal.family,
+                }
+                for signal in signals
+            ],
         }
     except Exception as exc:
         LOGGER.error("detect_patterns error: %s", exc)

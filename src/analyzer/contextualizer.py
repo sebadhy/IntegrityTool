@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import hashlib
-import re
 from typing import Any
 
 from .domain_models import Clause, FindingCandidate, Signal
 from .mitigants import detect_mitigants, missing_mitigants
 from .taxonomy_loader import TaxonomyPattern, load_taxonomy
+from .text_utils import normalize_text_es
 
 
 def build_finding_candidates(
@@ -25,7 +25,7 @@ def build_finding_candidates(
         mitigants = detect_mitigants(signal, clause, pattern)
         missing = missing_mitigants(signal, mitigants)
         historical = _historical_context(pattern, corpus_context or {})
-        normalized_requirement = _normalize(signal.evidence_text)
+        normalized_requirement = normalize_text_es(signal.evidence_text)
         candidate_id = hashlib.sha1(f"{signal.signal_id}|{normalized_requirement[:160]}".encode("utf-8")).hexdigest()[:12]
         candidates.append(
             FindingCandidate(
@@ -97,7 +97,3 @@ def _limitations(clause: Clause, historical: dict[str, Any]) -> list[str]:
         limitations.append("La sección documental no pudo clasificarse con alta precisión.")
     return limitations
 
-
-def _normalize(text: str) -> str:
-    replacements = str.maketrans("áéíóúñü", "aeiounu")
-    return re.sub(r"\s+", " ", text.lower().translate(replacements)).strip()
