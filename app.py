@@ -153,6 +153,24 @@ def safe_text(value: object) -> str:
     return escape(str(value))
 
 
+def _highlight_matched(text: str, matched: str) -> str:
+    """Devuelve el texto con matched en negrita, escapado para HTML seguro."""
+    safe = escape(text.strip())
+    if not matched or not matched.strip():
+        return f"<p>{safe}</p>"
+    safe_match = escape(matched.strip())
+    # Búsqueda case-insensitive preservando el texto original
+    import re as _re
+    highlighted = _re.sub(
+        f"({_re.escape(safe_match)})",
+        r"<strong>\1</strong>",
+        safe,
+        count=1,
+        flags=_re.IGNORECASE,
+    )
+    return f"<p>{highlighted}</p>"
+
+
 def dimension_label(value: object) -> str:
     raw_value = str(value or "").strip()
     if not raw_value or raw_value == "No disponible":
@@ -964,7 +982,7 @@ def render_evidence_panel(row: pd.Series, pages: list | None = None, pdf_bytes: 
             if isinstance(raw_items, list) and raw_items and isinstance(raw_items[0], dict):
                 for index, item in enumerate(raw_items, start=1):
                     st.markdown(f"**Ocurrencia {index} · página {safe_text(item.get('page', 'No disponible'))}**")
-                    st.write(safe_text(item.get("text", "")))
+                    st.markdown(_highlight_matched(item.get("text", ""), item.get("matched_text", "")), unsafe_allow_html=True)
             else:
                 for index, item in enumerate(display_list(raw_items), start=1):
                     st.markdown(f"**Ocurrencia {index}**")
