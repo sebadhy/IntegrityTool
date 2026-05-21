@@ -4,6 +4,7 @@
     --blue-soft: #EAF3FA;
     --gray-light: #F5F7FA;
     --text-gray: #333333;
+    --text-muted: #6B7A8D;
     --border: #D6DEE6;
     --warning-soft: #FFF8E5;
     --white: #FFFFFF;
@@ -1327,4 +1328,66 @@ h3 {
     .methodology-brief {
         grid-template-columns: 1fr;
     }
+}
+
+/* ============================================================
+   Hover/focus overrides — fuerza fondo claro sobre Streamlit dark
+   ============================================================ */
+
+/* Expander: header hover y open state */
+[data-testid="stExpander"] details summary:hover,
+[data-testid="stExpander"] details summary:focus,
+[data-testid="stExpander"] details[open] summary {
+    background: var(--blue-soft) !important;
+    color: var(--blue-dark) !important;
+}
+
+[data-testid="stExpander"] details summary:hover svg,
+[data-testid="stExpander"] details summary:focus svg,
+[data-testid="stExpander"] details[open] summary svg {
+    color: var(--blue-dark) !important;
+    fill: var(--blue-dark) !important;
+}
+
+/* Expander: contenido interno siempre blanco */
+[data-testid="stExpander"] details > div {
+    background: var(--white) !important;
+    color: var(--text-gray) !important;
+}
+
+/* File uploader: dropzone y botón upload */
+[data-testid="stFileUploaderDropzone"] {
+    background: #FBFCFE !important;
+    border: 1.5px dashed var(--border) !important;
+    border-radius: 5px !important;
+    color: var(--text-gray) !important;
+}
+
+[data-testid="stFileUploaderDropzone"]:hover,
+[data-testid="stFileUploaderDropzone"]:focus-within {
+    background: var(--blue-soft) !important;
+    border-color: var(--blue-medium) !important;
+    color: var(--text-gray) !important;
+}
+
+[data-testid="stFileUploaderDropzone"] button,
+[data-testid="stFileUploaderDropzone"] [data-testid="baseButton-secondary"] {
+    background: var(--white) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--blue-dark) !important;
+}
+
+[data-testid="stFileUploaderDropzone"] button:hover,
+[data-testid="stFileUploaderDropzone"] [data-testid="baseButton-secondary"]:hover {
+    background: var(--blue-dark) !important;
+    border-color: var(--blue-dark) !important;
+    color: var(--white) !important;
+}
+
+[data-testid="stFileUploaderDropzoneInstructions"] {
+    color: var(--text-gray) !important;
+}
+
+[data-testid="stFileUploaderDropzoneInstructions"] small {
+    color: var(--text-muted) !important;
 }
