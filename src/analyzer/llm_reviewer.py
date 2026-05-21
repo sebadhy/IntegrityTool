@@ -1,12 +1,26 @@
+"""
+llm_reviewer.py — Lectura asistida por LLM para revisión de pliegos.
+
+Proveedores soportados (prioridad descendente):
+  1. Azure OpenAI  — OPENAI_API_KEY + OPENAI_BASE_URL + OPENAI_API_VERSION
+  2. Groq          — GROQ_API_KEY  (modelo: GROQ_MODEL, default: llama-3.3-70b-versatile)
+  3. Ollama local  — OLLAMA_BASE_URL (default: http://localhost:11434/v1) + OLLAMA_MODEL
+  4. OpenAI directo — OPENAI_API_KEY (sin OPENAI_API_VERSION)
+
+Máximo 2 llamadas LLM por documento: un brief + explicaciones individuales on-demand.
+Reintentos automáticos con backoff exponencial para errores 429 de rate limit.
+"""
+
 from __future__ import annotations
 
 import json
 import logging
 import os
+import random
+import time
 from typing import Any
 
 from dotenv import load_dotenv
-from openai import OpenAI
 
 from src.config import APP_MAX_DOCUMENT_CHARS, OPENAI_MODEL
 
@@ -19,8 +33,13 @@ LOGGER = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = (
     "Eres un asistente técnico para revisión preliminar de neutralidad competitiva en "
-    "documentos de contratación pública de Ecuador. Tu función es resumir, contextualizar "
-    "y apoyar la priorización de revisión humana a partir de señales documentales ya detectadas. Puedes apoyarte en principios normativos "
+    "documentos de contratación pública de Ecuador. "
+    "Tu lector objetivo es un técnico institucional sin formación legal especializada, "
+    "que necesita decidir qué cláusulas del documento merecen revisión más detallada "
+    "en los próximos 30 minutos. Escribe de forma concisa, orientada a decisión, "
+    "sin adornos ni lenguaje acusatorio. "
+    "Tu función es resumir, contextualizar y apoyar la priorización de revisión humana "
+    "a partir de señales documentales ya detectadas. Puedes apoyarte en principios normativos "
     "como concurrencia, igualdad, trato justo, no discriminación, transparencia, mejor valor "
     "por dinero, claridad de especificaciones, proporcionalidad y justificación técnica. "
     "No emites dictámenes legales, no atribuyes intencionalidad, no infieres proveedores beneficiados "
@@ -31,6 +50,187 @@ SYSTEM_PROMPT = (
 DEFAULT_MODEL = OPENAI_MODEL
 UNAVAILABLE = "No disponible"
 MAX_DOCUMENT_CHARS = APP_MAX_DOCUMENT_CHARS
+MAX_RETRIES = 4
+BASE_DELAY = 2.0
+
+
+# ---------------------------------------------------------------------------
+# Detección de proveedor LLM
+# ---------------------------------------------------------------------------
+
+def _use_azure() -> bool:
+    return bool(
+        os.getenv("OPENAI_API_KEY")
+        and os.getenv("OPENAI_BASE_URL")
+        and os.getenv("OPENAI_API_VERSION")
+    )
+
+
+def _use_groq() -> bool:
+    return bool(os.getenv("GROQ_API_KEY"))
+
+
+def _use_ollama() -> bool:
+    return bool(os.getenv("OLLAMA_BASE_URL") or os.getenv("OLLAMA_MODEL"))
+
+
+def _use_openai() -> bool:
+    return bool(os.getenv("OPENAI_API_KEY"))
+
+
+def _llm_available() -> bool:
+    return _use_azure() or _use_groq() or _use_ollama() or _use_openai()
+
+
+def _no_llm_reason() -> str:
+    return (
+        "Sin LLM configurado. Define OPENAI_API_KEY (Azure/OpenAI), "
+        "GROQ_API_KEY (Groq) u OLLAMA_BASE_URL (Ollama) en .env"
+    )
+
+
+def _provider_name() -> str:
+    if _use_azure():
+        return "Azure OpenAI"
+    if _use_groq():
+        return "Groq"
+    if _use_ollama():
+        return "Ollama"
+    return "OpenAI"
+
+
+def _model() -> str:
+    if _use_azure():
+        return os.getenv("OPENAI_MODEL", DEFAULT_MODEL)
+    if _use_groq():
+        return os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    if _use_ollama():
+        return os.getenv("OLLAMA_MODEL", "llama3.1")
+    return os.getenv("OPENAI_MODEL", DEFAULT_MODEL)
+
+
+def _client():
+    """Retorna cliente OpenAI-compatible según las variables de entorno disponibles."""
+    if _use_azure():
+        from openai import AzureOpenAI
+        return AzureOpenAI(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            azure_endpoint=os.getenv("OPENAI_BASE_URL"),
+            api_version=os.getenv("OPENAI_API_VERSION", "2024-06-01"),
+        )
+    if _use_groq():
+        from openai import OpenAI
+        return OpenAI(
+            api_key=os.getenv("GROQ_API_KEY"),
+            base_url="https://api.groq.com/openai/v1",
+        )
+    if _use_ollama():
+        from openai import OpenAI
+        return OpenAI(
+            api_key="ollama",
+            base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
+        )
+    from openai import OpenAI
+    return OpenAI(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        base_url=os.getenv("OPENAI_BASE_URL") or None,
+    )
+
+
+def _response_format(schema: dict) -> dict:
+    """Devuelve response_format apropiado según el proveedor activo.
+
+    Ollama y modelos locales solo soportan json_object; cloud providers soportan json_schema estricto.
+    """
+    if _use_ollama():
+        return {"type": "json_object"}
+    return schema
+
+
+# ---------------------------------------------------------------------------
+# Retry con backoff exponencial ante rate limit
+# ---------------------------------------------------------------------------
+
+def _is_rate_limit(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return "429" in msg or "rate_limit" in msg or "ratelimit" in msg or "too many requests" in msg
+
+
+def _call_with_retry(fn):
+    """Ejecuta fn() con hasta MAX_RETRIES reintentos ante rate limit (429)."""
+    last_exc: Exception | None = None
+    for attempt in range(MAX_RETRIES):
+        try:
+            return fn()
+        except Exception as exc:
+            last_exc = exc
+            if _is_rate_limit(exc) and attempt < MAX_RETRIES - 1:
+                delay = BASE_DELAY * (2 ** attempt) + random.uniform(0, 0.5)
+                LOGGER.warning(
+                    "Rate limit detectado. Reintentando en %.1fs (intento %d/%d).",
+                    delay, attempt + 1, MAX_RETRIES,
+                )
+                time.sleep(delay)
+            else:
+                raise
+    raise last_exc  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# Few-shots para guiar respuestas de hallazgos
+# ---------------------------------------------------------------------------
+
+_FEWSHOT_MARCA_SIN_EQUIVALENTE = """\
+### EJEMPLO 1 — Marca sin equivalente → revisión prioritaria
+
+Señal detectada:
+{
+  "patron": "marca",
+  "pattern_id": "cn-brand-model-provider-reference",
+  "fragmento": "Las luminarias deberán ser marca PHILIPS modelo CorePro LEDBulb",
+  "mitigating_factors": [],
+  "escalation_factors": ["No se observa mitigante de equivalencia cerca del fragmento."]
+}
+
+Output esperado:
+{
+  "plain_language_explanation": "La especificación nombra una marca comercial específica sin indicar que se aceptan productos equivalentes. En ausencia de una cláusula de equivalencia funcional, la mayoría de oferentes que no distribuyan esa marca quedarían excluidos de facto.",
+  "why_it_matters": "La combinación de referencia de marca cerrada sin mitigante justifica revisión prioritaria de proporcionalidad.",
+  "possible_legitimate_justification": "La exigencia podría estar justificada si existe infraestructura instalada que requiera compatibilidad, o si hay razones de estandarización documentadas.",
+  "suggested_review_action": "Verificar si el documento incluye cláusula de equivalencia funcional. Si no existe, solicitar justificación técnica.",
+  "questions_for_reviewer": [
+    "¿El pliego incluye en algún punto una cláusula de aceptación de equivalentes funcionales?",
+    "¿Existe justificación técnica de la exigencia de esta marca específica?"
+  ]
+}"""
+
+_FEWSHOT_MARCA_CON_EQUIVALENTE = """\
+### EJEMPLO 2 — Marca con equivalente funcional → atención baja
+
+Señal detectada:
+{
+  "patron": "marca",
+  "pattern_id": "cn-brand-model-provider-reference",
+  "fragmento": "Las luminarias deberán ser marca PHILIPS o equivalente funcional que cumpla las mismas especificaciones",
+  "mitigating_factors": ["o equivalente funcional"],
+  "escalation_factors": []
+}
+
+Output esperado:
+{
+  "plain_language_explanation": "La especificación nombra una marca pero incluye una cláusula de equivalencia funcional. El documento establece que se aceptarán productos que cumplan las mismas especificaciones técnicas, lo que mantiene la apertura competitiva.",
+  "why_it_matters": "La presencia de la cláusula de equivalencia mitiga el riesgo competitivo. La atención sugerida es baja.",
+  "possible_legitimate_justification": "La referencia a marca parece usarse como referencia técnica orientativa, no como requisito cerrado. Esto es práctica aceptada cuando se acompaña de criterios de equivalencia verificables.",
+  "suggested_review_action": "Verificar que los criterios de equivalencia mencionados sean objetivamente verificables durante la evaluación de ofertas.",
+  "questions_for_reviewer": [
+    "¿Los criterios de equivalencia están suficientemente definidos para ser verificables en evaluación?"
+  ]
+}"""
+
+
+# ---------------------------------------------------------------------------
+# Schemas JSON para respuestas estructuradas
+# ---------------------------------------------------------------------------
 
 DOCUMENT_BRIEF_SCHEMA = {
     "type": "json_schema",
@@ -161,40 +361,47 @@ PLIEGO_METADATA_SCHEMA = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Funciones públicas
+# ---------------------------------------------------------------------------
+
 def extract_pliego_metadata_assisted(
     document_text: str,
     heuristic_candidates: dict,
     first_pages: str,
 ) -> dict:
     """Validate and complete pliego metadata using optional assisted processing."""
-    if not os.getenv("OPENAI_API_KEY"):
-        return _unavailable_pliego_metadata("OPENAI_API_KEY no está configurada.")
+    if not _llm_available():
+        return _unavailable_pliego_metadata(_no_llm_reason())
 
     try:
-        response = _client().chat.completions.create(
-            model=os.getenv("OPENAI_MODEL", DEFAULT_MODEL),
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "Eres un asistente técnico para extracción preliminar de metadata de pliegos "
-                        "de contratación pública de Ecuador. Debes validar campos con evidencia textual, "
-                        "corregir truncamientos obvios y no inventar datos. Si un campo no está sustentado, "
-                        "usa 'No identificado'. Responde solo JSON estricto."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": _build_pliego_metadata_prompt(document_text, heuristic_candidates, first_pages),
-                },
-            ],
-            response_format=PLIEGO_METADATA_SCHEMA,
-        )
+        def _call():
+            return _client().chat.completions.create(
+                model=_model(),
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Eres un asistente técnico para extracción preliminar de metadata de pliegos "
+                            "de contratación pública de Ecuador. Debes validar campos con evidencia textual, "
+                            "corregir truncamientos obvios y no inventar datos. Si un campo no está sustentado, "
+                            "usa 'No identificado'. Responde solo JSON estricto."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": _build_pliego_metadata_prompt(document_text, heuristic_candidates, first_pages),
+                    },
+                ],
+                response_format=_response_format(PLIEGO_METADATA_SCHEMA),
+            )
+        response = _call_with_retry(_call)
         content = response.choices[0].message.content or "{}"
         return _normalize_pliego_metadata(json.loads(content))
     except Exception as exc:
         LOGGER.warning("Pliego metadata assisted extraction failed: %s", exc)
         return _unavailable_pliego_metadata(_friendly_llm_error(exc))
+
 
 def generate_document_brief(
     document_text: str,
@@ -203,26 +410,28 @@ def generate_document_brief(
     normative_context: dict | None = None,
 ) -> dict:
     """Generate a cautious executive brief from document text and prior rule findings."""
-    if not os.getenv("OPENAI_API_KEY"):
-        return _unavailable_document_brief("OPENAI_API_KEY no está configurada.")
+    if not _llm_available():
+        return _unavailable_document_brief(_no_llm_reason())
 
     try:
-        response = _client().chat.completions.create(
-            model=os.getenv("OPENAI_MODEL", DEFAULT_MODEL),
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": _build_document_brief_prompt(
-                        document_text=document_text,
-                        findings=prioritized_findings,
-                        corpus_context=corpus_context,
-                        normative_context=normative_context,
-                    ),
-                },
-            ],
-            response_format=DOCUMENT_BRIEF_SCHEMA,
-        )
+        def _call():
+            return _client().chat.completions.create(
+                model=_model(),
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {
+                        "role": "user",
+                        "content": _build_document_brief_prompt(
+                            document_text=document_text,
+                            findings=prioritized_findings,
+                            corpus_context=corpus_context,
+                            normative_context=normative_context,
+                        ),
+                    },
+                ],
+                response_format=_response_format(DOCUMENT_BRIEF_SCHEMA),
+            )
+        response = _call_with_retry(_call)
         content = response.choices[0].message.content or "{}"
         return _normalize_document_brief(json.loads(content))
     except Exception as exc:
@@ -235,24 +444,26 @@ def explain_priority_with_llm(
     corpus_context: dict | None = None,
 ) -> dict:
     """Explain one prioritized signal in plain language."""
-    if not os.getenv("OPENAI_API_KEY"):
-        return _unavailable_finding_explanation("OPENAI_API_KEY no está configurada.")
+    if not _llm_available():
+        return _unavailable_finding_explanation(_no_llm_reason())
 
     try:
-        response = _client().chat.completions.create(
-            model=os.getenv("OPENAI_MODEL", DEFAULT_MODEL),
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": _build_finding_prompt(
-                        finding=priority,
-                        corpus_context=corpus_context,
-                    ),
-                },
-            ],
-            response_format=FINDING_EXPLANATION_SCHEMA,
-        )
+        def _call():
+            return _client().chat.completions.create(
+                model=_model(),
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {
+                        "role": "user",
+                        "content": _build_finding_prompt(
+                            finding=priority,
+                            corpus_context=corpus_context,
+                        ),
+                    },
+                ],
+                response_format=_response_format(FINDING_EXPLANATION_SCHEMA),
+            )
+        response = _call_with_retry(_call)
         content = response.choices[0].message.content or "{}"
         return _normalize_finding_explanation(json.loads(content))
     except Exception as exc:
@@ -280,38 +491,31 @@ def review_detection_with_llm(detection: dict) -> dict:
 
 
 def test_llm_connection() -> tuple[bool, str]:
-    """Check API key presence and perform a minimal model call."""
-    if not os.getenv("OPENAI_API_KEY"):
-        return False, "OPENAI_API_KEY no está configurada."
+    """Check LLM availability and perform a minimal model call."""
+    if not _llm_available():
+        return False, _no_llm_reason()
 
     try:
-        response = _client().chat.completions.create(
-            model=os.getenv("OPENAI_MODEL", DEFAULT_MODEL),
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Responde de forma breve y técnica.",
-                },
-                {
-                    "role": "user",
-                    "content": "Responde exactamente: OK",
-                },
-            ],
-        )
+        def _call():
+            return _client().chat.completions.create(
+                model=_model(),
+                messages=[
+                    {"role": "system", "content": "Responde de forma breve y técnica."},
+                    {"role": "user", "content": "Responde exactamente: OK"},
+                ],
+            )
+        response = _call_with_retry(_call)
         content = (response.choices[0].message.content or "").strip()
         if content:
-            return True, "Conexión LLM OK"
+            return True, f"Conexión LLM OK ({_provider_name()} · {_model()})"
         return False, "La conexión respondió, pero no devolvió contenido."
     except Exception as exc:
         return False, _friendly_llm_error(exc)
 
 
-def _client() -> OpenAI:
-    return OpenAI(
-        api_key=os.getenv("OPENAI_API_KEY"),
-        base_url=os.getenv("OPENAI_BASE_URL") or None,
-    )
-
+# ---------------------------------------------------------------------------
+# Helpers privados
+# ---------------------------------------------------------------------------
 
 def _friendly_llm_error(exc: Exception) -> str:
     message = str(exc)
@@ -319,13 +523,12 @@ def _friendly_llm_error(exc: Exception) -> str:
     if "insufficient_quota" in lower_message or "quota" in lower_message:
         return "No hay cuota o crédito disponible para usar el modelo configurado."
     if "authentication" in lower_message or "api key" in lower_message or "401" in lower_message:
-        return "La API key no pudo autenticarse. Verifique OPENAI_API_KEY."
+        return f"La API key no pudo autenticarse. Verifique la clave de {_provider_name()}."
     if "connection" in lower_message or "timeout" in lower_message:
-        return "No se pudo conectar con el proveedor LLM. Revise red o OPENAI_BASE_URL."
+        return f"No se pudo conectar con {_provider_name()}. Revise red o URL de endpoint."
     if "model" in lower_message and ("not found" in lower_message or "does not exist" in lower_message):
-        return "El modelo configurado no está disponible. Revise OPENAI_MODEL."
+        return f"El modelo '{_model()}' no está disponible en {_provider_name()}."
     return f"No se pudo verificar la conexión LLM: {message[:240]}"
-
 
 
 def _build_pliego_metadata_prompt(document_text: str, heuristic_candidates: dict, first_pages: str) -> str:
@@ -434,6 +637,11 @@ def _build_finding_prompt(finding: dict, corpus_context: dict | None) -> str:
     pattern = str(finding.get("patrón detectado", "No disponible"))
     context = (corpus_context or {}).get(pattern, {})
 
+    # Seleccionar few-shot más relevante según el tipo de señal
+    mitigants = finding.get("mitigating_factors", [])
+    has_mitigant = bool(mitigants) if isinstance(mitigants, list) else bool(mitigants)
+    fewshot = _FEWSHOT_MARCA_CON_EQUIVALENTE if has_mitigant else _FEWSHOT_MARCA_SIN_EQUIVALENTE
+
     return (
         "Explica una señal sugerida para revisión humana de forma clara y prudente.\n\n"
         "Condiciones:\n"
@@ -446,6 +654,8 @@ def _build_finding_prompt(finding: dict, corpus_context: dict | None) -> str:
         "- No atribuyas intencionalidad.\n"
         "- Usa lenguaje técnico, breve y orientado a decisión.\n"
         "- Devuelve únicamente JSON estricto con las claves solicitadas.\n\n"
+        f"{fewshot}\n\n"
+        "---\n"
         f"Señal sugerida:\n{json.dumps(_compact_finding(finding), ensure_ascii=False, indent=2)}\n\n"
         f"Contexto histórico del patrón:\n{json.dumps(context, ensure_ascii=False, indent=2)}\n\n"
         f"Taxonomía documental de referencia:\n{json.dumps(taxonomy_context(limit=6), ensure_ascii=False, indent=2)}\n"
