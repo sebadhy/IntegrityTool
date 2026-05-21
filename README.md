@@ -1,62 +1,107 @@
-# Asistente exploratorio de neutralidad competitiva en pliegos
+# Asistente exploratorio de neutralidad competitiva en pliegos — Branch `fusion`
 
-Aplicación exploratoria local para apoyar la revisión humana de neutralidad competitiva en pliegos de contratación pública.
+Aplicación local para apoyar la revisión humana de neutralidad competitiva en pliegos de contratación pública de Ecuador.
 
-La herramienta ayuda a priorizar y contextualizar señales preliminares de restricción competitiva, requisitos potencialmente limitantes, baja neutralidad competitiva y condiciones que podrían reducir concurrencia.
+> **Branch `fusion`**: integración de lo mejor de los branches `Andres`, `Sebastian` y `Vladimiro`, con correcciones y mejoras adicionales. Los tres branches originales se conservan sin modificación.
 
-Las señales identificadas son insumos preliminares para revisión humana de neutralidad competitiva. No constituyen dictamen técnico, legal ni determinación de responsabilidad.
+---
+
+## Qué aportó cada branch
+
+### Branch `Sebastian`
+Base técnica principal adoptada en `fusion`:
+
+- **Pipeline clause-centric**: PDF → parse → segment → extract_clauses → boilerplate_filter → detect_signals → contextualize → consolidate → relevance_filter → prioritize → ReviewItems
+- **`observation_filter.py`**: agrupa hallazgos por `(pattern_id + competition_dimension + signal_type)`, cuenta ocurrencias, vincula páginas relacionadas y aplica visibility scoring
+- **Suite de 47 tests** que cubre taxonomía, mitigantes, señales contextuales, priorización y control de lenguaje
+- Arquitectura modular con separación clara entre detección, consolidación, priorización y renderizado
+
+### Branch `Andres`
+Capacidades de modo agente adoptadas en `fusion`:
+
+- **`agent.py` / `agent_runner.py`**: modo batch para procesar múltiples pliegos sin interfaz Streamlit
+- **`db.py`**: persistencia en SQL Server vía pyodbc; campo allowlist `_AGENT_RUN_UPDATABLE_FIELDS` para prevenir inyección SQL en UPDATE dinámico
+- **`notifier.py`**: notificaciones de resultado por lote
+- **`tools.py`**: herramientas de agente para extracción de texto y detección de patrones
+- **`pages/Ayuda.py`**: página de ayuda integrada en Streamlit
+- **Soporte Groq**: `GROQ_API_KEY` y `GROQ_MODEL` para usar `llama-3.3-70b-versatile` u otros modelos del ecosistema Groq
+
+### Branch `Vladimiro`
+Experiencia de usuario y capa LLM adoptadas en `fusion`:
+
+- **Few-shots en el prompt LLM**: `_FEWSHOT_MARCA_SIN_EQUIVALENTE` y `_FEWSHOT_MARCA_CON_EQUIVALENTE` para calibrar la lectura asistida
+- **Encabezado de documento con resumen analítico**: señales Alto/Medio/Bajo, temas principales y objeto del proceso visibles desde el primer pantallazo
+- **UI en tabs**: organización de la vista de resultados por pestañas
+- **CSS limpio y variables definidas**: primera versión con `--surface`, `--shadow-soft`, `--text-muted` en `:root`
+- **Configuración flexible por env**: `OPENAI_BASE_URL`, `OPENAI_MODEL` y fallback seguro cuando no hay LLM configurado
+
+---
+
+## Qué se mejoró en `fusion`
+
+### Soporte multi-proveedor LLM
+- Cadena de detección automática: **Azure OpenAI → Groq → Ollama → OpenAI directo**
+- Variable `LLM_PROVIDER` para forzar proveedor: `groq`, `azure`, `ollama`, `openai`
+- `_forced_provider()` correctamente conectado a `_use_azure/groq/ollama/openai()`
+- `_response_format()`: esquema `json_schema` (strict) para cloud, `json_object` para Ollama
+- `_call_with_retry()`: backoff exponencial, MAX_RETRIES=4, BASE_DELAY=2.0 para rate limit 429
+- `test_llm_connection()` usado consistentemente (antes solo se chequeaba `OPENAI_API_KEY`)
+- `src/config.py` con `GROQ_MODEL`, `OLLAMA_BASE_URL`, `OLLAMA_MODEL`
+
+### Pipeline correctamente cableado
+- `observation_filter.prepare_visible_review_items()` existía en Sebastian pero **nunca se llamaba**; ahora está integrado en `review_pipeline.py` y se retorna como `enriched_df`
+- `tools.py` (Andres): `detect_patterns()` ahora usa el pipeline clause-centric completo igual que la UI, en vez de una función separada que fue removida
+
+### Refactor de utilidades duplicadas
+- **`src/analyzer/text_utils.py`** (nuevo): `unique_strings`, `list_field`, `normalize_text_es`, `is_substantive_evidence_text`, `has_concrete_requirement_detail`, `looks_like_structural_text` — antes duplicadas en 6+ módulos del pipeline
+- **`src/analyzer/review_row_schema.py`** (nuevo): constantes para todos los nombres de campo del row (`SIGNAL_ID`, `PATTERN_NAME`, `REVIEW_PRIORITY_LABELS`, `HISTORY_ORDER`, etc.) con fuente única
+- Eliminadas `_unique()`, `_escalation_factors()`, `_catalog_severity()` locales de `detector.py` y equivalentes en `consolidator`, `prioritizer`, `observation_filter`, `mitigants`
+
+### CSS consolidado
+- Eliminadas 2 definiciones duplicadas de `:root` → 1 bloque unificado con todas las variables
+- Eliminadas 3 definiciones de `.block-container` → 1 definitiva: `max-width: 1180px; padding: 0.85rem 2rem 3rem`
+- Eliminadas 2 definiciones de `h2, h3` → 1 sin border-bottom (limpia; `.section-heading` maneja sus separadores)
+- Eliminadas 2 definiciones de `.document-header-simple` → 1 consolidada con `border-radius: 6px` y `box-shadow`
+- Eliminada segunda definición de `.top-finding-card` que sobreescribía el borde de color azul
+- Eliminada segunda definición de `.evidence-snippet` que destruía la paleta dorada de evidencia
+- Añadidas variables `--surface-muted: #F8FAFC` y `--text-muted: #5F6B76` al `:root` principal
+
+### UX y experiencia de uso
+- **Barra de navegación integrada** (`render_review_nav`): reemplaza el botón "Nueva revisión" flotante y desconectado por una barra horizontal con nombre del documento y botón `← Nueva revisión` a la derecha
+- `render_methodological_limitations()` se mueve **antes** de los hallazgos (entre resumen y aspectos sugeridos) para que el usuario vea el alcance antes de los resultados
+- Expander "Qué revisa la herramienta" abre `expanded=True` por defecto
+- Resultado vacío cambia de `st.success` a `st.info` (semánticamente correcto)
+- Explicación de **Alto / Medio / Bajo** visible en el encabezado de la sección de hallazgos
+- Texto "PoC" eliminado → "herramienta exploratoria"
+- Negrita en `matched_text` dentro de ocurrencias relacionadas (`_highlight_matched`)
+- Hover de expanders y file uploader con fondo claro (override `!important` sobre dark mode de Streamlit)
+
+### Seguridad
+- `db.py`: `_AGENT_RUN_UPDATABLE_FIELDS` (frozenset) valida nombres de columna antes de UPDATE dinámico
+- `agent.py`: usa `GROQ_MODEL` desde `src/config` en vez de hardcoded
+- `.env.example` documenta los 4 proveedores con instrucciones comentadas
+
+---
 
 ## Stack
 
-- Python
+- Python 3.11+
 - Streamlit
-- PyMuPDF
+- PyMuPDF (fitz)
 - pandas
-- OpenAI API compatible
+- openai (compatible con Azure, Groq, Ollama y OpenAI directo)
+- groq >= 0.11.0
 - python-dotenv
+- pyodbc (modo agente, opcional)
 
-## Estructura
-
-```text
-.
-├── assets
-│   └── styles.css
-├── app.py
-├── data
-│   ├── raw
-│   │   ├── metadata
-│   │   │   └── procesos.csv
-│   │   ├── pliegos
-│   │   └── especificaciones
-│   └── processed
-│       └── extracted_text
-├── requirements.txt
-├── README.md
-└── src
-    └── analyzer
-        ├── corpus_loader.py
-        ├── corpus_validator.py
-        ├── __init__.py
-        ├── detector.py
-        ├── finding_model.py
-        ├── llm_reviewer.py
-        ├── normative_reference.py
-        ├── pdf_extractor.py
-        ├── patterns
-        │   ├── __init__.py
-        │   ├── competitive_neutrality_patterns.py
-        │   └── risk_taxonomy.yaml
-        ├── prioritizer.py
-        ├── taxonomy_loader.py
-        └── review_synthesis.py
-```
-
-## Instalación local
+## Instalación
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+cp .env.example .env
+# editar .env con las credenciales del proveedor LLM elegido
 ```
 
 ## Ejecución
@@ -65,530 +110,58 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Luego abre:
-
-```text
-http://localhost:8501
-```
-
-
-## Arquitectura del pipeline
-
-El pipeline técnico actual se documenta en:
-
-- `docs/architecture.md`
-
-La arquitectura es clause-centric, taxonomy-driven y deterministic-first. La interfaz Streamlit renderiza `ReviewItem[]`; la detección, mitigantes, consolidación, priorización y filtrado de relevancia viven en módulos separados de `src/analyzer/`.
-
-## Enfoque analítico
-
-La interfaz se presenta como:
-
-```text
-Asistente exploratorio de neutralidad competitiva en pliegos
-```
-
-Subtítulo:
-
-```text
-Identificación preliminar de requisitos potencialmente limitantes en documentos de contratación pública
-```
-
-La herramienta ayuda a responder:
-
-```text
-¿Qué condiciones del pliego podrían requerir validación de proporcionalidad o revisión humana sugerida por posible efecto sobre concurrencia?
-```
-
-La experiencia principal está organizada como una lectura vertical tipo briefing institucional. Los controles analíticos principales se mantienen en la vista central:
-
-- carga del documento
-- selección de comparación con corpus histórico
-- activación de lectura asistida por IA
-- pipeline visual
-- lectura preliminar
-- criterios de lectura
-- temas sugeridos para revisión
-- evidencia documental
-
-La barra lateral queda reservada para configuración técnica opcional, como `Test LLM`.
-
-## Flujo de briefing institucional
-
-Al cargar un PDF, la app muestra un pipeline visual:
-
-1. Extracción documental
-2. Identificación de cláusulas
-3. Comparación histórica
-4. Consolidación analítica
-5. Lectura asistida por IA
-
-La vista principal prioriza comprensión antes que tabla técnica:
-
-- lectura preliminar asistida por IA, si está configurada
-- resumen ejecutivo basado en reglas y comparación documental
-- balance analítico entre factores de revisión, mitigantes y requisitos habituales
-- Top 3 aspectos prioritarios sugeridos para revisión
-- temas agrupados en bloques expandibles
-- evidencia textual y criterios normativos por señal
-- exportación CSV y reporte ejecutivo en Markdown
-
-## Categorías de revisión
-
-- Autorizaciones comerciales o de fabricante
-- Referencias a marca, origen o fabricante
-- Certificaciones específicas
-- Requisitos técnicos cerrados
-- Garantías, repuestos y postventa
-- Restricciones geográficas o de presencia local
-- Experiencia o capacidad excesivamente específica
-- Combinaciones de requisitos potencialmente limitantes
-- Completitud y trazabilidad documental
-- Requisitos regulatorios o habituales
-- Elementos que favorecen concurrencia
-
-## Evaluación contextual
-
-El motor ya no trata toda coincidencia textual como señal prioritaria. Cada detección se clasifica con `tipo_señal`:
-
-- `señal_revision`: aspecto que podría requerir revisión humana por posible impacto sobre concurrencia.
-- `mitigante_concurrencia`: elemento que favorece apertura competitiva o reduce una lectura cerrada.
-- `requisito_habitual`: requisito regulatorio, administrativo o estándar que no se prioriza por sí solo.
-
-Ejemplos de requisitos regulatorios o habituales:
-
-- RUP
-- capacidad legal
-- domicilio fiscal
-- asociaciones y consorcios
-- personas naturales o jurídicas
-- documentación administrativa estándar
-
-Estos requisitos no suben atención automáticamente y no aparecen en el Top 3 salvo que una combinación contextual específica justifique revisión.
-
-Ejemplos de mitigantes:
-
-- aceptación de equivalentes funcionales
-- participación mediante consorcios
-- apertura a oferentes nacionales y extranjeros
-- marcas equivalentes
-- criterios funcionales en vez de referencias cerradas
-
-Los mitigantes reducen la atención contextual de señales relacionadas y se muestran como aspectos que favorecen apertura competitiva.
-
-
-## Taxonomía de patrones documentales
-
-La app incorpora una taxonomía editable en `src/analyzer/patterns/risk_taxonomy.yaml`. Esta taxonomía permite ajustar patrones documentales sin modificar código Python. Cada patrón define dimensión competitiva, señales textuales, señales semánticas, posibles indicadores, mitigantes, justificaciones legítimas, preguntas de revisión humana y lenguaje recomendado.
-
-El loader `src/analyzer/taxonomy_loader.py` valida campos obligatorios y aplica fallback seguro si el YAML falta o contiene errores parciales. La herramienta conserva compatibilidad con el catálogo Python inicial en `src/analyzer/patterns/competitive_neutrality_patterns.py`.
-
-La diferencia metodológica central es que una señal preliminar no equivale a una conclusión legal o técnica. El motor preserva evidencia y contexto para revisión humana: equivalencias, justificaciones cercanas, acumulación de condiciones y frecuencia histórica.
-
-Los mitigantes no eliminan automáticamente una señal. La contextualizan. Por ejemplo, una mención a marca con “o equivalente” se mantiene como aspecto revisable, pero con menor prioridad y con una pregunta sobre si la equivalencia es efectiva y verificable.
-
-
-## Segmentación documental y calibración contextual
-
-La detección incorpora una segmentación liviana por secciones documentales para reducir falsos positivos. Las reglas se aplican con mayor intensidad en especificaciones técnicas, experiencia/capacidad y soporte; se restringen en condiciones generales y se omiten en formularios o anexos puramente administrativos cuando corresponde.
-
-La taxonomía registra un hash SHA256 en la exportación para mejorar reproducibilidad y auditoría de qué versión de patrones se usó en cada análisis.
-
-Las acciones humanas de revisión (`Confirmar`, `Descartar`, `Seguimiento`) pueden guardarse localmente en `data/feedback/cases.jsonl`. Ese archivo queda fuera de Git para evitar subir comentarios de trabajo o casos de revisión del equipo.
-
-## Modelo estructurado de hallazgos
-
-La app incorpora una capa estructurada de hallazgos mediante `src/analyzer/finding_model.py`, alimentada por la taxonomía YAML y el catálogo inicial de respaldo.
-
-Cada hallazgo conserva:
-
-- identificador trazable
-- `pattern_id` y `pattern_name`
-- dimensión competitiva
-- sección documental probable
-- severidad prudente: `low`, `medium` o `contextual`
-- evidencia textual y página
-- razón de revisión
-- factores mitigantes
-- posibles justificaciones legítimas
-- información faltante
-- preguntas sugeridas
-- prioridad de revisión: `general`, `suggested` o `priority`
-- advertencia metodológica
-
-Los resultados son preliminares, no constituyen dictamen legal o técnico definitivo y no reemplazan la revisión humana.
-
-## Capa normativa orientativa
-
-La herramienta incluye una capa simple de referencia normativa para alinear las observaciones con principios y reglas relevantes de contratación pública en Ecuador.
-
-Principios y criterios considerados:
-
-- concurrencia
-- igualdad y no discriminación
-- trato justo
-- transparencia
-- mejor valor por dinero
-- claridad, completitud y no ambigüedad de especificaciones
-- especificaciones relacionadas con bienes/rubros y no con proveedores
-- necesidad de justificación técnica o jurídica cuando un requisito pueda limitar competencia
-- consistencia entre pliego y anexos
-- uso adecuado de CPC
-
-Por cada señal sugerida para revisión, la app agrega:
-
-- `principio_normativo_relacionado`
-- `criterio_normativo_de_revision`
-- `pregunta_normativa_sugerida`
-
-La referencia normativa incluida es orientativa y sirve para apoyar revisión humana. No constituye interpretación legal oficial ni reemplaza el análisis jurídico o técnico de la entidad competente.
-
-Fuentes de referencia:
-
-- LOSNCP, disponible en el portal normativo del SERCOP: https://portal.compraspublicas.gob.ec/sercop/normativa/
-- RLOSNCP, disponible en el portal normativo del SERCOP: https://portal.compraspublicas.gob.ec/sercop/normativa/
-- Resoluciones SERCOP vigentes y régimen de transición, cuando aplique: https://portal.compraspublicas.gob.ec/sercop/cat_normativas/nor_res_ext
-
-## Salida principal
-
-Cada señal sugerida para revisión incluye:
-
-- `signal_id`
-- `rule_id`
-- `pattern_id`
-- `pattern_name`
-- dimensión competitiva
-- sección documental probable
-- prioridad de revisión
-- confidence
-- `rule_version`
-- `timestamp_analisis`
-- `engine_version`
-- `tipo_señal`
-- tema de revisión
-- página
-- categoría de revisión
-- patrón detectado
-- atención sugerida
-- relevancia analítica
-- criterios de priorización
-- explicación de priorización
-- clasificación histórica
-- frecuencia en corpus
-- procesos con patrón
-- posible efecto sobre concurrencia
-- validación sugerida
-- principio normativo relacionado
-- criterio normativo de revisión
-- pregunta normativa sugerida
-- por qué se sugiere revisar
-- posible justificación legítima
-- fragmento textual
-
-## Priorización
-
-El módulo `src/analyzer/prioritizer.py` agrega una priorización explicable. No calcula un indicador acusatorio; organiza señales para responder qué revisar primero y por qué.
-
-Campos principales:
-
-- `nivel_atencion`: Bajo, Medio o Alto, usado como etiqueta de atención visual
-- `review_priority`: `general`, `suggested` o `priority`
-- `prioridad de revisión`: revisión general, revisión sugerida o revisión prioritaria
-- `relevancia_analitica`: Bajo, Medio o Alto
-- `criterios_de_priorizacion`: razones concretas usadas por el motor
-- `explicacion_priorizacion`: síntesis prudente para revisión humana
-
-La atención sugerida combina:
-
-- frecuencia histórica del patrón
-- concentración de señales relacionadas
-- nivel de atención base de la regla
-- presencia de combinaciones potencialmente limitantes
-- presencia en secciones críticas
-- número de coincidencias
-- completitud documental y referencias a anexos externos
-- criterios normativos asociados
-- factores mitigantes identificados en el documento
-
-No se priorizan requisitos regulatorios estándar como RUP, domicilio fiscal, capacidad legal o fórmulas generales de participación, salvo combinación contextual específica.
-
-La atención sube cuando aparecen combinaciones como:
-
-- autorización comercial o de fabricante + certificación específica
-- marca/fabricante + requisito técnico cerrado
-- distribuidor autorizado + garantía/postventa
-- certificación específica + baja frecuencia en corpus
-- requisito técnico cerrado + baja frecuencia histórica
-
-## Niveles de atención
-
-- **Alto:** conviene revisar primero por baja frecuencia, acumulación de condiciones, combinación de requisitos o posible impacto relevante sobre concurrencia.
-- **Medio:** requiere validación de proporcionalidad, justificación técnica o equivalencias disponibles.
-- **Bajo:** señal habitual o de menor concentración; se mantiene como apoyo documental y puede adquirir relevancia si aparece combinada con otros requisitos.
-
-
-## Configuración avanzada por variables de entorno
-
-La app funciona con valores por defecto, pero permite ajustar rutas y límites sin tocar código:
-
-- `OPENAI_MODEL`: modelo usado por la capa LLM opcional.
-- `APP_MAX_DOCUMENT_CHARS`: máximo de caracteres enviados al LLM para el brief.
-- `APP_DEFAULT_CONTEXT_CHARS`: ventana textual usada alrededor de cada señal.
-- `APP_CORPUS_METADATA_PATH`: ruta del CSV de metadata del corpus.
-- `APP_CORPUS_PLIEGOS_DIR`: carpeta de pliegos del corpus.
-- `APP_CORPUS_ESPECIFICACIONES_DIR`: carpeta de especificaciones técnicas.
-- `APP_CORPUS_PROCESSED_DIR`: carpeta de textos extraídos incrementales.
-- `APP_FEEDBACK_PATH`: archivo JSONL local para feedback humano.
-
-## Corpus histórico integrado
-
-La comparación histórica se integra automáticamente en cada señal sugerida para revisión.
-
-La herramienta prioriza trazabilidad documental, reproducibilidad y auditabilidad por encima de conveniencia automática. Por defecto no realiza matching por similitud, coincidencias parciales ni inferencias por `process_id`.
-
-Estructura esperada:
-
-```text
-data/
-  raw/
-    metadata/
-      procesos.csv
-    pliegos/
-    especificaciones/
-  processed/
-    extracted_text/
-```
-
-`data/raw/metadata/procesos.csv` debe incluir:
-
-```text
-process_id
-entidad
-objeto
-fecha
-pliego_file
-especificaciones_file
-```
-
-## Convención obligatoria de nombres
-
-Los campos `pliego_file` y `especificaciones_file` deben apuntar al nombre del PDF ubicado en la carpeta exacta correspondiente:
-
-- `pliego_file` se busca solo en `data/raw/pliegos/`
-- `especificaciones_file` se busca solo en `data/raw/especificaciones/`
-
-Normalización estricta aplicada por `normalize_filename()`:
-
-- elimina espacios iniciales y finales
-- elimina dobles espacios
-- reemplaza espacios por `_`
-- elimina caracteres invisibles
-- convierte el nombre base a mayúsculas de forma consistente
-- normaliza la extensión como `.pdf`
-
-Ejemplos válidos:
-
-```text
-process_id,pliego_file,especificaciones_file
-SIE-EMASEO-EP-2026-006,SIE-EMASEO-EP-2026-006_PLIEGO.pdf,SIE-EMASEO-EP-2026-006_ESPECIFICACIONES.pdf
-LICB-EMASEO-EP-2025-001,LICB-EMASEO-EP-2025-001_PLIEGO.pdf,LICB-EMASEO-EP-2025-001_ESPECIFICACIONES.pdf
-```
-
-Errores comunes:
-
-- declarar un PDF en `procesos.csv` que no existe físicamente
-- ubicar especificaciones en la carpeta de pliegos o al revés
-- usar extensión distinta de `.pdf`
-- repetir `process_id`
-- referenciar el mismo PDF en más de un proceso
-- dejar campos obligatorios vacíos
-- dejar PDFs en carpetas del corpus sin correspondencia en `procesos.csv`
-
-## Validación documental del corpus
-
-El módulo `src/analyzer/corpus_validator.py` valida antes de cargar documentos:
-
-- PDFs faltantes
-- nombres inconsistentes
-- `process_id` duplicados
-- documentos repetidos
-- extensiones inválidas
-- metadata incompleta
-- archivos huérfanos
-- documentos sin correspondencia CSV
-
-La app muestra la sección `Estado del corpus documental` con:
-
-- total de documentos esperados
-- encontrados
-- faltantes
-- inconsistencias
-- duplicados
-- errores de naming
-
-La tabla de validación incluye:
-
-- `process_id`
-- `tipo_documento`
-- `archivo_esperado`
-- `archivo_encontrado`
-- `estado_validacion`
-- `observacion`
-
-Estados posibles:
-
-- `OK`
-- `No encontrado`
-- `Nombre inconsistente`
-- `Duplicado`
-- `Metadata incompleta`
-- `Coincidencia ambigua`
-- `Documento sin correspondencia CSV`
-
-Si el corpus tiene errores críticos como PDF faltante, coincidencia ambigua, duplicados graves o metadata incompleta, la app bloquea la comparación histórica y muestra:
-
-```text
-El corpus presenta inconsistencias documentales que podrían afectar la trazabilidad y confiabilidad del análisis.
-```
-
-Los PDFs huérfanos se reportan, pero no se cargan automáticamente.
-
-Cada documento cargado guarda trazabilidad:
-
-- `document_id`
-- `process_id`
-- path exacto
-- filename original
-- filename normalizado
-- SHA256
-- timestamp de carga
-- tamaño del archivo
-
-El cache incremental se reutiliza solo si el SHA256 del PDF coincide con el registro procesado.
-
-Para agregar nuevos procesos:
-
-1. Copia el PDF del pliego en `data/raw/pliegos/`.
-2. Copia el PDF de especificaciones técnicas en `data/raw/especificaciones/`, si existe.
-3. Actualiza `data/raw/metadata/procesos.csv`.
-4. Ejecuta nuevamente la revisión desde la app.
-
-La ingesta es incremental. Por cada documento procesado se crea un JSON en:
-
-```text
-data/processed/extracted_text/
-```
-
-## Lectura asistida por IA
-
-La capa de IA generativa es opcional. Si no configuras una API key, la app sigue funcionando con reglas, comparación documental, filtros y exportación CSV.
-
-Para configurarla:
+Con proveedor específico:
 
 ```bash
-export OPENAI_API_KEY="tu_api_key"
-streamlit run app.py
+LLM_PROVIDER=groq streamlit run app.py
+LLM_PROVIDER=ollama streamlit run app.py
+LLM_PROVIDER=azure streamlit run app.py
 ```
 
-También puedes crear un archivo `.env`:
+## Proveedores LLM soportados
 
-```text
-OPENAI_API_KEY=tu_api_key
-OPENAI_MODEL=gpt-5.4-mini
-```
+| Proveedor | Variables requeridas | Modelo por defecto |
+|-----------|---------------------|-------------------|
+| Azure OpenAI | `OPENAI_API_KEY` + `OPENAI_BASE_URL` + `OPENAI_API_VERSION` | `gpt-4o` |
+| Groq | `GROQ_API_KEY` | `llama-3.3-70b-versatile` |
+| Ollama | `OLLAMA_BASE_URL` o `OLLAMA_MODEL` | `llama3.1` |
+| OpenAI directo | `OPENAI_API_KEY` | `gpt-4o` |
 
-Si usas un proveedor compatible:
-
-```text
-OPENAI_BASE_URL=https://tu-proveedor-compatible.example/v1
-OPENAI_MODEL=nombre-del-modelo
-```
-
-En la app:
-
-- usa `Test LLM` para verificar conexión
-- marca `Activar lectura asistida por IA` para generar la lectura preliminar
-- usa `Generar explicación asistida por IA` en una señal puntual si necesitas una explicación adicional
-
-La lectura asistida por IA:
-
-- usa máximo 12.000 caracteres del documento
-- prioriza fragmentos vinculados a señales sugeridas
-- recibe señales priorizadas, categorías, atención sugerida, taxonomía documental y frecuencias comparativas
-- recibe mitigantes y requisitos habituales como contexto de balance
-- recibe criterios normativos orientativos curados
-- no debe proponer señales nuevas sin soporte en el análisis previo
-- usa la capa normativa como referencia prudente, sin emitir dictámenes legales
-- debe distinguir requisitos habituales, señales atípicas y elementos que favorecen concurrencia
-
-Funciones principales:
-
-- `generate_document_brief(document_text, prioritized_findings, corpus_context, normative_context)`
-- `explain_priority_with_llm(priority)`
-
-La salida del brief incluye:
-
-- resumen del documento
-- nivel general de atención
-- principales temas de revisión
-- posibles efectos sobre concurrencia
-- contexto comparativo
-- razones de las prioridades principales
-- preguntas sugeridas para revisión humana
-- nota metodológica
+Forzar proveedor: `LLM_PROVIDER=groq` (o `azure`, `ollama`, `openai`).
 
 ## Tests
 
-La suite cubre carga de taxonomía, fallback seguro, mitigantes, señales contextuales, priorización y control de lenguaje en outputs principales.
-
 ```bash
 pytest
+# 47 tests — todos deben pasar
 ```
 
-## Exportaciones
+## Modo agente (batch)
 
-La app permite descargar:
+```bash
+python agent_runner.py
+```
 
-- CSV con señales consolidadas, priorización, trazabilidad, contexto histórico y criterios normativos.
-- Reporte ejecutivo en Markdown con lectura preliminar, Top 3 prioridades, señales agrupadas, evidencia textual, nota metodológica y advertencia institucional.
+Procesa lotes de pliegos sin interfaz Streamlit. Requiere SQL Server configurado en `.env` para persistencia (`DB_SERVER`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`).
 
-## Validaciones y control
+## Estructura de módulos clave
 
-La app muestra mensajes comprensibles cuando detecta:
-
-- PDF sin texto seleccionable
-- páginas sin texto extraído
-- OCR requerido, no disponible en esta versión
-- metadata de corpus faltante
-- PDFs del corpus no encontrados
-- API key no configurada
-- error o timeout del proveedor LLM
-
-## Referencias conceptuales y metodológicas
-
-La arquitectura conceptual, los principios analíticos, el enfoque metodológico y los lineamientos de gobernanza de esta herramienta se documentan en:
-
-- [docs/technical_and_conceptual_framework.md](docs/technical_and_conceptual_framework.md)
-
-Este documento incluye:
-
-- enfoque de neutralidad competitiva;
-- principios de prudencia analítica, revisión humana y trazabilidad;
-- estrategia de corpus histórico;
-- arquitectura conceptual;
-- uso prudente de IA generativa;
-- mitigación de falsos positivos;
-- gobernanza y lineamientos de evolución futura.
-
-La herramienta constituye un ejercicio exploratorio de apoyo analítico documental y no reemplaza revisión técnica, jurídica o institucional.
+```text
+src/analyzer/
+  review_pipeline.py       # orquestador principal
+  text_utils.py            # utilidades de texto compartidas (nuevo en fusion)
+  review_row_schema.py     # constantes de campos del row (nuevo en fusion)
+  detector.py              # detección de señales clause-centric
+  observation_filter.py    # deduplicación y visibility scoring
+  prioritizer.py           # priorización explicable
+  relevance_filter.py      # filtrado de hallazgos relevantes
+  consolidator.py          # consolidación de candidatos
+  contextualizer.py        # mitigantes y contexto
+  llm_reviewer.py          # capa LLM multi-proveedor
+  patterns/
+    risk_taxonomy.yaml     # taxonomía editable de patrones
+```
 
 ## Advertencia institucional
 
-Las señales identificadas son insumos preliminares para revisión humana de neutralidad competitiva. No constituyen dictamen técnico, legal ni determinación de responsabilidad.
-
-## Limitaciones
-
-- Usa reglas textuales y comparación documental exploratoria.
-- No reemplaza análisis técnico, jurídico ni operativo.
-- La capa IA puede fallar por falta de credenciales, red, cuota o respuesta inválida.
-- PDFs escaneados podrían requerir OCR en una versión posterior.
+Las señales identificadas son insumos preliminares para revisión humana. No constituyen dictamen técnico, legal ni determinación de responsabilidad administrativa.
