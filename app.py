@@ -22,6 +22,7 @@ from src.analyzer.feedback_store import save_reviewer_feedback
 from src.analyzer.llm_reviewer import (
     extract_pliego_metadata_assisted,
     explain_priority_with_llm,
+    test_llm_connection,
 )
 from src.analyzer.metadata_extractor import (
     apply_assisted_metadata,
@@ -1696,7 +1697,7 @@ def render_review_flow() -> None:
     signal_count = len(reviewable_signals(visible_df))
     assisted_summary: list[str] = []
     if enable_ai_reading:
-        if not os.getenv("OPENAI_API_KEY"):
+        if not test_llm_connection()[0]:
             validation_messages.append("Análisis asistido no configurado en este entorno.")
         else:
             with st.spinner("Validando metadata y resumen preliminar..."):

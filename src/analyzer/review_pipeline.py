@@ -12,6 +12,7 @@ from .contextualizer import build_finding_candidates
 from .detector import detect_signals
 from .document_segmenter import DocumentSection, segment_document
 from .domain_models import Clause, ConsolidatedFinding, FindingCandidate, ReviewItem, Signal
+from .observation_filter import prepare_visible_review_items
 from .parser import parse_pdf_bytes
 from .pdf_extractor import PageText
 from .prioritizer import prioritize_consolidated_findings
@@ -64,6 +65,8 @@ def analyze_document_bytes(
     review_items = build_review_items(prioritized)
     review_df = review_items_to_dataframe(review_items, document_name)
 
+    visible_df = prepare_visible_review_items(review_df)
+
     return DocumentReviewResult(
         pages=pages,
         sections=sections,
@@ -74,7 +77,7 @@ def analyze_document_bytes(
         review_items=review_items,
         document_text=document_text,
         results_df=review_df,
-        enriched_df=review_df.copy(),
+        enriched_df=visible_df,
     )
 
 
