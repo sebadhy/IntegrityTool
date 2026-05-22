@@ -6,6 +6,50 @@ Aplicación local para apoyar la revisión humana de neutralidad competitiva en 
 
 ---
 
+## Cómo funciona el análisis
+
+**El motor de detección es 100% reglas duras — no usa ningún modelo de IA.**
+
+Las observaciones se generan aplicando una taxonomía de patrones definida en un archivo YAML editable (`risk_taxonomy.yaml`). El flujo completo desde PDF hasta observaciones priorizadas es determinístico: expresiones regulares, heurísticas de sección y tablas de puntaje. Sin GPU, sin API, sin costos por análisis.
+
+El LLM (modelo de lenguaje) es **opcional** y entra únicamente en tres momentos puntuales, todos **después** de que el análisis ya terminó:
+
+```mermaid
+flowchart TD
+    PDF([📄 PDF del pliego])
+    PARSE["📖 Extracción de texto\nPyMuPDF · Tesseract OCR si es escaneado"]
+    SEG["✂️ Segmentación de secciones\nheurísticas por encabezados y estructura"]
+    CLAUSES["📋 Extracción de cláusulas\npor página y sección detectada"]
+    BOILER["🧹 Filtro boilerplate\nelimina texto estándar o administrativo"]
+    DETECT["🔍 Detección de señales\nTaxonomía YAML — reglas duras\ncoincidencias textuales + contexto de sección"]
+    CONTEXT["🔗 Contextualización\nidentifica mitigantes y datos faltantes"]
+    CONSOL["📦 Consolidación\nagrupa ocurrencias del mismo patrón"]
+    RELEV["⚖️ Filtro de relevancia\ndescarta señales sin sustento suficiente"]
+    PRIO["🎯 Priorización\nAlto / Medio / Bajo según frecuencia,\ncombinaciones y corpus histórico"]
+    OBS([✅ Observaciones para revisión humana])
+
+    PDF --> PARSE --> SEG --> CLAUSES --> BOILER
+    BOILER --> DETECT --> CONTEXT --> CONSOL --> RELEV --> PRIO --> OBS
+
+    LLM1["🤖 LLM — momento 1\nExtrae metadata del encabezado\nentidad · objeto · procedimiento · fecha"]
+    LLM2["🤖 LLM — momento 2\nGenera resumen ejecutivo\nde las observaciones ya detectadas"]
+    LLM3["🤖 LLM — momento 3\nExplica un hallazgo puntual\nbajo demanda del revisor"]
+
+    PARSE -. "primeras páginas" .-> LLM1
+    OBS -. "hallazgos priorizados" .-> LLM2
+    OBS -. "clic del revisor" .-> LLM3
+
+    style LLM1 fill:#fffbeb,stroke:#d97706,color:#78350f
+    style LLM2 fill:#fffbeb,stroke:#d97706,color:#78350f
+    style LLM3 fill:#fffbeb,stroke:#d97706,color:#78350f
+    style OBS fill:#f0fdf4,stroke:#16a34a,color:#14532d
+    style PDF fill:#eff6ff,stroke:#2563eb,color:#1e3a5f
+```
+
+**Si no hay LLM configurado** la app funciona completa: el análisis corre igual, la metadata se extrae por heurísticas y el resumen se genera con reglas. El LLM solo mejora la lectura en lenguaje natural, no afecta las observaciones detectadas.
+
+---
+
 ## Qué aportó cada branch
 
 ### Branch `Sebastian`
