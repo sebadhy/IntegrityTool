@@ -10,35 +10,58 @@ Aplicación local para apoyar la revisión humana de neutralidad competitiva en 
 
 **El motor de detección es 100% reglas duras — no usa ningún modelo de IA.**
 
-Las observaciones se generan aplicando una taxonomía de patrones definida en un archivo YAML editable (`risk_taxonomy.yaml`). El flujo completo desde PDF hasta observaciones priorizadas es determinístico: expresiones regulares, heurísticas de sección y tablas de puntaje. Sin GPU, sin API, sin costos por análisis.
+Todo lo que genera las observaciones (detectar señales, priorizar, filtrar) corre con una taxonomía de patrones en un archivo YAML editable. Es determinístico, rápido, sin GPU, sin API, sin costo por análisis.
 
-El LLM (modelo de lenguaje) es **opcional** y entra únicamente en tres momentos puntuales, todos **después** de que el análisis ya terminó:
+El LLM es **opcional** y entra solo en 3 momentos, **después** de que el análisis ya terminó.
 
 ```mermaid
 flowchart TD
     PDF([📄 PDF del pliego])
-    PARSE["📖 Extracción de texto\nPyMuPDF · Tesseract OCR si es escaneado"]
-    SEG["✂️ Segmentación de secciones\nheurísticas por encabezados y estructura"]
-    CLAUSES["📋 Extracción de cláusulas\npor página y sección detectada"]
-    BOILER["🧹 Filtro boilerplate\nelimina texto estándar o administrativo"]
-    DETECT["🔍 Detección de señales\nTaxonomía YAML — reglas duras\ncoincidencias textuales + contexto de sección"]
-    CONTEXT["🔗 Contextualización\nidentifica mitigantes y datos faltantes"]
-    CONSOL["📦 Consolidación\nagrupa ocurrencias del mismo patrón"]
-    RELEV["⚖️ Filtro de relevancia\ndescarta señales sin sustento suficiente"]
-    PRIO["🎯 Priorización\nAlto / Medio / Bajo según frecuencia,\ncombinaciones y corpus histórico"]
-    OBS([✅ Observaciones para revisión humana])
 
-    PDF --> PARSE --> SEG --> CLAUSES --> BOILER
-    BOILER --> DETECT --> CONTEXT --> CONSOL --> RELEV --> PRIO --> OBS
+    subgraph EXTRACCION ["📖 PASO 1 — Extracción de texto  ·  pdf_extractor.py"]
+        PARSE["PyMuPDF extrae texto seleccionable\nSi página tiene menos de 100 chars →\nTesseract OCR intenta leerla como imagen"]
+    end
 
-    LLM1["🤖 LLM — momento 1\nExtrae metadata del encabezado\nentidad · objeto · procedimiento · fecha"]
-    LLM2["🤖 LLM — momento 2\nGenera resumen ejecutivo\nde las observaciones ya detectadas"]
-    LLM3["🤖 LLM — momento 3\nExplica un hallazgo puntual\nbajo demanda del revisor"]
+    subgraph ESTRUCTURA ["✂️ PASO 2 — Estructura del documento  ·  document_segmenter.py"]
+        SEG["Detecta secciones por encabezados y patrones\n(Especificaciones técnicas · Cronograma ·\nExperiencia · Condiciones generales…)"]
+    end
 
-    PARSE -. "primeras páginas" .-> LLM1
+    subgraph CLAUSULAS ["📋 PASO 3 — Extracción y filtrado de cláusulas  ·  clause_extractor + boilerplate_filter"]
+        CL["Divide el texto en unidades analizables\nFiltra cláusulas de boilerplate\n(texto estándar, formularios, páginas vacías)"]
+    end
+
+    subgraph DETECCION ["🔍 PASO 4 — Detección de señales  ·  detector.py"]
+        DET["Para cada cláusula activa busca coincidencias\ncon los textual_signals de la taxonomía YAML\nGuarda: patrón · texto coincidente · página · sección"]
+    end
+
+    subgraph CONTEXTO ["🔗 PASO 5 — Contextualización  ·  contextualizer.py + mitigants.py"]
+        CTX["Busca mitigantes cerca de cada señal\n(ej. 'o equivalente' cerca de una marca)\nIdentifica información faltante o incompleta"]
+    end
+
+    subgraph CONSOLIDACION ["📦 PASO 6 — Consolidación  ·  consolidator.py"]
+        CON["Agrupa señales del mismo patrón en el mismo documento\nCuenta ocurrencias · vincula páginas relacionadas\nElige el fragmento más representativo"]
+    end
+
+    subgraph FILTRADO ["⚖️ PASO 7 — Relevancia y priorización  ·  relevance_filter + prioritizer"]
+        FIL["Descarta señales sin sustento textual suficiente\nAsigna nivel Alto / Medio / Bajo según:\n· frecuencia histórica en corpus\n· combinación de requisitos\n· presencia de mitigantes\n· sección del documento"]
+    end
+
+    OBS([✅ Observaciones listas para revisión humana])
+
+    PDF --> EXTRACCION --> ESTRUCTURA --> CLAUSULAS --> DETECCION
+    DETECCION --> CONTEXTO --> CONSOLIDACION --> FILTRADO --> OBS
+
+    subgraph LLM ["🤖 LLM — opcional, 3 momentos puntuales post-análisis"]
+        LLM1["Momento 1 · metadata\nEntidad · objeto · procedimiento · fecha\n(heurística si no hay LLM)"]
+        LLM2["Momento 2 · resumen ejecutivo\nTexto de lectura preliminar en lenguaje natural\n(versión esquemática si no hay LLM)"]
+        LLM3["Momento 3 · explicación bajo demanda\nCuando el revisor clickea en un hallazgo específico"]
+    end
+
+    EXTRACCION -. "primeras páginas" .-> LLM1
     OBS -. "hallazgos priorizados" .-> LLM2
     OBS -. "clic del revisor" .-> LLM3
 
+    style LLM fill:#fffbeb,stroke:#d97706,color:#78350f
     style LLM1 fill:#fffbeb,stroke:#d97706,color:#78350f
     style LLM2 fill:#fffbeb,stroke:#d97706,color:#78350f
     style LLM3 fill:#fffbeb,stroke:#d97706,color:#78350f
@@ -46,7 +69,160 @@ flowchart TD
     style PDF fill:#eff6ff,stroke:#2563eb,color:#1e3a5f
 ```
 
-**Si no hay LLM configurado** la app funciona completa: el análisis corre igual, la metadata se extrae por heurísticas y el resumen se genera con reglas. El LLM solo mejora la lectura en lenguaje natural, no afecta las observaciones detectadas.
+---
+
+## Dos caminos de análisis: con y sin modelo
+
+La herramienta puede operar de dos formas según si hay un LLM configurado o no.  
+**Las señales detectadas son siempre las mismas** — el LLM no cambia los hallazgos, solo agrega lectura narrativa encima de ellos.
+
+### Camino A — Solo reglas duras (sin LLM)
+
+El análisis completo corre con YAML + Python. No requiere API, no tiene costo por uso, es 100% determinístico.
+
+Lo que produce cada señal:
+
+```
+Patrón:     marca
+Señal:      "distribuidor autorizado"
+Fragmento:  "Los equipos deberán ser marca SIEMENS, distribuidor autorizado en Ecuador"
+Página:     12
+Mitigantes: []
+Prioridad:  Medio
+```
+
+El revisor ve el fragmento, la página, el patrón detectado y el nivel de atención. No hay narrativa. Tiene que interpretar el hallazgo por su cuenta.
+
+### Camino B — Reglas duras + LLM
+
+El mismo análisis de reglas corre primero, sin cambios. Después el LLM entra en **3 momentos puntuales**:
+
+#### Momento 1 — Metadata (primeras páginas → LLM)
+
+Sin LLM la metadata se extrae por heurística de texto (regex y patrones de posición).  
+Con LLM el modelo recibe las primeras páginas + los candidatos heurísticos y los valida:
+
+```json
+// Heurística sola:
+{ "entidad_contratante": { "value": "DEBERÁ SER ENTIDAD DE...", "confidence": "baja" } }
+
+// Con LLM:
+{ "entidad_contratante": { "value": "Municipio de Santo Domingo de los Tsáchilas",
+                           "confidence": "alta",
+                           "evidence": "Encabezado pág 1: 'GAD Municipal Santo Domingo...'" } }
+```
+
+El LLM corrige truncamientos, detecta si el valor es en realidad una cláusula y no un nombre, y normaliza el tipo de procedimiento.
+
+#### Momento 2 — Resumen ejecutivo (hallazgos priorizados → LLM)
+
+Sin LLM el encabezado muestra conteo de señales por nivel (Alto / Medio / Bajo) y lista de temas.  
+Con LLM el modelo recibe el extracto del documento + todos los hallazgos ordenados por prioridad + contexto normativo, y genera:
+
+```
+// Sin LLM:
+Alto: 2  Medio: 5  Bajo: 3
+Temas: marca, experiencia específica, cronograma restringido
+
+// Con LLM:
+"El documento presenta 3 patrones acumulados de restricción competitiva en la
+sección de especificaciones técnicas: referencia de marca sin equivalente funcional,
+experiencia en marca específica y certificación no estándar en el mismo lote.
+La combinación justifica revisión prioritaria de proporcionalidad antes de publicar.
+Las condiciones de cronograma parecen razonables para el monto estimado."
+```
+
+El modelo usa los few-shots `_FEWSHOT_MARCA_SIN_EQUIVALENTE` / `_FEWSHOT_MARCA_CON_EQUIVALENTE` para calibrar el tono: no acusatorio, orientado a decisión, distingue requisitos habituales de señales atípicas.
+
+#### Momento 3 — Explicación on-demand (clic del revisor → LLM)
+
+Sin LLM el hallazgo muestra: fragmento, página, patrón, prioridad, preguntas de revisión sugeridas del YAML.  
+Con LLM, cuando el revisor hace clic en "Leer con IA", el modelo recibe ese hallazgo específico + contexto histórico del patrón y genera:
+
+```
+// Sin LLM (campo "por qué se sugiere revisar" del YAML):
+"Referencia de marca comercial sin equivalente funcional explícito."
+
+// Con LLM:
+Explicación:  "La especificación nombra marca SIEMENS con requisito de distribución
+              autorizada en Ecuador, sin incluir cláusula de aceptación de equivalentes.
+              Esto limita de facto la competencia a los distribuidores autorizados de
+              esa marca en el territorio, independientemente de si otros productos
+              cumplen las mismas especificaciones técnicas."
+
+Por qué importa: "La combinación marca + distribuidor autorizado + sin equivalente
+                 es una señal acumulada de restricción. Justifica revisar si la
+                 entidad tiene justificación técnica o historial de compatibilidad
+                 que respalde la exigencia."
+
+Acción sugerida: "Verificar si existe cláusula de equivalencia funcional en otro
+                apartado. Si no existe, solicitar justificación técnica documentada."
+
+Preguntas:  ["¿El pliego incluye en algún punto una cláusula de aceptación de
+             equivalentes funcionales?",
+             "¿Existe justificación técnica de la exigencia de esta marca?"]
+```
+
+El few-shot que usa el modelo depende de si la señal tiene mitigantes: con mitigantes usa el ejemplo de "marca con equivalente → atención baja"; sin mitigantes usa "marca sin equivalente → revisión prioritaria". Esto calibra al modelo para que no sobre-alarme cuando el pliego ya incluyó la cláusula de equivalencia.
+
+### Resumen de diferencias
+
+| | Solo reglas | Con LLM |
+|---|---|---|
+| Señales detectadas | ✅ Igual en ambos casos | ✅ Igual en ambos casos |
+| Metadata del documento | Heurística (puede truncarse o errar) | Validada con evidencia textual |
+| Resumen ejecutivo | Conteo y lista de temas | Narrativa interpretativa contextual |
+| Explicación de hallazgo | Campo del YAML ("por qué revisar") | Texto en lenguaje natural orientado a decisión |
+| Costo | $0 por análisis | Por llamada API (Groq tiene plan gratuito) |
+| Determinismo | 100% (mismo doc = mismo resultado) | No determinístico (puede variar leve) |
+| Velocidad | Inmediato | ~2-5s adicionales (metadata + brief) |
+
+> El LLM nunca agrega ni elimina señales. Si el YAML detecta 7 hallazgos, el revisor ve 7 hallazgos con o sin modelo. La diferencia es si esos hallazgos vienen con narrativa interpretativa o solo con los campos estructurados del YAML.
+
+---
+
+## De dónde vienen las reglas duras
+
+Las reglas de detección tienen **dos fuentes**, con prioridad clara:
+
+### Fuente 1 (principal): `risk_taxonomy.yaml`
+Archivo YAML de ~2000 líneas con **19 patrones** editables sin tocar código. Cada patrón define:
+
+| Campo | Qué hace |
+|-------|----------|
+| `textual_signals` | Términos que activan la señal (ej. `"distribuidor autorizado"`, `"marca"`) |
+| `mitigating_factors` | Términos que reducen la prioridad (ej. `"o equivalente"`) |
+| `escalation_factors` | Combinaciones que suben la prioridad (ej. marca + certificación + baja frecuencia) |
+| `competition_dimension` | Dimensión competitiva asociada (neutralidad, proporcionalidad, barreras…) |
+| `severity_guidance` | Nivel base: `general`, `suggested` o `priority` |
+| `human_review_questions` | Preguntas sugeridas al revisor humano |
+
+Para agregar o ajustar un patrón: editar el YAML y relanzar la app. Sin tocar Python.
+
+### Fuente 2 (respaldo): `competitive_neutrality_patterns.py`
+Catálogo Python de ~190 líneas, con los mismos patrones en formato dict. **Solo se usa si el YAML no carga** (archivo faltante, error de sintaxis). Es un seguro de operación, no una fuente paralela.
+
+> **¿Por qué existían los dos?** El catálogo Python fue el origen del proyecto. El YAML se introdujo para que los patrones fueran editables sin código. El Python quedó como fallback. En operación normal el YAML es lo único que corre.
+
+### Reglas globales en `detector.py`
+Además del YAML, el detector tiene tres listas hardcodeadas que aplican a **todos** los patrones:
+
+- `GLOBAL_MITIGATING_TERMS` — términos que siempre reducen prioridad (`"o equivalente"`, `"consorcios"`, `"equivalente funcional"`, …)
+- `GLOBAL_JUSTIFICATION_TERMS` — justificaciones legítimas universales (`"según normativa aplicable"`, `"por continuidad operativa"`, …)
+- `GOODS_PROCUREMENT_TERMS` — contexto de bienes regulados donde ciertos requisitos son habituales (`"registro sanitario"`, `"BPM"`, `"trazabilidad"`, …)
+
+---
+
+## Dos funciones de detección (y cuándo se usa cada una)
+
+Hay dos funciones en `detector.py` que no son lo mismo:
+
+| Función | Usada por | Qué hace |
+|---------|-----------|----------|
+| `detect_signals(clauses)` | Pipeline principal · Streamlit UI | Opera sobre cláusulas ya clasificadas. Solo usa YAML. Es el camino principal. |
+| `detect_patterns(pages)` | Modo agente · `tools.py` · tests | Opera sobre páginas crudas. Usa YAML + reglas RULES (mitigantes y habituales del catálogo Python). Deduplica si un término aparece en ambas fuentes. |
+
+En la práctica: la UI usa `detect_signals`, el agente batch usa `detect_patterns`. Los resultados son equivalentes porque el YAML es la fuente dominante en ambos casos.
 
 ---
 
