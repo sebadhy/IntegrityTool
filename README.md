@@ -21,10 +21,11 @@ Capacidades de modo agente adoptadas en `fusion`:
 
 - **`agent.py` / `agent_runner.py`**: modo batch para procesar múltiples pliegos sin interfaz Streamlit
 - **`db.py`**: persistencia en SQL Server vía pyodbc; campo allowlist `_AGENT_RUN_UPDATABLE_FIELDS` para prevenir inyección SQL en UPDATE dinámico
-- **`notifier.py`**: notificaciones de resultado por lote
+- **`notifier.py`**: envío de alertas por email SMTP con informe HTML de hallazgos
 - **`tools.py`**: herramientas de agente para extracción de texto y detección de patrones
 - **`pages/Ayuda.py`**: página de ayuda integrada en Streamlit
 - **Soporte Groq**: `GROQ_API_KEY` y `GROQ_MODEL` para usar `llama-3.3-70b-versatile` u otros modelos del ecosistema Groq
+- **OCR con Tesseract** (`pdf_extractor.py`): extractor enriquecido con fallback OCR para PDFs escaneados; si Tesseract no está instalado marca páginas como `requires_ocr` sin interrumpir el análisis
 
 ### Branch `Vladimiro`
 Experiencia de usuario y capa LLM adoptadas en `fusion`:
@@ -66,6 +67,23 @@ Experiencia de usuario y capa LLM adoptadas en `fusion`:
 - Eliminada segunda definición de `.evidence-snippet` que destruía la paleta dorada de evidencia
 - Añadidas variables `--surface-muted: #F8FAFC` y `--text-muted: #5F6B76` al `:root` principal
 
+### OCR para PDFs escaneados
+- `pdf_extractor.py` reemplazado por la versión de Andres con soporte Tesseract
+- Flujo: PyMuPDF primero → si página < 100 chars intenta OCR (español + inglés, 300 DPI) → si Tesseract no está instalado marca `requires_ocr` y sigue sin crashear
+- `PageStatus` enum: `OK`, `OCR_OK`, `OCR_FAILED`, `REQUIRES_OCR`, `EMPTY`
+- `ExtractionResult`: metadata completa de extracción (totales, páginas con OCR, disponibilidad de Tesseract)
+- `check_tesseract_setup()`: diagnóstico con instrucciones de instalación por OS
+- API 100% compatible: `extract_text_by_page()` sigue retornando `list[PageText]`; los campos nuevos tienen defaults
+- Instalación: `pip install pytesseract Pillow` + binario del sistema (`brew install tesseract tesseract-lang` / `apt install tesseract-ocr tesseract-ocr-spa`)
+
+### Envío de informe por email desde la UI
+- Panel **"Compartir por email"** al pie de los resultados, junto al export CSV
+- Campo de destinatarios (uno o varios separados por coma) + botón "Enviar informe"
+- Si `SMTP_USER`/`SMTP_PASSWORD` no están en `.env`: muestra hint amigable con instrucciones, no bloquea
+- Si están configurados: envía informe HTML con nivel de atención, resumen, temas y top 3 hallazgos
+- Usa `notifier.send_alert_email()` — compatible con Gmail (contraseña de app) y cualquier servidor SMTP con TLS
+- También disponible en modo batch desde `agent.py`
+
 ### UX y experiencia de uso
 - **Barra de navegación integrada** (`render_review_nav`): reemplaza el botón "Nueva revisión" flotante y desconectado por una barra horizontal con nombre del documento y botón `← Nueva revisión` a la derecha
 - `render_methodological_limitations()` se mueve **antes** de los hallazgos (entre resumen y aspectos sugeridos) para que el usuario vea el alcance antes de los resultados
@@ -92,7 +110,8 @@ Experiencia de usuario y capa LLM adoptadas en `fusion`:
 - openai (compatible con Azure, Groq, Ollama y OpenAI directo)
 - groq >= 0.11.0
 - python-dotenv
-- pyodbc (modo agente, opcional)
+- pytesseract + Pillow (OCR opcional, requiere binario `tesseract` en el sistema)
+- pyodbc (modo agente batch, opcional)
 
 ## Instalación
 
@@ -136,13 +155,53 @@ pytest
 # 47 tests — todos deben pasar
 ```
 
+## Envío de informe por email
+
+Configurar en `.env`:
+
+```text
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=tu_cuenta@gmail.com
+SMTP_PASSWORD=xxxx_xxxx_xxxx_xxxx   # contraseña de app Gmail, no la normal
+SMTP_FROM=tu_cuenta@gmail.com
+```
+
+Desde la UI: al pie de los resultados, expander **"Compartir por email"** → ingresar destinatarios → "Enviar informe".
+
+Desde modo batch: `agent.py` envía alertas automáticamente cuando detecta señales de alta atención.
+
+## OCR para PDFs escaneados
+
+Instalar Tesseract en el sistema:
+
+```bash
+# Mac
+brew install tesseract tesseract-lang
+
+# Linux
+sudo apt install tesseract-ocr tesseract-ocr-spa
+
+# Windows
+# https://github.com/UB-Mannheim/tesseract/wiki
+```
+
+Sin Tesseract la app funciona igual; las páginas escaneadas se marcan como `requires_ocr` y el resto se analiza normalmente.
+
 ## Modo agente (batch)
 
 ```bash
 python agent_runner.py
 ```
 
-Procesa lotes de pliegos sin interfaz Streamlit. Requiere SQL Server configurado en `.env` para persistencia (`DB_SERVER`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`).
+Procesa lotes de pliegos sin interfaz Streamlit. Requiere SQL Server configurado en `.env`:
+
+```text
+DB_SERVER=servidor\instancia
+DB_NAME=nombre_base_datos
+DB_USER=usuario
+DB_PASSWORD=contraseña
+```
 
 ## Estructura de módulos clave
 
