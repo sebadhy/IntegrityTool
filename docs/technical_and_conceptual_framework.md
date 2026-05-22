@@ -402,6 +402,8 @@ Por ejemplo, la sola presencia de referencias a fabricantes, garantías o soport
 
 - o estándares regulatorios sectoriales.
 
+El mismo criterio aplica a familias sectoriales más específicas. En adquisiciones farmacéuticas, por ejemplo, una combinación de principio activo, concentración exacta, volumen, vía de administración, forma farmacéutica o presentación comercial puede constituir una señal documental para revisión humana cuando aparenta alinearse con una presentación comercial muy granular. Esta observación no implica una conclusión sobre validez del requisito; únicamente sugiere revisar proporcionalidad, equivalencias terapéuticas o técnicas, registro sanitario aplicable y justificación clínica, regulatoria u operativa.
+
 En consecuencia, la lógica analítica de la herramienta debe orientarse hacia una evaluación contextual y balanceada, considerando simultáneamente:
 
 - requisitos potencialmente limitantes;
@@ -1128,6 +1130,8 @@ Toda señal debería registrar:
 
 - criterios utilizados.
 
+La taxonomía de señales debería mantenerse como un instrumento versionado y gobernado. La incorporación de patrones sectoriales, como presentaciones farmacéuticas altamente específicas, debe exigir evidencia observable, mitigantes, controles de falsos positivos, preguntas de revisión humana y lenguaje prudente. Su finalidad es orientar revisión preventiva, no producir determinaciones automáticas.
+
 # 15. Roadmap Exploratorio
 
 ## Etapa 1 – PoC inicial
@@ -1398,9 +1402,9 @@ El flujo conceptual sería:
 
 Documento PDF  
 → extracción local de texto  
-→ identificación de señales  
+→ identificación de señales mediante taxonomía editable y reglas trazables  
 → consolidación analítica  
-→ envío de contexto reducido al LLM  
+→ envío de contexto reducido al LLM cuando corresponda  
 → generación de resumen/contextualización  
 → revisión humana
 
