@@ -29,6 +29,7 @@ from src.analyzer.metadata_extractor import (
     extract_pliego_metadata,
     first_pages_text,
 )
+from notifier import send_alert_email
 from src.analyzer.review_pipeline import analyze_document_bytes
 from src.analyzer.review_synthesis import (
     THEME_ORDER,
@@ -1611,6 +1612,68 @@ def render_review_top_bar(document_name: str, signal_count: int) -> None:
     render_review_nav(document_name, signal_count)
 
 
+def _smtp_configured() -> bool:
+    return bool(os.getenv("SMTP_USER") and os.getenv("SMTP_PASSWORD"))
+
+
+def _build_email_brief(brief: dict) -> dict:
+    return {
+        "overall_attention_level": brief.get("general_attention", "No disponible"),
+        "document_summary": brief.get("general_reading", "No disponible"),
+        "main_review_topics": brief.get("top_themes", []),
+        "suggested_human_review_questions": brief.get("validation_areas", []),
+        "methodological_note": (
+            "Las señales son insumos preliminares para revisión humana. "
+            "No constituyen dictamen técnico, legal ni determinación de responsabilidad."
+        ),
+    }
+
+
+def render_email_report_panel(
+    document_name: str,
+    brief: dict,
+    visible_df: pd.DataFrame,
+) -> None:
+    with st.expander("Compartir por email", expanded=False):
+        if not _smtp_configured():
+            st.markdown(
+                '<div class="methodology-limits">'
+                "<strong>Envío por email no configurado.</strong> "
+                "Agregá en tu <code>.env</code>:<br><br>"
+                "<code>SMTP_USER=cuenta@gmail.com</code><br>"
+                "<code>SMTP_PASSWORD=xxxx_xxxx_xxxx_xxxx</code>"
+                " &nbsp;← contraseña de app Gmail, no la normal"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            return
+
+        st.caption("Enviá un informe HTML con los hallazgos principales. Separá múltiples destinatarios con coma.")
+        recipients_raw = st.text_input(
+            "Destinatarios",
+            placeholder="analista@entidad.gob.ec, supervisor@entidad.gob.ec",
+            label_visibility="collapsed",
+            key="email_recipients_input",
+        )
+        if st.button("Enviar informe", type="primary", key="email_send_btn"):
+            recipients = [r.strip() for r in recipients_raw.split(",") if r.strip() and "@" in r.strip()]
+            if not recipients:
+                st.warning("Ingresá al menos un email válido.")
+                return
+            top_findings = reviewable_signals(visible_df).head(3).to_dict(orient="records")
+            with st.spinner("Enviando..."):
+                ok, msg = send_alert_email(
+                    document_name=document_name,
+                    brief=_build_email_brief(brief),
+                    top_findings=top_findings,
+                    recipients=recipients,
+                )
+            if ok:
+                st.success(msg)
+            else:
+                st.error(msg)
+
+
 def render_technical_details(corpus_payload: dict, validation_messages: list[str]) -> None:
     with st.expander("Detalles técnicos", expanded=False):
         st.markdown("**Etapas:** Lectura del documento · Observaciones preliminares · Detalle técnico")
@@ -1735,16 +1798,20 @@ def render_review_flow() -> None:
 
     filtered_df = visible_df
 
-    with st.expander("Exportar resultados", expanded=False):
-        st.caption("Exporta los aspectos sugeridos para revisión en formato tabular.")
-        st.dataframe(ordered_export(filtered_df), width="stretch", hide_index=True)
-        csv_data = ordered_export(filtered_df).to_csv(index=False).encode("utf-8")
-        st.download_button(
-            "Descargar CSV",
-            data=csv_data,
-            file_name="observaciones_preliminares.csv",
-            mime="text/csv",
-        )
+    export_col, email_col = st.columns(2)
+    with export_col:
+        with st.expander("Exportar resultados", expanded=False):
+            st.caption("Exporta los aspectos sugeridos para revisión en formato tabular.")
+            st.dataframe(ordered_export(filtered_df), width="stretch", hide_index=True)
+            csv_data = ordered_export(filtered_df).to_csv(index=False).encode("utf-8")
+            st.download_button(
+                "Descargar CSV",
+                data=csv_data,
+                file_name="observaciones_preliminares.csv",
+                mime="text/csv",
+            )
+    with email_col:
+        render_email_report_panel(uploaded_file_name, overview_brief, visible_df)
 
 st.set_page_config(
     page_title="Integrity Tool - revisión de pliegos",
