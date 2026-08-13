@@ -28,7 +28,7 @@ SIGNAL_REVIEW = "señal_revision"
 SIGNAL_MITIGANT = "mitigante_concurrencia"
 SIGNAL_HABITUAL = "requisito_habitual"
 
-PHARMA_PRESENTATION_PATTERN_ID = "cn-pharma-commercial-presentation-specificity"
+COMMERCIAL_CONFIGURATION_PATTERN_ID = "cn-commercial-product-configuration-specificity"
 
 GLOBAL_MITIGATING_TERMS = [
     "o equivalente",
@@ -709,7 +709,7 @@ def detect_patterns(
             pattern_context_chars = _context_chars_for_pattern(pattern.id, context_chars)
             for term, start, end in find_terms(normalized_text, pattern.textual_signals):
                 fragment = extract_context_window(normalized_text, start, end, context_chars=pattern_context_chars)
-                if pattern.id == PHARMA_PRESENTATION_PATTERN_ID and not _supports_pharma_commercial_presentation(fragment):
+                if pattern.id == COMMERCIAL_CONFIGURATION_PATTERN_ID and not _supports_commercial_product_configuration(fragment):
                     continue
                 is_common_goods_signal = _is_weak_goods_signal(pattern, fragment)
                 mitigating_factors = _contextual_mitigating_factors(fragment, pattern)
@@ -1225,67 +1225,113 @@ def _has_negated_equivalence(text: str) -> bool:
 
 
 
-def _supports_pharma_commercial_presentation(fragment: str) -> bool:
-    """Require strong pharmaceutical specificity before surfacing SKU-like signals.
+def _supports_commercial_product_configuration(fragment: str) -> bool:
+    """Require a distinctive combination before surfacing commercial alignment.
 
-    Generic medicine catalogue language such as "sólido oral, 10 mg, caja x
-    blíster" is common in regulated goods and should not be classified as a
-    commercial-presentation signal by itself. The pattern is reserved for more
-    granular combinations such as exact dose plus exact volume, or explicit
-    commercial/SKU/exclusivity language.
+    The unit of analysis is not an isolated attribute. The signal is only
+    emitted when the text contains a combination of commercially meaningful
+    parameters that could materially narrow compatible products, models, SKUs or
+    presentations. Generic catalogue descriptions such as "Laptop, 16 GB RAM",
+    "Monitor 27 pulgadas" or "Lenalidomida, sólido oral, 10 mg, caja x blíster"
+    are intentionally insufficient.
     """
     normalized = normalize_text(fragment)
     if not normalized:
         return False
 
-    has_dose = bool(re.search(r"\b\d+(?:[\.,]\d+)?\s*(?:mg|mcg|g|ui|iu)\b", normalized))
-    has_exact_volume = bool(re.search(r"\b\d+(?:[\.,]\d+)?\s*ml\b", normalized))
-    has_concentration_ratio = bool(
-        re.search(r"\b\d+(?:[\.,]\d+)?\s*(?:mg|mcg|g|ui|iu)\s*/\s*\d+(?:[\.,]\d+)?\s*ml\b", normalized)
-        or re.search(r"\b\d+(?:[\.,]\d+)?\s*(?:mg|mcg|g|ui|iu)\s*/\s*ml\b", normalized)
-    )
-    has_route_or_form = any(
-        term in normalized
-        for term in [
-            "liquido parenteral",
-            "liquido inyectable",
-            "solucion inyectable",
-            "suspension inyectable",
-            "via intravenosa",
-            "via subcutanea",
-            "jeringa prellenada",
-            "frasco ampolla",
+    families = _commercial_attribute_families(normalized)
+    exactness = _commercial_exactness_score(normalized)
+    has_commercial_language = _has_commercial_alignment_language(normalized)
+    has_exclusive_language = _has_strong_restrictive_language(normalized)
+
+    # Chemical, pharmaceutical, regulated-goods or packaged-product descriptions
+    # only surface when concentration/dose and volume/package create a concrete
+    # configuration. A single dose plus generic packaging remains insufficient.
+    if (
+        families.get("dose_or_concentration")
+        and families.get("volume_or_package")
+        and exactness >= 2
+    ):
+        return True
+
+    # Technology/equipment configurations that combine several exact attributes.
+    tech_families = sum(
+        bool(families.get(name))
+        for name in [
+            "processor_or_technology",
+            "memory_storage_capacity",
+            "display_resolution",
+            "physical_dimensions_weight",
+            "interfaces_ports",
+            "compatibility_accessories",
+            "performance_power",
         ]
     )
-    has_explicit_commercial_language = any(
+    if tech_families >= 4 and exactness >= 3:
+        return True
+
+    # General case: many distinctive attributes plus explicit commercial/model language.
+    distinctive_count = sum(bool(value) for value in families.values())
+    if distinctive_count >= 4 and exactness >= 3 and (has_commercial_language or has_exclusive_language):
+        return True
+
+    # Explicit model/SKU/exclusive language with multiple attributes can be enough.
+    if distinctive_count >= 3 and exactness >= 2 and ("sku" in normalized or "modelo" in normalized or has_exclusive_language):
+        return True
+
+    return False
+
+
+def _commercial_attribute_families(normalized: str) -> dict[str, bool]:
+    return {
+        "product_category": bool(re.search(r"\b(laptop|computador|computadora|monitor|servidor|equipo|maquinaria|vehiculo|vehiculo|medicamento|insumo|software|licencia|impresora|scanner|ecografo|tomografo|bomba|motor)\b", normalized)),
+        "processor_or_technology": bool(re.search(r"\b(procesador|intel|amd|core i[3579]|ryzen|xeon|chip|tecnologia|tecnologia propietaria|sistema operativo|arquitectura)\b", normalized)),
+        "memory_storage_capacity": bool(re.search(r"\b\d+(?:[\.,]\d+)?\s*(?:gb|tb|mb)\b", normalized) or any(term in normalized for term in ["memoria ram", "almacenamiento", "disco solido", "ssd", "hdd"])),
+        "display_resolution": bool(re.search(r"\b\d+(?:[\.,]\d+)?\s*(?:pulgadas|pulgada|\")\b", normalized) or re.search(r"\b\d{3,5}\s*[x×]\s*\d{3,5}\b", normalized) or any(term in normalized for term in ["resolucion", "pantalla", "display"])),
+        "physical_dimensions_weight": bool(re.search(r"\b\d+(?:[\.,]\d+)?\s*(?:kg|g|mm|cm|m)\b", normalized) or any(term in normalized for term in ["peso maximo", "peso máximo", "dimensiones", "ancho", "alto", "profundidad"])),
+        "interfaces_ports": any(term in normalized for term in ["puerto", "puertos", "usb-c", "usb c", "usb 3", "thunderbolt", "hdmi", "displayport", "ethernet", "wifi", "bluetooth", "interfaz", "interfaces"]),
+        "performance_power": bool(re.search(r"\b\d+(?:[\.,]\d+)?\s*(?:w|kw|hp|rpm|mah|hz|ghz|mhz|dpi|ppm|lumenes|lumen)\b", normalized) or any(term in normalized for term in ["potencia", "rendimiento", "velocidad", "capacidad de procesamiento"])),
+        "dose_or_concentration": bool(re.search(r"\b\d+(?:[\.,]\d+)?\s*(?:mg|mcg|g|ui|iu)\b", normalized) or re.search(r"\b\d+(?:[\.,]\d+)?\s*mg\s*(?:i|yodo)?\s*/\s*ml\b", normalized) or "concentracion" in normalized or "concentración" in normalized),
+        "volume_or_package": bool(re.search(r"\b\d+(?:[\.,]\d+)?\s*ml\b", normalized) or re.search(r"\b(?:envase|frasco|caja|blister|blister|vial|ampolla|jeringa)\b", normalized)),
+        "route_or_form": any(term in normalized for term in ["liquido parenteral", "solido oral", "solucion inyectable", "suspension inyectable", "via intravenosa", "via subcutanea", "jeringa prellenada", "frasco ampolla", "forma farmaceutica"]),
+        "compatibility_accessories": any(term in normalized for term in ["compatible con", "compatibilidad", "interoperabilidad", "accesorio", "accesorios", "plataforma", "sistema existente", "infraestructura existente"]),
+        "certification_materials": any(term in normalized for term in ["certificacion", "certificación", "material", "aleacion", "aleación", "norma", "estandar", "estándar"]),
+    }
+
+
+def _commercial_exactness_score(normalized: str) -> int:
+    patterns = [
+        r"\b\d+(?:[\.,]\d+)?\s*(?:mg|mcg|g|ui|iu|ml|gb|tb|mb|kg|mm|cm|w|kw|hp|rpm|mah|hz|ghz|mhz|dpi|ppm)\b",
+        r"\b\d{3,5}\s*[x×]\s*\d{3,5}\b",
+        r"\b\d+(?:[\.,]\d+)?\s*(?:pulgadas|pulgada|\")\b",
+        r"\b\d+(?:[\.,]\d+)?\s*(?:mg|mcg|g|ui|iu)\s*/\s*\d+(?:[\.,]\d+)?\s*ml\b",
+        r"\b\d+(?:[\.,]\d+)?\s*mg\s*(?:i|yodo)?\s*/\s*ml\b",
+    ]
+    matches: set[str] = set()
+    for pattern in patterns:
+        matches.update(re.findall(pattern, normalized))
+    exact_terms = ["exacto", "exacta", "maximo", "máximo", "minimo", "mínimo", "debera ser", "deberá ser", "solo se acept"]
+    return len(matches) + sum(1 for term in exact_terms if term in normalized)
+
+
+def _has_commercial_alignment_language(normalized: str) -> bool:
+    return any(
         term in normalized
         for term in [
             "presentacion comercial",
             "presentacion propietaria",
+            "producto comercial",
             "sku",
             "codigo de producto",
+            "codigo del producto",
+            "modelo comercial",
+            "modelo especifico",
+            "modelo específico",
             "marca",
             "fabricante",
-            "proveedor exclusivo",
-            "distribuidor exclusivo",
-            "solo se aceptara",
-            "solo se aceptan",
-            "sin equivalentes",
-            "no se aceptan equivalentes",
+            "serie",
         ]
     )
-
-    # Strong case: exact dose/concentration plus exact volume, especially for
-    # parenteral/injectable presentations such as 1400 mg / 11,7 ml.
-    if has_dose and (has_exact_volume or has_concentration_ratio) and (has_route_or_form or has_explicit_commercial_language):
-        return True
-
-    # Explicit commercial/exclusive language can support review if paired with
-    # a pharmaceutical dose. Standard packaging terms alone are intentionally insufficient.
-    if has_dose and has_explicit_commercial_language:
-        return True
-
-    return False
 
 
 def _finding_id(pattern_id: str, page: int, fragment: str) -> str:
@@ -1317,7 +1363,7 @@ def detect_signals(clauses: list[Clause]) -> list[Signal]:
                 continue
             term, start, end = sorted(matches, key=lambda item: (item[1], -len(item[0])))[0]
             evidence = extract_context_window(clause.text, start, end, context_chars=APP_DEFAULT_CONTEXT_CHARS)
-            if pattern.id == PHARMA_PRESENTATION_PATTERN_ID and not _supports_pharma_commercial_presentation(evidence):
+            if pattern.id == COMMERCIAL_CONFIGURATION_PATTERN_ID and not _supports_commercial_product_configuration(evidence):
                 continue
             signal_id = _finding_id(f"signal-{pattern.id}-{clause.clause_id}", clause.page, evidence)
             signals.append(

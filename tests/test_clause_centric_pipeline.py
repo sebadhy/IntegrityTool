@@ -218,19 +218,52 @@ def test_pipeline_does_not_create_review_item_from_index_only_timeline_reference
     assert items == []
 
 
-def test_standard_pharmaceutical_catalogue_description_is_not_commercial_presentation_signal():
+COMMERCIAL_CONFIGURATION_PATTERN_ID = "cn-commercial-product-configuration-specificity"
+
+
+def test_standard_catalogue_description_is_not_commercial_configuration_signal():
     texts = [
         "ESPECIFICACIONES TÉCNICAS. 2.1 Lenalidomida, Sólido oral, 10 mg, Caja x blíster/ristra 23450 u."
     ]
     _, signals, _, _, items = _run_text_pipeline(texts)
-    assert not any(signal.pattern_id == "cn-pharma-commercial-presentation-specificity" for signal in signals)
-    assert not any(item.metadata.get("pattern_id") == "cn-pharma-commercial-presentation-specificity" for item in items)
+    assert not any(signal.pattern_id == COMMERCIAL_CONFIGURATION_PATTERN_ID for signal in signals)
+    assert not any(item.metadata.get("pattern_id") == COMMERCIAL_CONFIGURATION_PATTERN_ID for item in items)
 
 
-def test_exact_pharmaceutical_dose_and_volume_can_trigger_commercial_presentation_signal():
+def test_generic_laptop_memory_only_is_not_commercial_configuration_signal():
+    texts = ["ESPECIFICACIONES TÉCNICAS. Laptop, memoria RAM 16 GB."]
+    _, signals, _, _, items = _run_text_pipeline(texts)
+    assert not any(signal.pattern_id == COMMERCIAL_CONFIGURATION_PATTERN_ID for signal in signals)
+    assert not any(item.metadata.get("pattern_id") == COMMERCIAL_CONFIGURATION_PATTERN_ID for item in items)
+
+
+def test_generic_monitor_size_only_is_not_commercial_configuration_signal():
+    texts = ["ESPECIFICACIONES TÉCNICAS. Monitor 27 pulgadas para estación de trabajo."]
+    _, signals, _, _, items = _run_text_pipeline(texts)
+    assert not any(signal.pattern_id == COMMERCIAL_CONFIGURATION_PATTERN_ID for signal in signals)
+    assert not any(item.metadata.get("pattern_id") == COMMERCIAL_CONFIGURATION_PATTERN_ID for item in items)
+
+
+def test_exact_dose_and_volume_can_trigger_commercial_configuration_signal():
     texts = [
         "ESPECIFICACIONES TÉCNICAS. Rituximab líquido parenteral 1400mg / 11,7ml sin equivalentes terapéuticos visibles."
     ]
     _, signals, _, _, items = _run_text_pipeline(texts)
-    assert any(signal.pattern_id == "cn-pharma-commercial-presentation-specificity" for signal in signals)
-    assert any(item.metadata.get("pattern_id") == "cn-pharma-commercial-presentation-specificity" for item in items)
+    assert any(signal.pattern_id == COMMERCIAL_CONFIGURATION_PATTERN_ID for signal in signals)
+    assert any(item.metadata.get("pattern_id") == COMMERCIAL_CONFIGURATION_PATTERN_ID for item in items)
+
+
+def test_iopromida_concentration_and_volume_can_trigger_commercial_configuration_signal():
+    texts = ["ESPECIFICACIONES TÉCNICAS. Iopromida 370 mg I/ml envase de 100 ml sin equivalentes visibles."]
+    _, signals, _, _, items = _run_text_pipeline(texts)
+    assert any(signal.pattern_id == COMMERCIAL_CONFIGURATION_PATTERN_ID for signal in signals)
+    assert any(item.metadata.get("pattern_id") == COMMERCIAL_CONFIGURATION_PATTERN_ID for item in items)
+
+
+def test_distinctive_laptop_configuration_can_trigger_commercial_configuration_signal():
+    texts = [
+        "ESPECIFICACIONES TÉCNICAS. Laptop con procesador específico, pantalla 13,6 pulgadas, resolución 2560x1664, peso máximo 1,24 kg y puertos Thunderbolt."
+    ]
+    _, signals, _, _, items = _run_text_pipeline(texts)
+    assert any(signal.pattern_id == COMMERCIAL_CONFIGURATION_PATTERN_ID for signal in signals)
+    assert any(item.metadata.get("pattern_id") == COMMERCIAL_CONFIGURATION_PATTERN_ID for item in items)

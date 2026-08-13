@@ -591,98 +591,125 @@ patterns:
   interpretive_indicators:
   - La certificación se exige sin justificar relación con el objeto.
   - No se aceptan certificaciones, registros o estándares equivalentes.
-- id: cn-pharma-commercial-presentation-specificity
-  name: Posible alineamiento farmacéutico con presentación comercial específica
-  description: Identifica combinaciones farmacéuticas de alta granularidad, especialmente principio activo con
-    concentración y volumen exactos, vía o formulación específica, o lenguaje comercial/exclusivo, que podrían coincidir
-    con presentaciones comerciales particulares. No debe activarse por nomenclatura farmacéutica estándar aislada.
+- id: cn-commercial-product-configuration-specificity
+  name: Posible alineación con producto o presentación comercial específica
+  description: Identifica combinaciones de especificaciones técnicas suficientemente específicas o distintivas que
+    podrían aproximarse a la configuración de un producto, modelo, SKU, presentación o marca disponible comercialmente,
+    incluso cuando la marca no esté mencionada. La señal no se activa por atributos aislados ni por descripciones
+    genéricas de mercado; requiere evaluar la combinación de parámetros y su posible efecto sobre el espacio de
+    productos compatibles.
   competition_dimension: neutralidad_competitiva
-  risk_type: especificación farmacéutica granular sujeta a revisión contextual
+  risk_type: configuración técnica comercialmente concentrada sujeta a revisión contextual
   document_sections:
   - especificaciones técnicas
   - ficha técnica
+  - características técnicas
+  - bienes
+  - equipamiento
   - medicamentos
-  - dispositivos médicos
-  - bienes farmacéuticos
+  - software
+  - maquinaria
+  - vehículos
   textual_signals:
-  - líquido parenteral
-  - liquido parenteral
-  - sólido oral
-  - solido oral
-  - solución inyectable
-  - solucion inyectable
-  - suspensión inyectable
-  - suspension inyectable
-  - vial
-  - ampolla
-  - jeringa prellenada
-  - frasco ampolla
-  - blist
-  - blister
-  - caja x blist
-  - cj x blist
   - presentación comercial
   - presentacion comercial
-  - dosis fija
-  - mg / ml
+  - producto comercial
+  - modelo comercial
+  - modelo específico
+  - modelo especifico
+  - SKU
+  - sku
+  - código de producto
+  - codigo de producto
+  - marca
+  - fabricante
+  - serie
+  - procesador
+  - memoria
+  - almacenamiento
+  - pantalla
+  - resolución
+  - resolucion
+  - peso máximo
+  - peso maximo
+  - puertos
+  - interfaz
+  - interfaces
+  - compatibilidad
+  - capacidad
+  - potencia
+  - dimensiones
+  - concentración
+  - concentracion
+  - volumen
+  - envase
   - mg/ml
-  - mg /
-  - rituximab
-  - everolimus
+  - mg / ml
+  - jeringa prellenada
+  - frasco ampolla
+  - líquido parenteral
+  - liquido parenteral
   semantic_signals:
-  - principio activo con concentración y volumen exactos
-  - dosis fija poco común
-  - forma farmacéutica específica combinada con vía de administración
-  - empaque comercial detallado o descripción tipo SKU
-  - ausencia de equivalencia terapéutica o técnica observable
+  - combinación de atributos técnicos altamente específica
+  - configuración que puede aproximarse a uno o pocos modelos, SKU o presentaciones comerciales
+  - atributos estándar que solo adquieren relevancia por acumulación
+  - posible concentración comercial por combinación de parámetros
+  - ausencia de rangos, equivalencias o alternativas funcionales observables
   possible_indicators:
-  - La descripción combina principio activo, concentración, volumen y vía o formulación de forma altamente específica.
-  - La presentación solicitada aparenta corresponder a una configuración comercial concreta o de mercado reducido.
-  - No se observa lenguaje de equivalencia terapéutica, técnica o regulación sanitaria aplicable en el fragmento.
-  - El empaque o presentación se describe con detalle comercial que podría reducir alternativas sustituibles.
+  - La descripción combina varios atributos exactos de capacidad, rendimiento, dimensiones, compatibilidad, dosis,
+    volumen, empaque, interfaz o presentación.
+  - La combinación de parámetros parece más específica que una necesidad funcional general.
+  - La configuración podría reducir materialmente el universo de productos compatibles si no se aceptan rangos,
+    equivalencias o alternativas razonables.
+  - Existen referencias a modelo, SKU, serie, fabricante, marca, presentación comercial o compatibilidad muy delimitada.
   mitigating_factors:
-  - o equivalente terapéutico
-  - o equivalente terapeutico
+  - o equivalente
   - o equivalente técnico
   - o equivalente tecnico
+  - equivalente funcional
   - equivalente terapéutico
   - equivalente terapeutico
-  - equivalente técnico
-  - equivalente tecnico
+  - o superior
+  - rangos aceptables
+  - mínimo o superior
+  - minimo o superior
+  - se aceptan alternativas
+  - varias marcas aceptadas
+  - estándares abiertos
+  - estandares abiertos
+  - compatibilidad con alternativas
+  - según normativa aplicable
+  - segun normativa aplicable
   - según registro sanitario vigente
   - segun registro sanitario vigente
-  - registro sanitario vigente
-  - registro sanitario o equivalente
-  - biosimilar
-  - biosimilares
-  - alternativas terapéuticas
-  - alternativas terapeuticas
-  - protocolo clínico
-  - protocolo clinico
-  - continuidad terapéutica
-  - continuidad terapeutica
+  - justificación técnica
+  - justificacion tecnica
   - justificación clínica
   - justificacion clinica
-  - necesidad clínica documentada
-  - necesidad clinica documentada
-  - normativa sanitaria aplicable
-  - nomenclador oficial
+  - continuidad operativa
+  - interoperabilidad
+  - múltiples fabricantes
+  - multiples fabricantes
+  - múltiples proveedores
+  - multiples proveedores
   possible_legitimate_justifications:
-  - Protocolo clínico documentado, continuidad terapéutica o seguridad del paciente.
-  - Registro sanitario, nomenclador oficial obligatorio o regulación sanitaria aplicable.
-  - Necesidad operativa de una forma farmacéutica, vía o presentación específica debidamente justificada.
-  - Compatibilidad con condiciones de almacenamiento, administración, dosificación o prestación del servicio.
+  - Compatibilidad o interoperabilidad con infraestructura existente debidamente documentada.
+  - Continuidad operativa, mantenimiento, soporte, seguridad o estandarización técnica justificada.
+  - Protocolo clínico, registro sanitario, nomenclador oficial o regulación sectorial aplicable.
+  - Necesidad funcional vinculada al desempeño, capacidad, seguridad, calidad o finalidad del bien.
+  - Disponibilidad comprobable de varias alternativas equivalentes que cumplen la combinación solicitada.
   human_review_questions:
-  - ¿La concentración y el volumen exactos son clínicamente necesarios para el procedimiento?
-  - ¿Existen equivalentes terapéuticos, biosimilares o alternativas registradas que podrían cumplir la necesidad?
-  - ¿La vía de administración o forma farmacéutica requerida limita alternativas disponibles sin justificación visible?
-  - ¿El empaque o presentación solicitada es indispensable para la prestación del servicio?
-  - ¿La entidad documentó justificación técnica, clínica, regulatoria u operativa?
-  - ¿La especificación permite equivalencias terapéuticas o técnicas razonables?
+  - ¿Qué atributos son estándar de mercado y cuáles resultan distintivos por su combinación?
+  - ¿Cuántos productos, modelos, presentaciones, marcas o proveedores podrían cumplir simultáneamente la especificación?
+  - ¿Qué atributos generan la mayor restricción sobre el universo de alternativas compatibles?
+  - ¿La especificación admite rangos, equivalencias funcionales, técnicas, terapéuticas o regulatorias?
+  - ¿Existe justificación técnica, clínica, operativa o regulatoria para exigir esa combinación exacta?
+  - ¿La necesidad podría describirse de forma funcional sin reproducir una configuración comercial particular?
   recommended_language:
-  - se recomienda validar la justificación clínica, regulatoria u operativa de la presentación requerida
-  - convendría revisar si existen alternativas terapéuticas o equivalentes disponibles
-  - observación preliminar sujeta a revisión humana de proporcionalidad y equivalencias
+  - posible alineación con producto o presentación comercial específica
+  - coincidencia comercial no exclusiva cuando existan varias alternativas compatibles
+  - validar concentración comercial y alternativas equivalentes
+  - revisar si la combinación de atributos es proporcional al objeto contractual
   prohibited_language:
   - corrupción
   - fraude
@@ -696,94 +723,85 @@ patterns:
   severity_guidance: suggested
   confidence_guidance: medium
   related_patterns:
-  - cn-specific-certification
+  - cn-brand-origin-manufacturer-reference
   - cn-weak-equivalence-clause
   - cn-technical-closed-requirement
-  taxonomy_version: '2026.05'
+  - cn-interoperability-lock-in
+  taxonomy_version: '2026.08'
   technical_dimension: technical_restriction
-  institutional_dimension: neutralidad competitiva / proporcionalidad / equivalencias / trazabilidad regulatoria
+  institutional_dimension: neutralidad competitiva / proporcionalidad / equivalencias / barreras de entrada / relación con objeto contractual
   document_signal:
-  - principio activo + concentración exacta + volumen exacto
-  - dosis fija poco común
-  - forma farmacéutica específica
-  - vía de administración específica
-  - empaque comercial detallado
-  - presentación tipo SKU
+  - combinación exacta de atributos técnicos, físicos, funcionales, regulatorios o comerciales
+  - configuración tipo producto, modelo, SKU o presentación comercial
+  - ausencia de equivalencias, rangos o alternativas observables
   possible_competition_effect:
-  - Podría reducir el universo de oferentes potenciales si la configuración solicitada coincide con una presentación
-    comercial específica y no se admiten alternativas terapéuticas o técnicas razonables.
-  - Podría limitar sustituibilidad competitiva si la concentración, volumen, vía o empaque no están justificados por
-    protocolo clínico, regulación sanitaria o necesidad operativa documentada.
+  - Podría reducir el universo de productos compatibles si la combinación exigida solo puede ser satisfecha por uno o pocos productos, modelos, presentaciones o proveedores.
+  - Podría elevar barreras de entrada cuando atributos individualmente razonables se acumulan de forma altamente distintiva sin justificación visible.
   normative_basis:
   - libre concurrencia
   - proporcionalidad
   - igualdad y no discriminación
   - relación con el objeto contractual
-  - trazabilidad regulatoria
+  - transparencia y trazabilidad
   procurement_principle:
   - neutralidad competitiva
   - proporcionalidad de requisitos
   - aceptación de equivalencias
   - relación con el objeto contractual
-  - transparencia y trazabilidad
+  - especificaciones orientadas a necesidades funcionales
   ecuador_legal_reference:
   - Constitución de la República del Ecuador, Art. 288
   - Ley Orgánica del Sistema Nacional de Contratación Pública (LOSNCP)
   - Reglamento General a la LOSNCP
-  - normativa sanitaria y registros aplicables según el tipo de bien farmacéutico
-  - principios aplicables de concurrencia, igualdad, trato justo, transparencia, calidad y participación nacional
-    según corresponda
+  - principios aplicables de concurrencia, igualdad, trato justo, transparencia, calidad y participación nacional según corresponda
   international_reference:
   - OECD Recommendation of the Council on Public Procurement
-  - OECD Guidelines for Fighting Bid Rigging in Public Procurement
   - MAPS Methodology for Assessing Procurement Systems
   - Open Contracting Global Principles
   - UNCITRAL Model Law on Public Procurement
-  - enfoques de competencia efectiva y proporcionalidad en adquisición pública de bienes regulados
+  - enfoques de competencia efectiva y proporcionalidad en contratación pública
   human_validation_required: true
   review_status: curated_initial_framework
   confidence_level: medium
-  severity_rationale: 'Revisión sugerida: la señal depende de si existen equivalentes terapéuticos o técnicos,
-    justificación clínica, urgencia, continuidad terapéutica y regulación sanitaria aplicable.'
+  severity_rationale: 'Revisión sugerida: la señal depende de la combinación de atributos, la disponibilidad de alternativas, la existencia de equivalencias y la justificación técnica, clínica, operativa o regulatoria.'
   evidence_type:
-  - señal textual observable
-  - combinación de principio activo, dosis, concentración, volumen, vía, forma o empaque
-  - fragmento documental de especificación técnica o ficha farmacéutica
-  - mitigantes o equivalencias cercanas si existen
+  - fragmento documental de especificación técnica o ficha del bien
+  - atributos técnicos detectados y combinación concreta
+  - comparación contextual con mitigantes o equivalencias cercanas
+  - evidencia externa de productos compatibles solo si existe capacidad explícita de búsqueda o verificación
   limitations:
-  - La especificidad de una presentación farmacéutica puede responder a protocolos clínicos, continuidad terapéutica,
-    seguridad del paciente, nomencladores oficiales o regulación sanitaria.
-  - La señal no implica invalidez del requisito ni determina responsabilidad.
-  - La revisión debe considerar expediente, ficha técnica, registro sanitario, disponibilidad de equivalentes y contexto
-    clínico u operativo.
-  disclaimer: Mecanismo de apoyo analítico preventivo. No determina corrupción, ilegalidad, direccionamiento ni
-    responsabilidad administrativa.
+  - La coincidencia con un producto comercial no implica por sí sola una conclusión sobre el requisito.
+  - La herramienta no verifica automáticamente todo el mercado disponible ni registros comerciales externos.
+  - La señal debe interpretarse como una invitación a verificar concentración comercial, alternativas equivalentes y justificación técnica.
+  - La prioridad orienta revisión humana y no constituye calificación jurídica automática.
+  disclaimer: Mecanismo de apoyo analítico preventivo. No determina corrupción, ilegalidad, direccionamiento ni responsabilidad administrativa.
+  classification_guidance:
+  - 'Sin señal: características estándar y pluralidad aparente de alternativas.'
+  - 'Coincidencia comercial no exclusiva: existen productos coincidentes, pero no evidencia de concentración relevante.'
+  - 'Posible alineación con producto comercial específico: la combinación parece inusual y merece revisión humana.'
+  - 'Alta alineación comercial: la combinación es altamente distintiva y la evidencia disponible sugiere pocas alternativas compatibles.'
   positive_examples:
   - RITUXIMAB LÍQUIDO PARENTERAL 1400MG / 11,7ML
-  - MEDICAMENTO SOLUCIÓN INYECTABLE 50MG / 0,5ML JERINGA PRELLENADA SIN EQUIVALENTES
+  - Iopromida 370 mg I/ml envase de 100 ml
+  - Laptop con pantalla de 13,6 pulgadas, resolución 2560x1664, peso máximo 1,24 kg, procesador específico y puertos Thunderbolt
   false_positive_controls:
-  - verificar si la presentación responde a protocolo clínico documentado
-  - verificar continuidad terapéutica
-  - verificar registro sanitario obligatorio
-  - verificar si existen equivalentes terapéuticos o biosimilares disponibles
-  - verificar si la descripción proviene de nomenclador oficial obligatorio
-  - no clasificar como presentación comercial específica una descripción estándar de principio activo, forma, dosis y empaque habitual sin volumen exacto, marca, exclusividad o lenguaje comercial
+  - Laptop, 16 GB RAM
+  - Monitor 27 pulgadas
+  - Lenalidomida, sólido oral, 10 mg, caja x blíster
+  - No clasificar atributos aislados o descripciones de catálogo estándar como alineación comercial específica.
+  - Verificar si la descripción proviene de nomenclador oficial, estándar técnico obligatorio o regulación sectorial.
   triggers:
-  - active_ingredient_with_exact_dose_and_volume
-  - fixed_dose_presentation
-  - uncommon_mg_ml_combination
-  - specific_route_or_formulation
-  - commercial_packaging_detail
+  - distinctive_attribute_combination
+  - exact_specification_cluster
   - sku_like_description
+  - model_like_configuration
+  - commercial_presentation_detail
   - absence_of_equivalent_language
-  suggested_observation: La especificación técnica presenta una combinación altamente específica de principio activo,
-    concentración, volumen, forma farmacéutica o presentación comercial, lo que podría reducir el universo de oferentes
-    potenciales. Se recomienda validar la existencia de alternativas terapéuticas o equivalentes disponibles y documentar
-    la justificación clínica, regulatoria u operativa de la configuración requerida.
+  suggested_observation: La especificación técnica presenta una combinación específica de atributos que podría aproximarse a una configuración comercial particular. Se recomienda validar cuántos productos, modelos, presentaciones o proveedores pueden cumplir simultáneamente la especificación, si existen equivalencias razonables y si la combinación está justificada por la necesidad técnica, clínica, operativa o regulatoria del procedimiento.
   interpretive_indicators:
-  - La combinación de principio activo, concentración, volumen exacto, vía/formulación o lenguaje comercial parece más específica que una necesidad funcional general.
-  - No se observa aceptación de equivalentes terapéuticos, técnicos o regulatorios en el fragmento revisado.
-  - La especificación podría requerir justificación clínica, regulatoria u operativa para sostener su proporcionalidad.
+  - La señal se genera por la combinación de atributos, no por una característica aislada.
+  - La revisión debe distinguir coincidencia comercial no exclusiva de concentración comercial relevante.
+  - No se observa aceptación de equivalencias, rangos o alternativas en el fragmento revisado.
 - id: cn-short-submission-deadline
   name: Plazo reducido de presentación
   description: Identifica plazos que podrían limitar preparación de ofertas cuando son breves respecto de la carga
