@@ -751,7 +751,7 @@ def integrated_contextual_explanation(row: pd.Series, corpus_context: dict | Non
     plain = str(explanation.get("plain_language_explanation") or "").strip()
     why = str(explanation.get("why_it_matters") or "").strip()
     parts = [part for part in [plain, why] if _is_useful_text(part) and "no disponible" not in part.lower()]
-    return short_fragment(" ".join(parts), 520) if parts else fallback
+    return " ".join(parts) if parts else fallback
 
 
 def _deterministic_contextual_explanation(row: pd.Series) -> str:
