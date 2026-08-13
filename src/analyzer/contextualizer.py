@@ -80,6 +80,9 @@ def _candidate_rationale(
         f"Se identificó una señal preliminar asociada a {pattern.name}.",
         "Convendría verificar proporcionalidad, relación con el objeto y condiciones de participación.",
     ]
+    schedule_note = signal.metadata.get("schedule_analysis_note")
+    if schedule_note:
+        parts.append(str(schedule_note))
     if mitigants:
         parts.append("Se identificaron mitigantes textuales que pueden reducir la prioridad de revisión.")
     if missing:

@@ -17,6 +17,7 @@ from .parser import parse_pdf_bytes
 from .pdf_extractor import PageText
 from .prioritizer import prioritize_consolidated_findings
 from .relevance_filter import filter_relevant_findings
+from .schedule_analyzer import detect_schedule_signals
 from .review_item_builder import build_review_items, review_items_to_dataframe
 
 
@@ -57,7 +58,8 @@ def analyze_document_bytes(
     clauses = classify_clauses(extract_clauses(pages, sections, document_id))
     document_text = "\n\n".join(page.text for page in pages)
 
-    signals = detect_signals(active_clauses(clauses))
+    active = active_clauses(clauses)
+    signals = detect_signals(active) + detect_schedule_signals(active)
     candidates = build_finding_candidates(signals, clauses, corpus_context)
     consolidated = consolidate_candidates(candidates, clauses, document_id)
     relevant = filter_relevant_findings(consolidated)

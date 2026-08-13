@@ -151,6 +151,13 @@ def _ranking_score(
     if any(_mandatory_language(candidate.requirement_text) for candidate in group):
         score += 2
         factors.append("Lenguaje obligatorio en el requisito.")
+    if any(
+        signal.detector_name == "schedule_interval_detector_v1"
+        for candidate in group
+        for signal in candidate.signals
+    ):
+        score += 3
+        factors.append("Intervalo de cronograma calculado a partir de fechas concretas.")
     return score, factors
 
 

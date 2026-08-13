@@ -11,6 +11,7 @@ from src.analyzer.pdf_extractor import PageText
 from src.analyzer.prioritizer import prioritize_consolidated_findings
 from src.analyzer.relevance_filter import filter_relevant_findings
 from src.analyzer.review_item_builder import build_review_items, review_items_to_dataframe
+from src.analyzer.schedule_analyzer import detect_schedule_signals
 
 PROHIBITED = [
     "corrupción",
@@ -28,7 +29,8 @@ def _run_text_pipeline(texts, corpus_context=None):
     pages = [PageText(page_number=index, text=text) for index, text in enumerate(texts, start=1)]
     sections = segment_document(pages)
     clauses = classify_clauses(extract_clauses(pages, sections, "doc-test"))
-    signals = detect_signals(active_clauses(clauses))
+    active = active_clauses(clauses)
+    signals = detect_signals(active) + detect_schedule_signals(active)
     candidates = build_finding_candidates(signals, clauses, corpus_context or {})
     consolidated = consolidate_candidates(candidates, clauses, "doc-test")
     relevant = filter_relevant_findings(consolidated)
@@ -267,3 +269,41 @@ def test_distinctive_laptop_configuration_can_trigger_commercial_configuration_s
     _, signals, _, _, items = _run_text_pipeline(texts)
     assert any(signal.pattern_id == COMMERCIAL_CONFIGURATION_PATTERN_ID for signal in signals)
     assert any(item.metadata.get("pattern_id") == COMMERCIAL_CONFIGURATION_PATTERN_ID for item in items)
+
+
+def test_short_publication_to_offer_interval_creates_schedule_review_item():
+    texts = [
+        "CRONOGRAMA. Fecha de publicación: 01/08/2026. Presentación de ofertas: 03/08/2026."
+    ]
+    _, signals, _, _, items = _run_text_pipeline(texts)
+    schedule_signals = [signal for signal in signals if signal.detector_name == "schedule_interval_detector_v1"]
+    assert schedule_signals
+    assert any(signal.pattern_id == "cn-short-submission-deadline" for signal in schedule_signals)
+    assert any(item.metadata.get("pattern_id") == "cn-short-submission-deadline" for item in items)
+    assert "intervalo" in items[0].why_it_matters.lower() or "fecha" in items[0].evidence_summary.lower()
+
+
+def test_generic_schedule_reference_without_dates_does_not_create_schedule_signal():
+    texts = ["CRONOGRAMA. La presentación de ofertas será conforme al cronograma del procedimiento."]
+    _, signals, _, _, items = _run_text_pipeline(texts)
+    assert not any(signal.detector_name == "schedule_interval_detector_v1" for signal in signals)
+    assert items == []
+
+
+def test_reasonable_publication_to_offer_interval_does_not_create_schedule_signal():
+    texts = [
+        "CRONOGRAMA. Fecha de publicación: 01/08/2026. Presentación de ofertas: 15/08/2026."
+    ]
+    _, signals, _, _, items = _run_text_pipeline(texts)
+    assert not any(signal.detector_name == "schedule_interval_detector_v1" for signal in signals)
+    assert not any(item.metadata.get("pattern_id") == "cn-short-submission-deadline" for item in items)
+
+
+def test_mandatory_technical_visit_near_offer_submission_creates_schedule_signal():
+    texts = [
+        "CRONOGRAMA. Visita técnica obligatoria: 02/08/2026. Presentación de ofertas: 03/08/2026."
+    ]
+    _, signals, _, _, items = _run_text_pipeline(texts)
+    visit_signals = [signal for signal in signals if signal.detector_name == "schedule_interval_detector_v1"]
+    assert any(signal.pattern_id == "cn-mandatory-technical-visit" for signal in visit_signals)
+    assert any(item.metadata.get("pattern_id") == "cn-mandatory-technical-visit" for item in items)
