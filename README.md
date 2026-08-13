@@ -200,8 +200,8 @@ Estado de referencia de esta rama: `57 passed`.
 
 La arquitectura conceptual, los principios analíticos, el enfoque metodológico y los lineamientos de gobernanza se documentan en:
 
-- `docs/technical_and_conceptual_framework.md`
-- `docs/architecture.md`
+- [Marco técnico y conceptual](docs/technical_and_conceptual_framework.md)
+- [Arquitectura del pipeline documental](docs/architecture.md)
 
 Estos documentos explican el enfoque de neutralidad competitiva, trazabilidad, revisión humana, corpus histórico, uso prudente de LLM y mitigación de falsos positivos.
 
