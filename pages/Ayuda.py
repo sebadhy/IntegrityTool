@@ -84,13 +84,20 @@ st.markdown(
 <div class="help-card">
 <h2>Cómo funciona el análisis</h2>
 <p>
-El análisis combina extracción y estructuración automática del contenido con una taxonomía de señales documentales.
-Esa taxonomía organiza condiciones que podrían requerir revisión desde dimensiones como neutralidad competitiva,
-proporcionalidad, barreras de entrada, interoperabilidad, trazabilidad regulatoria y relación con el objeto contractual.
+La herramienta toma un PDF, extrae el texto, organiza el contenido en cláusulas revisables y aplica una taxonomía de señales documentales.
+Luego consolida observaciones similares y las presenta con evidencia, mitigantes y preguntas para revisión humana.
 </p>
+<ol>
+<li>PDF cargado por el usuario.</li>
+<li>Extracción y estructuración del texto.</li>
+<li>Filtrado de índices, placeholders y texto no sustantivo.</li>
+<li>Aplicación de taxonomía documental.</li>
+<li>Consolidación y priorización de observaciones.</li>
+<li>Presentación de evidencia y preguntas sugeridas.</li>
+</ol>
 <p>
-Cuando existe procesamiento asistido configurado, puede utilizarse para validar metadata, resumir contenido y redactar
-explicaciones contextuales. La identificación primaria de señales se basa en reglas, taxonomía y evidencia textual.
+Si existe procesamiento asistido configurado, se utiliza como apoyo para validar metadata y redactar síntesis contextual.
+No decide por sí solo qué observaciones se muestran ni reemplaza la revisión humana.
 </p>
 </div>
 """,

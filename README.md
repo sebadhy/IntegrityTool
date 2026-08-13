@@ -14,7 +14,7 @@ La herramienta busca responder:
 
 Para eso combina extracción documental, reglas determinísticas, una taxonomía editable de señales y, cuando está configurado, procesamiento asistido para redactar resúmenes o explicaciones contextuales.
 
-## Cómo Funciona
+## Cómo funciona
 
 El flujo principal es determinístico:
 
@@ -29,7 +29,26 @@ El flujo principal es determinístico:
 
 El LLM es opcional. Si existe una clave o proveedor configurado, se usa solo como capa de apoyo para validar metadata, redactar lectura preliminar y contextualizar observaciones ya detectadas. No agrega ni elimina observaciones por decisión propia.
 
-## Qué Analiza
+### Cursograma general
+
+```mermaid
+flowchart TD
+    A["PDF de pliego o especificación técnica"] --> B["Extracción de texto"]
+    B --> C["Segmentación por secciones"]
+    C --> D["Extracción de cláusulas revisables"]
+    D --> E["Filtrado de índices, placeholders y texto no sustantivo"]
+    E --> F["Aplicación de taxonomía documental"]
+    F --> G["Detección de señales textuales"]
+    G --> H["Identificación de mitigantes y contexto"]
+    H --> I["Consolidación de observaciones equivalentes"]
+    I --> J["Priorización para revisión humana"]
+    J --> K["Observaciones visibles con evidencia y preguntas sugeridas"]
+
+    L["Procesamiento asistido opcional"] -. "Valida metadata y redacta síntesis contextual" .-> J
+    L -. "No decide visibilidad ni prioridad" .-> K
+```
+
+## Qué analiza
 
 La herramienta puede revisar PDFs de pliegos y especificaciones técnicas. La taxonomía actual incluye señales relacionadas con:
 
@@ -83,13 +102,13 @@ OCR en Windows es opcional. Solo hace falta instalar Tesseract si se van a anali
 python -m streamlit run app.py
 ```
 
-Luego abrí la URL local que indique Streamlit, usualmente `http://localhost:8501`.
+Luego abra la URL local que indique Streamlit, usualmente `http://localhost:8501`.
 
 Usar `python -m streamlit` evita problemas de rutas internas del entorno virtual en Windows, macOS y Linux.
 
 ## Configuración LLM Opcional
 
-Editá `.env` solo si querés habilitar procesamiento asistido.
+Edite `.env` solo si desea habilitar procesamiento asistido.
 
 OpenAI directo:
 
@@ -177,7 +196,7 @@ pytest -q
 
 Estado de referencia de esta rama: `57 passed`.
 
-## Referencias Conceptuales Y Metodológicas
+## Referencias conceptuales y metodológicas
 
 La arquitectura conceptual, los principios analíticos, el enfoque metodológico y los lineamientos de gobernanza se documentan en:
 
