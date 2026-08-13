@@ -74,6 +74,28 @@ def cached_explain_priority_with_llm(
     return explain_priority_with_llm(priority, corpus_context)
 
 
+@st.cache_data(show_spinner=False, ttl=300)
+def cached_llm_connection_status() -> tuple[bool, str]:
+    return test_llm_connection()
+
+
+def llm_configured_by_env() -> bool:
+    return bool(
+        os.getenv("OPENAI_API_KEY")
+        or os.getenv("GROQ_API_KEY")
+        or os.getenv("OLLAMA_BASE_URL")
+        or os.getenv("OLLAMA_MODEL")
+    )
+
+
+def render_llm_usage_note(message: str, active: bool = True) -> None:
+    css_class = "llm-note-active" if active else "llm-note-inactive"
+    st.markdown(
+        f'<div class="llm-usage-note {css_class}">{safe_text(message)}</div>',
+        unsafe_allow_html=True,
+    )
+
+
 def corpus_cache_signature() -> tuple[tuple[str, int, int], ...]:
     paths = [APP_DIR / "data" / "raw" / "metadata" / "procesos.csv"]
     for folder in (
@@ -571,6 +593,12 @@ def render_pliego_summary(
 ) -> None:
     st.subheader("Lectura para decisión")
     st.caption("Síntesis breve para entender qué tipo de revisión conviene hacer. Los datos formales están arriba.")
+    if assisted_summary:
+        render_llm_usage_note("Modelo LLM utilizado en esta etapa: validó/corrigió metadata candidata y apoyó la síntesis preliminar. Las observaciones provienen de reglas y taxonomía.")
+    elif llm_configured_by_env():
+        render_llm_usage_note("Modelo LLM configurado, pero esta síntesis se muestra con lectura determinística porque no hubo salida asistida disponible.", active=False)
+    else:
+        render_llm_usage_note("Sin modelo LLM en esta etapa: la síntesis se generó con reglas, taxonomía y evidencia textual.", active=False)
     top_themes = brief.get("top_themes", [])[:3]
     theme_text = ", ".join(top_themes) if top_themes else "condiciones documentales del proceso"
     condition_count = len(reviewable_signals(filtered_df))
@@ -710,7 +738,7 @@ def corpus_context_sentence(row: pd.Series) -> str:
 
 def integrated_contextual_explanation(row: pd.Series, corpus_context: dict | None = None) -> str:
     fallback = _deterministic_contextual_explanation(row)
-    if not test_llm_connection()[0]:
+    if not cached_llm_connection_status()[0]:
         return fallback
     explanation = cached_explain_priority_with_llm(
         row.to_dict(),
@@ -914,7 +942,7 @@ def _methodology_sections(row: pd.Series) -> list[tuple[str, list[str]]]:
     mitigants = display_list(row.get("mitigating_factors", []))
     missing = display_list(row.get("missing_information", []))
     evidence = short_fragment(row.get("fragmento textual", row.get("representative_excerpt", "No disponible")), 240)
-    ai_active = test_llm_connection()[0]
+    ai_active = cached_llm_connection_status()[0]
 
     basis = [
         f"Patrón aplicado: {pattern}.",
@@ -1094,6 +1122,10 @@ def _render_aspect_rows(
         )
         st.markdown('<div class="review-item-body">', unsafe_allow_html=True)
         st.markdown("**Lectura contextual**")
+        if cached_llm_connection_status()[0]:
+            render_llm_usage_note("Modelo LLM usado aquí: redacta una explicación breve a partir del fragmento, la taxonomía y mitigantes ya detectados. No agrega ni elimina observaciones.")
+        else:
+            render_llm_usage_note("Sin modelo LLM aquí: la explicación proviene de reglas, taxonomía y contexto documental.", active=False)
         st.write(integrated_contextual_explanation(row, corpus_context))
         mitigants = display_list(row.get("mitigating_factors", []))
         if mitigants:
@@ -1588,6 +1620,7 @@ def render_setup_panel() -> tuple[object | None, bool, bool, bool]:
         <div class="decision-explain">
             <div><strong>Resultado esperado</strong><span>Una lista corta de aspectos que conviene revisar primero.</span></div>
             <div><strong>Base de la lectura</strong><span>Reglas documentales, taxonomía, evidencia textual y corpus disponible.</span></div>
+            <div><strong>Uso de modelo</strong><span>Si está configurado, apoya metadata, síntesis y lectura contextual; no decide observaciones.</span></div>
             <div><strong>Alcance</strong><span>Insumo preliminar para revisión humana; no es dictamen técnico ni jurídico.</span></div>
         </div>
         """,
@@ -1605,7 +1638,7 @@ Cada observación debe verificarse contra el documento y, cuando corresponda, co
     uploaded_file = st.file_uploader("Documento PDF", type=["pdf"], label_visibility="collapsed")
     process_document = st.button("Iniciar revisión", type="primary", width="stretch")
     st.markdown('</div>', unsafe_allow_html=True)
-    return uploaded_file, True, bool(os.getenv("OPENAI_API_KEY")), process_document
+    return uploaded_file, True, llm_configured_by_env(), process_document
 
 def render_review_top_bar(document_name: str, signal_count: int) -> None:
     render_review_nav(document_name, signal_count)
@@ -1766,7 +1799,7 @@ def render_review_flow() -> None:
     signal_count = len(reviewable_signals(visible_df))
     assisted_summary: list[str] = []
     if enable_ai_reading:
-        if not test_llm_connection()[0]:
+        if not cached_llm_connection_status()[0]:
             validation_messages.append("Análisis asistido no configurado en este entorno.")
         else:
             with st.spinner("Validando metadata y resumen preliminar..."):

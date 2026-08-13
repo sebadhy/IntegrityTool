@@ -1465,3 +1465,26 @@ textarea {
         grid-template-columns: 1fr;
     }
 }
+
+/* Transparent but calm LLM usage indicators */
+.llm-usage-note {
+    border-radius: 5px;
+    font-size: 0.82rem;
+    line-height: 1.38;
+    margin: 0.35rem 0 0.65rem;
+    padding: 0.52rem 0.65rem;
+}
+
+.llm-note-active {
+    background: #F4F8FB;
+    border: 1px solid #C9D8E6;
+    border-left: 4px solid var(--blue-medium);
+    color: #263442;
+}
+
+.llm-note-inactive {
+    background: #F8FAFC;
+    border: 1px solid var(--border);
+    border-left: 4px solid #9AA6B2;
+    color: #52606D;
+}
