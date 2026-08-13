@@ -1488,3 +1488,191 @@ textarea {
     border-left: 4px solid #9AA6B2;
     color: #52606D;
 }
+
+/* ============================================================
+   SERCOP-inspired institutional look and feel
+   Inspiration: public procurement portal style. No official logo
+   or brand asset is copied; this only adjusts palette and UI tone.
+   ============================================================ */
+:root {
+    --blue-dark: #003A63;
+    --blue-medium: #0067A8;
+    --blue-soft: #E7F2FA;
+    --gray-light: #EEF3F7;
+    --text-gray: #26313D;
+    --text-muted: #657382;
+    --border: #C8D6E2;
+    --warning-soft: #FFF6DD;
+    --surface: #FFFFFF;
+    --surface-muted: #F6F9FB;
+    --accent-cyan: #00A6D6;
+    --accent-gold: #F2B705;
+    --accent-green: #2E8B68;
+    --shadow-soft: 0 1px 2px rgba(0, 58, 99, 0.05), 0 10px 26px rgba(0, 58, 99, 0.08);
+}
+
+.stApp {
+    background: linear-gradient(180deg, #EAF1F6 0%, #F5F8FA 38%, #EEF3F7 100%);
+}
+
+.block-container {
+    max-width: 1240px;
+}
+
+.app-strip,
+.top-strip {
+    background: linear-gradient(90deg, #003A63 0%, #005B93 62%, #007DB7 100%) !important;
+    border-radius: 0 !important;
+    box-shadow: inset 0 -3px 0 var(--accent-gold);
+    font-size: 0.88rem !important;
+    letter-spacing: 0.01em;
+    margin-bottom: 1rem !important;
+    padding: 0.66rem 0.9rem !important;
+}
+
+.setup-hero,
+.upload-panel,
+.document-header-simple,
+.pliego-summary,
+.review-nav-bar,
+.review-item-card,
+.review-item-body,
+.evidence-detail-box,
+[data-testid="stExpander"] {
+    border-color: var(--border) !important;
+    border-radius: 3px !important;
+    box-shadow: 0 1px 0 rgba(0, 58, 99, 0.05) !important;
+}
+
+.setup-hero {
+    border-left-color: var(--accent-cyan) !important;
+    background: linear-gradient(180deg, #FFFFFF 0%, #F8FBFD 100%) !important;
+}
+
+.setup-kicker,
+.section-eyebrow,
+.summary-label,
+.doc-label {
+    color: #005B93 !important;
+    letter-spacing: 0.06em;
+}
+
+.decision-explain > div,
+.methodology-brief-item {
+    border-top: 3px solid var(--accent-cyan);
+    background: #FFFFFF !important;
+}
+
+.upload-panel-title,
+.review-item-title,
+.doc-title,
+.doc-value {
+    color: #1E2C38 !important;
+}
+
+.stButton > button,
+.stDownloadButton > button {
+    background: #0067A8 !important;
+    border: 1px solid #004F82 !important;
+    border-radius: 3px !important;
+    box-shadow: none !important;
+    color: #FFFFFF !important;
+    font-weight: 700 !important;
+}
+
+.stButton > button:hover,
+.stDownloadButton > button:hover {
+    background: #003A63 !important;
+    border-color: #003A63 !important;
+    color: #FFFFFF !important;
+}
+
+.stButton > button[kind="secondary"] {
+    background: #FFFFFF !important;
+    border-color: var(--border) !important;
+    color: #003A63 !important;
+}
+
+.stButton > button[kind="secondary"]:hover {
+    background: #E7F2FA !important;
+    border-color: #0067A8 !important;
+    color: #003A63 !important;
+}
+
+[data-testid="stFileUploaderDropzone"] {
+    background: #F8FBFD !important;
+    border: 1.5px dashed #AFC4D5 !important;
+}
+
+[data-testid="stFileUploaderDropzone"]:hover,
+[data-testid="stFileUploaderDropzone"]:focus-within {
+    background: #E7F2FA !important;
+    border-color: #0067A8 !important;
+}
+
+.review-item-card {
+    border-left-color: var(--accent-cyan) !important;
+    background: #FFFFFF !important;
+}
+
+.review-item-number {
+    background: #003A63 !important;
+}
+
+.priority-high {
+    background: #FFF3D0 !important;
+    border-color: #E8C458 !important;
+    color: #5E4700 !important;
+}
+
+.priority-medium {
+    background: #E7F2FA !important;
+    border-color: #B7D4E8 !important;
+    color: #004F82 !important;
+}
+
+.priority-low {
+    background: #EEF7F3 !important;
+    border-color: #BDDCCF !important;
+    color: #235B45 !important;
+}
+
+.decision-guidance,
+.llm-note-active {
+    background: #F4FAFD !important;
+    border-color: #B7D4E8 !important;
+    border-left-color: #0067A8 !important;
+}
+
+.mitigant-strip {
+    background: #EEF7F3 !important;
+    border-color: #BDDCCF !important;
+    border-left-color: var(--accent-green) !important;
+}
+
+.methodology-limits,
+.ai-disclaimer {
+    background: #FFF6DD !important;
+    border-color: #E6CA70 !important;
+    border-left-color: var(--accent-gold) !important;
+}
+
+.pliego-summary {
+    border-left-color: #0067A8 !important;
+}
+
+.evidence-detail-box p {
+    background: #F6F9FB !important;
+    border-left-color: #0067A8 !important;
+}
+
+[data-testid="stExpander"] details summary:hover,
+[data-testid="stExpander"] details summary:focus,
+[data-testid="stExpander"] details[open] summary {
+    background: #E7F2FA !important;
+    color: #003A63 !important;
+}
+
+[data-testid="stDataFrame"] {
+    border-color: var(--border) !important;
+}
