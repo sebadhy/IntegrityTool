@@ -6,3 +6,5 @@ data/raw/
 data/processed/
 data/feedback/
 .streamlit/
+.pytest_cache/
+*.log

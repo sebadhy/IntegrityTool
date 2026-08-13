@@ -27,7 +27,7 @@ def send_alert_email(
     recipients: list[str],
 ) -> tuple[bool, str]:
     """
-    Envía alerta de red flag por email a los destinatarios indicados.
+    Envía una alerta de señal de atención por email a los destinatarios indicados.
     Retorna (success: bool, message: str).
     """
     smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")

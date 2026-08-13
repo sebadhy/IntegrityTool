@@ -37,6 +37,7 @@ PDF
 - `clause_extractor.py`: genera `Clause[]`.
 - `boilerplate_filter.py`: clasifica placeholders, texto de plantilla, índice, metadata o cláusulas no sustantivas.
 - `detector.py`: genera `Signal[]` desde cláusulas activas usando la taxonomía YAML.
+- `schedule_analyzer.py`: analiza fechas y cronogramas concretos cuando existe evidencia suficiente; no genera observaciones visibles sobre índices o referencias genéricas.
 - `taxonomy_loader.py` y `patterns/risk_taxonomy.yaml`: cargan patrones editables, dimensiones y lenguaje permitido.
 - `mitigants.py`: detecta equivalencias, justificaciones y mitigantes textuales.
 - `contextualizer.py`: construye `FindingCandidate[]`.
