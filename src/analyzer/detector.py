@@ -28,6 +28,8 @@ SIGNAL_REVIEW = "señal_revision"
 SIGNAL_MITIGANT = "mitigante_concurrencia"
 SIGNAL_HABITUAL = "requisito_habitual"
 
+PHARMA_PRESENTATION_PATTERN_ID = "cn-pharma-commercial-presentation-specificity"
+
 GLOBAL_MITIGATING_TERMS = [
     "o equivalente",
     "se aceptarán equivalentes",
@@ -707,6 +709,8 @@ def detect_patterns(
             pattern_context_chars = _context_chars_for_pattern(pattern.id, context_chars)
             for term, start, end in find_terms(normalized_text, pattern.textual_signals):
                 fragment = extract_context_window(normalized_text, start, end, context_chars=pattern_context_chars)
+                if pattern.id == PHARMA_PRESENTATION_PATTERN_ID and not _supports_pharma_commercial_presentation(fragment):
+                    continue
                 is_common_goods_signal = _is_weak_goods_signal(pattern, fragment)
                 mitigating_factors = _contextual_mitigating_factors(fragment, pattern)
                 possible_justifications = _contextual_justifications(fragment, pattern)
@@ -1220,6 +1224,70 @@ def _has_negated_equivalence(text: str) -> bool:
     return any(pattern in text for pattern in negated_patterns)
 
 
+
+def _supports_pharma_commercial_presentation(fragment: str) -> bool:
+    """Require strong pharmaceutical specificity before surfacing SKU-like signals.
+
+    Generic medicine catalogue language such as "sólido oral, 10 mg, caja x
+    blíster" is common in regulated goods and should not be classified as a
+    commercial-presentation signal by itself. The pattern is reserved for more
+    granular combinations such as exact dose plus exact volume, or explicit
+    commercial/SKU/exclusivity language.
+    """
+    normalized = normalize_text(fragment)
+    if not normalized:
+        return False
+
+    has_dose = bool(re.search(r"\b\d+(?:[\.,]\d+)?\s*(?:mg|mcg|g|ui|iu)\b", normalized))
+    has_exact_volume = bool(re.search(r"\b\d+(?:[\.,]\d+)?\s*ml\b", normalized))
+    has_concentration_ratio = bool(
+        re.search(r"\b\d+(?:[\.,]\d+)?\s*(?:mg|mcg|g|ui|iu)\s*/\s*\d+(?:[\.,]\d+)?\s*ml\b", normalized)
+        or re.search(r"\b\d+(?:[\.,]\d+)?\s*(?:mg|mcg|g|ui|iu)\s*/\s*ml\b", normalized)
+    )
+    has_route_or_form = any(
+        term in normalized
+        for term in [
+            "liquido parenteral",
+            "liquido inyectable",
+            "solucion inyectable",
+            "suspension inyectable",
+            "via intravenosa",
+            "via subcutanea",
+            "jeringa prellenada",
+            "frasco ampolla",
+        ]
+    )
+    has_explicit_commercial_language = any(
+        term in normalized
+        for term in [
+            "presentacion comercial",
+            "presentacion propietaria",
+            "sku",
+            "codigo de producto",
+            "marca",
+            "fabricante",
+            "proveedor exclusivo",
+            "distribuidor exclusivo",
+            "solo se aceptara",
+            "solo se aceptan",
+            "sin equivalentes",
+            "no se aceptan equivalentes",
+        ]
+    )
+
+    # Strong case: exact dose/concentration plus exact volume, especially for
+    # parenteral/injectable presentations such as 1400 mg / 11,7 ml.
+    if has_dose and (has_exact_volume or has_concentration_ratio) and (has_route_or_form or has_explicit_commercial_language):
+        return True
+
+    # Explicit commercial/exclusive language can support review if paired with
+    # a pharmaceutical dose. Standard packaging terms alone are intentionally insufficient.
+    if has_dose and has_explicit_commercial_language:
+        return True
+
+    return False
+
+
 def _finding_id(pattern_id: str, page: int, fragment: str) -> str:
     digest = hashlib.sha1(f"{pattern_id}|{page}|{fragment[:240]}".encode("utf-8")).hexdigest()
     return f"finding-{digest[:12]}"
@@ -1249,6 +1317,8 @@ def detect_signals(clauses: list[Clause]) -> list[Signal]:
                 continue
             term, start, end = sorted(matches, key=lambda item: (item[1], -len(item[0])))[0]
             evidence = extract_context_window(clause.text, start, end, context_chars=APP_DEFAULT_CONTEXT_CHARS)
+            if pattern.id == PHARMA_PRESENTATION_PATTERN_ID and not _supports_pharma_commercial_presentation(evidence):
+                continue
             signal_id = _finding_id(f"signal-{pattern.id}-{clause.clause_id}", clause.page, evidence)
             signals.append(
                 Signal(

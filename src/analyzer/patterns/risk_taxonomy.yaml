@@ -592,11 +592,10 @@ patterns:
   - La certificación se exige sin justificar relación con el objeto.
   - No se aceptan certificaciones, registros o estándares equivalentes.
 - id: cn-pharma-commercial-presentation-specificity
-  name: Especificación farmacéutica alineada a presentación comercial específica
-  description: Identifica combinaciones altamente específicas de principio activo, concentración, volumen, vía,
-    forma farmacéutica o empaque que podrían coincidir con presentaciones comerciales particulares y reducir la
-    sustituibilidad competitiva si no se admiten equivalencias o no existe justificación clínica, regulatoria u
-    operativa documentada.
+  name: Posible alineamiento farmacéutico con presentación comercial específica
+  description: Identifica combinaciones farmacéuticas de alta granularidad, especialmente principio activo con
+    concentración y volumen exactos, vía o formulación específica, o lenguaje comercial/exclusivo, que podrían coincidir
+    con presentaciones comerciales particulares. No debe activarse por nomenclatura farmacéutica estándar aislada.
   competition_dimension: neutralidad_competitiva
   risk_type: especificación farmacéutica granular sujeta a revisión contextual
   document_sections:
@@ -761,13 +760,14 @@ patterns:
     responsabilidad administrativa.
   positive_examples:
   - RITUXIMAB LÍQUIDO PARENTERAL 1400MG / 11,7ML
-  - EVEROLIMUS SÓLIDO ORAL 0,50 MG CJ X BLIST
+  - MEDICAMENTO SOLUCIÓN INYECTABLE 50MG / 0,5ML JERINGA PRELLENADA SIN EQUIVALENTES
   false_positive_controls:
   - verificar si la presentación responde a protocolo clínico documentado
   - verificar continuidad terapéutica
   - verificar registro sanitario obligatorio
   - verificar si existen equivalentes terapéuticos o biosimilares disponibles
   - verificar si la descripción proviene de nomenclador oficial obligatorio
+  - no clasificar como presentación comercial específica una descripción estándar de principio activo, forma, dosis y empaque habitual sin volumen exacto, marca, exclusividad o lenguaje comercial
   triggers:
   - active_ingredient_with_exact_dose_and_volume
   - fixed_dose_presentation
@@ -781,8 +781,7 @@ patterns:
     potenciales. Se recomienda validar la existencia de alternativas terapéuticas o equivalentes disponibles y documentar
     la justificación clínica, regulatoria u operativa de la configuración requerida.
   interpretive_indicators:
-  - La combinación de principio activo, concentración, volumen, forma o empaque parece más específica que una necesidad
-    funcional general.
+  - La combinación de principio activo, concentración, volumen exacto, vía/formulación o lenguaje comercial parece más específica que una necesidad funcional general.
   - No se observa aceptación de equivalentes terapéuticos, técnicos o regulatorios en el fragmento revisado.
   - La especificación podría requerir justificación clínica, regulatoria u operativa para sostener su proporcionalidad.
 - id: cn-short-submission-deadline

@@ -216,3 +216,21 @@ def test_pipeline_does_not_create_review_item_from_index_only_timeline_reference
     _, signals, _, _, items = _run_text_pipeline(texts)
     assert signals == []
     assert items == []
+
+
+def test_standard_pharmaceutical_catalogue_description_is_not_commercial_presentation_signal():
+    texts = [
+        "ESPECIFICACIONES TÉCNICAS. 2.1 Lenalidomida, Sólido oral, 10 mg, Caja x blíster/ristra 23450 u."
+    ]
+    _, signals, _, _, items = _run_text_pipeline(texts)
+    assert not any(signal.pattern_id == "cn-pharma-commercial-presentation-specificity" for signal in signals)
+    assert not any(item.metadata.get("pattern_id") == "cn-pharma-commercial-presentation-specificity" for item in items)
+
+
+def test_exact_pharmaceutical_dose_and_volume_can_trigger_commercial_presentation_signal():
+    texts = [
+        "ESPECIFICACIONES TÉCNICAS. Rituximab líquido parenteral 1400mg / 11,7ml sin equivalentes terapéuticos visibles."
+    ]
+    _, signals, _, _, items = _run_text_pipeline(texts)
+    assert any(signal.pattern_id == "cn-pharma-commercial-presentation-specificity" for signal in signals)
+    assert any(item.metadata.get("pattern_id") == "cn-pharma-commercial-presentation-specificity" for item in items)
