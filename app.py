@@ -1626,12 +1626,18 @@ def render_setup_panel() -> tuple[object | None, bool, bool, bool]:
         """,
         unsafe_allow_html=True,
     )
-    with st.expander("Ver alcance y límites", expanded=False):
+    with st.expander("Cómo funciona el análisis", expanded=False):
         st.markdown(
             """
-La herramienta organiza observaciones preliminares sobre requisitos técnicos, participación, experiencia, plazos, certificaciones, interoperabilidad y equivalencias.
+La herramienta toma un pliego o especificación técnica en PDF y combina tres capas de lectura:
 
-Cada observación debe verificarse contra el documento y, cuando corresponda, contra el expediente completo, anexos, aclaraciones y criterio técnico de la entidad competente.
+1. **Extracción y estructuración documental:** extrae texto, páginas, secciones y fragmentos verificables.
+2. **Taxonomía de señales:** organiza qué condiciones conviene revisar, como requisitos técnicos, experiencia, plazos, certificaciones, equivalencias, interoperabilidad o trazabilidad.
+3. **Modelos de IA/LLM:** cuando están configurados, ayudan a interpretar esas condiciones dentro del contexto del documento y a redactar síntesis más claras. No agregan conclusiones ni reemplazan la revisión humana.
+
+Las dimensiones usadas actualmente —neutralidad competitiva, proporcionalidad, barreras de entrada, relación con el objeto contractual, interoperabilidad y trazabilidad regulatoria— son una **propuesta inicial de organización analítica**. Pueden ajustarse, ampliarse o depurarse con revisión institucional y validación experta.
+
+Las observaciones generadas son insumos preliminares. Deben verificarse contra el documento, anexos, aclaraciones, expediente completo y criterio técnico o jurídico de la entidad competente.
             """
         )
     st.markdown('<div class="upload-panel"><div class="upload-panel-title">Archivo PDF</div><div class="upload-panel-help">Seleccione el documento y luego inicie la revisión.</div>', unsafe_allow_html=True)
