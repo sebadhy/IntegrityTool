@@ -569,8 +569,8 @@ def render_pliego_summary(
     ai_brief: dict | None = None,
     assisted_summary: list[str] | None = None,
 ) -> None:
-    st.subheader("Resumen del pliego")
-    st.caption("Lectura breve para orientar la revisión; los datos formales del procedimiento se muestran solo en el encabezado.")
+    st.subheader("Lectura para decisión")
+    st.caption("Síntesis breve para entender qué tipo de revisión conviene hacer. Los datos formales están arriba.")
     top_themes = brief.get("top_themes", [])[:3]
     theme_text = ", ".join(top_themes) if top_themes else "condiciones documentales del proceso"
     condition_count = len(reviewable_signals(filtered_df))
@@ -594,7 +594,7 @@ def render_pliego_summary(
         ]
     html = "".join(f"<li>{safe_text(item)}</li>" for item in bullets[:4] if _is_useful_text(item))
     st.markdown(
-        f'<div class="pliego-summary"><div class="summary-label">Lectura preliminar</div><ul>{html}</ul></div>',
+        f'<div class="pliego-summary"><div class="summary-label">Qué indica la revisión preliminar</div><ul>{html}</ul></div>',
         unsafe_allow_html=True,
     )
 
@@ -665,6 +665,15 @@ def priority_css_class(priority: str) -> str:
     if "sugerida" in normalized or "media" in normalized:
         return "priority-medium"
     return "priority-low"
+
+
+def decision_guidance(row: pd.Series) -> str:
+    priority = observation_priority(row).lower()
+    if "prioritaria" in priority or "alta" in priority:
+        return "Revisar primero y solicitar validación técnica o documental si la evidencia se confirma."
+    if "sugerida" in priority or "media" in priority:
+        return "Revisar después de las prioridades principales y confirmar proporcionalidad, equivalencias o justificación."
+    return "Mantener como contexto de revisión; no debería desplazar aspectos con mayor prioridad salvo nueva evidencia."
 
 
 def observation_source(row: pd.Series) -> str:
@@ -1033,10 +1042,10 @@ def render_suggested_aspects(
         """
         <div class="section-heading">
             <div>
-                <div class="section-eyebrow">Revisión humana</div>
+                <div class="section-eyebrow">Qué mirar primero</div>
                 <h2>Aspectos sugeridos para revisión</h2>
             </div>
-            <p>Observaciones consolidadas, ordenadas para revisar primero lo más accionable. <strong>Alto</strong>: requiere atención prioritaria · <strong>Medio</strong>: revisión sugerida · <strong>Bajo</strong>: contexto general.</p>
+            <p>Lista consolidada y priorizada. La prioridad solo ordena la revisión humana; no representa una conclusión automática.</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1076,20 +1085,21 @@ def _render_aspect_rows(
                     <span class="review-item-meta">Páginas {safe_text(pages_label)} · {safe_text(occurrence_label)} ocurrencia(s)</span>
                 </div>
                 <div class="review-item-title">{safe_text(str(row['patrón detectado']))}</div>
-                <div class="review-item-dimension">{safe_text(dimension)}</div>
-                <div class="review-item-summary">{safe_text(short_fragment(row.get('por qué se sugiere revisar', row.get('observación prudente', 'Requiere validación humana.')), 320))}</div>
+                <div class="review-item-dimension">Dimensión: {safe_text(dimension)}</div>
+                <div class="decision-guidance"><strong>Decisión sugerida:</strong> {safe_text(decision_guidance(row))}</div>
+                <div class="review-item-summary"><strong>Por qué conviene revisar:</strong> {safe_text(short_fragment(row.get('por qué se sugiere revisar', row.get('observación prudente', 'Requiere validación humana.')), 300))}</div>
             </div>
             """,
             unsafe_allow_html=True,
         )
         st.markdown('<div class="review-item-body">', unsafe_allow_html=True)
-        st.markdown("**Explicación contextual**")
+        st.markdown("**Lectura contextual**")
         st.write(integrated_contextual_explanation(row, corpus_context))
         mitigants = display_list(row.get("mitigating_factors", []))
         if mitigants:
             st.markdown('<div class="mitigant-strip"><strong>Mitigantes identificados:</strong> ' + safe_text("; ".join(mitigants[:3])) + '</div>', unsafe_allow_html=True)
         questions = row.get("human_review_questions") or row.get("suggested_questions") or row.get("pregunta_normativa_sugerida")
-        st.markdown("**Qué conviene validar**")
+        st.markdown("**Preguntas para el revisor**")
         st.markdown(display_bullets(questions, row.get("validación sugerida", "Validar proporcionalidad y necesidad técnica.")), unsafe_allow_html=True)
         render_evidence_panel(row, pages=pages, pdf_bytes=pdf_bytes)
         render_reasoning_expander(row)
@@ -1475,14 +1485,13 @@ def render_theme_groups(enriched_df: pd.DataFrame, corpus_context: dict | None =
 
 
 def render_methodological_limitations(validation_messages: list[str]) -> None:
-    st.subheader("Limitaciones metodológicas")
-    st.caption("La lectura es preliminar y depende de reglas documentales, texto extraído y corpus disponible.")
     limitations = [
         "Los resultados orientan revisión humana y no reemplazan análisis técnico, jurídico o institucional.",
         "La extracción de texto puede omitir información si el PDF contiene imágenes, escaneos o anexos no legibles.",
         "La comparación histórica depende del corpus local disponible y de su trazabilidad documental.",
     ] + validation_messages
-    st.markdown("<ul>" + "".join(f"<li>{safe_text(item)}</li>" for item in limitations if str(item).strip()) + "</ul>", unsafe_allow_html=True)
+    with st.expander("Alcance y límites de esta lectura", expanded=False):
+        st.markdown("<ul>" + "".join(f"<li>{safe_text(item)}</li>" for item in limitations if str(item).strip()) + "</ul>", unsafe_allow_html=True)
 
 
 
@@ -1566,43 +1575,33 @@ def validate_extracted_pages(pages: list) -> None:
 def render_setup_panel() -> tuple[object | None, bool, bool, bool]:
     st.markdown(
         """
-        <div class="setup-hero">
-            <div class="setup-kicker">Inicio de revisión</div>
-            <h1>Revisar pliego</h1>
-            <p>Suba el PDF del pliego y presione Iniciar revisión.</p>
+        <div class="setup-hero decision-setup">
+            <div class="setup-kicker">Inicio</div>
+            <h1>Revisar documento</h1>
+            <p>Suba el PDF del pliego o especificación técnica. La herramienta preparará una lectura preliminar con observaciones, evidencia y preguntas de validación.</p>
         </div>
         """,
         unsafe_allow_html=True,
     )
-    with st.expander("Qué revisa la herramienta", expanded=True):
+    st.markdown(
+        """
+        <div class="decision-explain">
+            <div><strong>Resultado esperado</strong><span>Una lista corta de aspectos que conviene revisar primero.</span></div>
+            <div><strong>Base de la lectura</strong><span>Reglas documentales, taxonomía, evidencia textual y corpus disponible.</span></div>
+            <div><strong>Alcance</strong><span>Insumo preliminar para revisión humana; no es dictamen técnico ni jurídico.</span></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    with st.expander("Ver alcance y límites", expanded=False):
         st.markdown(
             """
-<div class="methodology-brief">
-    <div class="methodology-brief-item">
-        <strong>Qué revisa</strong>
-        <p>Identifica observaciones preliminares sobre requisitos técnicos, participación, experiencia, plazos, certificaciones, interoperabilidad y condiciones que podrían requerir validación adicional.</p>
-    </div>
-    <div class="methodology-brief-item">
-        <strong>Cómo organiza evidencia</strong>
-        <p>Extrae texto del PDF, agrupa fragmentos relacionados, consolida ocurrencias y vincula cada observación con páginas y evidencia verificable.</p>
-    </div>
-    <div class="methodology-brief-item">
-        <strong>Cómo contextualiza</strong>
-        <p>Aplica reglas y taxonomías configuradas. Cuando hay corpus disponible, compara patrones para distinguir condiciones habituales de aspectos menos frecuentes.</p>
-    </div>
-    <div class="methodology-brief-item">
-        <strong>Qué dimensiones considera</strong>
-        <p>Neutralidad competitiva, proporcionalidad, equivalencias, barreras de entrada, trazabilidad regulatoria, interoperabilidad y relación con el objeto contractual.</p>
-    </div>
-</div>
+La herramienta organiza observaciones preliminares sobre requisitos técnicos, participación, experiencia, plazos, certificaciones, interoperabilidad y equivalencias.
 
-<div class="methodology-limits">
-    Las observaciones son insumos preliminares para revisión humana. La herramienta no determina ilegalidad, no detecta corrupción, no confirma direccionamiento y no reemplaza análisis técnico o jurídico.
-</div>
-            """,
-            unsafe_allow_html=True,
+Cada observación debe verificarse contra el documento y, cuando corresponda, contra el expediente completo, anexos, aclaraciones y criterio técnico de la entidad competente.
+            """
         )
-    st.markdown('<div class="upload-panel"><div class="upload-panel-title">Archivo PDF</div>', unsafe_allow_html=True)
+    st.markdown('<div class="upload-panel"><div class="upload-panel-title">Archivo PDF</div><div class="upload-panel-help">Seleccione el documento y luego inicie la revisión.</div>', unsafe_allow_html=True)
     uploaded_file = st.file_uploader("Documento PDF", type=["pdf"], label_visibility="collapsed")
     process_document = st.button("Iniciar revisión", type="primary", width="stretch")
     st.markdown('</div>', unsafe_allow_html=True)

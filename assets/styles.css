@@ -1375,3 +1375,93 @@ textarea {
 [data-testid="stFileUploaderDropzoneInstructions"] small {
     color: var(--text-muted) !important;
 }
+
+/* Decision clarity pass for SERCOP demo */
+.decision-setup {
+    margin-top: 0.25rem;
+    padding: 0.95rem 1.05rem;
+}
+
+.decision-setup h1 {
+    font-size: 1.36rem;
+}
+
+.decision-explain {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0.75rem 0 0.75rem;
+}
+
+.decision-explain > div {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: none;
+    padding: 0.72rem 0.8rem;
+}
+
+.decision-explain strong {
+    color: #1F2D3A;
+    display: block;
+    font-size: 0.82rem;
+    margin-bottom: 0.18rem;
+}
+
+.decision-explain span {
+    color: var(--text-muted);
+    display: block;
+    font-size: 0.84rem;
+    line-height: 1.35;
+}
+
+.decision-guidance {
+    background: #F4F8FB;
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--blue-dark);
+    border-radius: 5px;
+    color: #263442;
+    font-size: 0.9rem;
+    line-height: 1.42;
+    margin: 0.55rem 0;
+    padding: 0.58rem 0.68rem;
+}
+
+.decision-guidance strong {
+    color: var(--blue-dark);
+}
+
+.review-item-summary strong {
+    color: #1F2D3A;
+}
+
+.pliego-summary {
+    background: #FFFFFF;
+}
+
+.pliego-summary li {
+    font-size: 0.95rem;
+}
+
+.section-heading {
+    align-items: flex-start;
+}
+
+.section-heading p {
+    max-width: 520px;
+}
+
+.review-item-title {
+    font-size: 1.08rem;
+}
+
+.review-item-dimension {
+    color: #52606D;
+    font-weight: 600;
+}
+
+@media (max-width: 900px) {
+    .decision-explain {
+        grid-template-columns: 1fr;
+    }
+}
