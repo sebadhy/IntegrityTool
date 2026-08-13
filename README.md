@@ -49,6 +49,8 @@ Estas dimensiones son una propuesta metodológica inicial y pueden ajustarse med
 
 ## Instalación
 
+macOS / Linux:
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
@@ -56,7 +58,24 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
+Windows PowerShell:
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+copy .env.example .env
+```
+
+Si PowerShell bloquea la activación del entorno virtual, ejecutar una vez:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
 La aplicación funciona sin configurar un LLM. En ese caso se muestran resultados basados en reglas, taxonomía y comparación documental local cuando exista corpus disponible.
+
+OCR en Windows es opcional. Solo hace falta instalar Tesseract si se van a analizar PDFs escaneados como imagen. Para PDFs con texto seleccionable no es necesario.
 
 ## Ejecución Local
 
@@ -66,7 +85,7 @@ python -m streamlit run app.py
 
 Luego abrí la URL local que indique Streamlit, usualmente `http://localhost:8501`.
 
-Si el entorno virtual fue creado antes de renombrar la carpeta del proyecto, conviene ejecutar Streamlit con `python -m streamlit` desde el entorno activado.
+Usar `python -m streamlit` evita problemas de rutas internas del entorno virtual en Windows, macOS y Linux.
 
 ## Configuración LLM Opcional
 

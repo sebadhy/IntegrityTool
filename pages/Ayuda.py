@@ -154,6 +154,8 @@ st.markdown(
 <div class="help-card">
 <h2>Ejecución local</h2>
 
+macOS / Linux:
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
@@ -161,8 +163,18 @@ pip install -r requirements.txt
 python -m streamlit run app.py
 ```
 
+Windows PowerShell:
+
+```powershell
+py -m venv .venv
+.\\.venv\\Scripts\\Activate.ps1
+python -m pip install -r requirements.txt
+python -m streamlit run app.py
+```
+
 <p class="muted">
 La aplicación funciona sin claves de LLM. Para habilitar procesamiento asistido, configure un proveedor en <code>.env</code>.
+En Windows, Tesseract OCR es opcional y solo se requiere para PDFs escaneados como imagen.
 </p>
 </div>
 """,
