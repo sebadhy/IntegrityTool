@@ -190,6 +190,8 @@ class TaxonomyLoadResult:
     messages: list[str]
     loaded: bool
     metadata: dict[str, Any] = field(default_factory=dict)
+    source_sha256: str = ""
+    source_text: str = ""
 
 
 def taxonomy_sha256(path: Path | None = None) -> str:
@@ -202,8 +204,8 @@ def taxonomy_sha256(path: Path | None = None) -> str:
 def load_taxonomy(path: Path | None = None) -> TaxonomyLoadResult:
     """Load editable taxonomy with safe fallback behavior.
 
-    Partial errors are returned as messages instead of raising, so Streamlit can
-    continue running with the built-in fallback catalogue.
+    Partial errors are returned as messages. Callers decide whether an unavailable
+    taxonomy blocks review; no different catalogue is silently substituted here.
     """
 
     taxonomy_path = path or TAXONOMY_PATH
@@ -216,7 +218,9 @@ def load_taxonomy(path: Path | None = None) -> TaxonomyLoadResult:
         )
 
     try:
-        raw_data = yaml.safe_load(taxonomy_path.read_text(encoding="utf-8"))
+        source_bytes = taxonomy_path.read_bytes()
+        source_text = source_bytes.decode("utf-8")
+        raw_data = yaml.safe_load(source_text)
     except Exception as exc:
         return TaxonomyLoadResult(
             patterns=[],
@@ -256,7 +260,10 @@ def load_taxonomy(path: Path | None = None) -> TaxonomyLoadResult:
         messages.extend(f"{pattern.id}: {message}" for message in pattern.validation_messages)
         patterns.append(pattern)
 
-    return TaxonomyLoadResult(patterns=patterns, messages=messages, loaded=bool(patterns), metadata=metadata)
+    return TaxonomyLoadResult(
+        patterns=patterns, messages=messages, loaded=bool(patterns), metadata=metadata,
+        source_sha256=hashlib.sha256(source_bytes).hexdigest(), source_text=source_text,
+    )
 
 
 def taxonomy_context(limit: int = 12) -> dict[str, Any]:

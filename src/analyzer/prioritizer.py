@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import replace
 import json
 from datetime import datetime, timezone
 from typing import Any
@@ -8,6 +9,8 @@ from typing import Any
 import pandas as pd
 
 from .taxonomy_loader import taxonomy_sha256
+from .mitigants import has_strong_mitigant
+from .text_utils import affirmed_terms, normalize_text_es
 from .text_utils import unique_strings, list_field
 from .review_row_schema import REVIEW_PRIORITY_LABELS as _SHARED_PRIORITY_LABELS
 
@@ -376,15 +379,68 @@ def _normalized_text(value: str) -> str:
 
 
 def prioritize_consolidated_findings(findings: list) -> list:
-    """Order ConsolidatedFinding objects and keep internal ranking hidden from UI."""
+    """The single ranking stage; repeated mentions never increase priority."""
+    ranked = []
+    for finding in findings:
+        # Assess each requirement with its own mitigants, then keep the maximum.
+        # A permissive clause cannot neutralize an exclusive requirement elsewhere.
+        local = []
+        for signal in finding.signals:
+            if "local_mitigants" not in signal.metadata:
+                continue
+            scoped = replace(finding, signals=[signal],
+                             clauses=[c for c in finding.clauses if c.clause_id == signal.clause_id],
+                             detected_mitigants=signal.metadata["local_mitigants"],
+                             missing_mitigants=signal.metadata["local_missing_mitigants"])
+            local.append(_rank_consolidated(scoped))
+        score, factors = max(local, key=lambda pair: pair[0]) if local else _rank_consolidated(finding)
+        if len({entry[0] for entry in local}) > 1:
+            factors = factors + ["Se conserva la mayor prioridad contextual; los mitigantes se aplican solo a su requisito."]
+        ranked.append(replace(finding, internal_ranking_score=score, ranking_factors=factors))
     return sorted(
-        findings,
+        ranked,
         key=lambda finding: (
             -int(getattr(finding, "internal_ranking_score", 0)),
-            -int(getattr(finding, "duplicate_count", 1)),
             str(getattr(finding, "title", "")),
+            str(getattr(finding, "finding_id", "")),
         ),
     )
+
+
+def _rank_consolidated(finding) -> tuple[int, list[str]]:
+    score, factors = 0, []
+    if finding.missing_mitigants:
+        score += 3
+        factors.append("No se identificó mitigante textual en la evidencia revisada.")
+    if finding.detected_mitigants:
+        score -= 2
+        factors.append("Se identificaron factores mitigantes textuales.")
+    rarity = finding.historical_context.get("rarity")
+    if rarity == "Poco frecuente":
+        score += 3
+        factors.append("Baja frecuencia en el corpus disponible; no equivale a una conclusión.")
+    elif rarity == "Habitual":
+        score -= 3
+        factors.append("Requisito frecuente en el corpus disponible.")
+    if any(c.section_type in {"technical_requirements", "qualification"} for c in finding.clauses):
+        score += 2
+        factors.append("Requisito ubicado en una sección sustantiva.")
+    restrictions = unique_strings([term for s in finding.signals for term in s.metadata.get("restriction_factors", [])])
+    if has_strong_mitigant(finding.detected_mitigants):
+        restrictions = [term for term in restrictions if normalize_text_es(term) not in {"marca especifica", "marca x", "fabricante x"}]
+    if restrictions:
+        score += 3
+        factors.append("Condiciones explícitas que requieren validación: " + "; ".join(restrictions) + ".")
+    if any(affirmed_terms(s.evidence_text.lower(), ["deberá", "debera", "obligatorio", "se requiere", "debe ser", "solo se aceptará"]) for s in finding.signals):
+        score += 2
+        factors.append("Lenguaje obligatorio asociado al requisito.")
+    if any(s.detector_name == "schedule_interval_detector_v1" for s in finding.signals):
+        score += 3
+        factors.append("Intervalo calculado a partir de fechas documentadas; validar plazo aplicable.")
+    if finding.signals and not restrictions and not has_strong_mitigant(finding.detected_mitigants) and all(s.metadata.get("is_common_in_goods_procurement") for s in finding.signals):
+        score = min(2, max(1, score))
+        factors.append("Requisito potencialmente habitual en compras de bienes; revisión general.")
+    return score, factors
 
 
 def review_priority_from_score(score: int) -> str:

@@ -27,7 +27,7 @@ El flujo principal es determinístico:
 7. Prioriza revisión humana como `revisión general`, `revisión sugerida` o `revisión prioritaria`.
 8. Muestra evidencia textual y visual asociada a cada observación.
 
-El LLM es opcional. Si existe una clave o proveedor configurado, se usa solo como capa de apoyo para validar metadata, redactar lectura preliminar y contextualizar observaciones ya detectadas. No agrega ni elimina observaciones por decisión propia.
+El LLM es opcional y solo apoya la síntesis contextual y redacción de explicaciones. La metadata del encabezado, detección, consolidación, visibilidad y prioridad se resuelven sin modelos de lenguaje. Un fallo del proveedor no elimina los resultados documentales.
 
 ### Cursograma general
 
@@ -44,7 +44,7 @@ flowchart TD
     I --> J["Priorización para revisión humana"]
     J --> K["Observaciones visibles con evidencia y preguntas sugeridas"]
 
-    L["Procesamiento asistido opcional"] -. "Valida metadata y redacta síntesis contextual" .-> J
+    L["Procesamiento asistido opcional"] -. "Redacta síntesis contextual" .-> K
     L -. "No decide visibilidad ni prioridad" .-> K
 ```
 
@@ -86,10 +86,11 @@ python -m pip install -r requirements.txt
 copy .env.example .env
 ```
 
-Si PowerShell bloquea la activación del entorno virtual, ejecutar una vez:
+Si PowerShell bloquea la activación, no es necesario cambiar la política del equipo. Use el ejecutable del entorno directamente:
 
 ```powershell
-Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m streamlit run app.py
 ```
 
 La aplicación funciona sin configurar un LLM. En ese caso se muestran resultados basados en reglas, taxonomía y comparación documental local cuando exista corpus disponible.
@@ -97,6 +98,33 @@ La aplicación funciona sin configurar un LLM. En ese caso se muestran resultado
 OCR en Windows es opcional. Solo hace falta instalar Tesseract si se van a analizar PDFs escaneados como imagen. Para PDFs con texto seleccionable no es necesario.
 
 ## Ejecución Local
+
+### Mesa documental nueva: React + PDF.js
+
+Conserva el motor Python y agrega una API local ligera. Permite revisar un expediente con pliego, especificaciones, anexos y versiones, navegar evidencia en un PDF real y guardar estados y comentarios.
+
+Requiere Python 3.11 o superior, Node.js 22.13 o superior (recomendado: 24) y pnpm 11.25. Desde la raíz del proyecto, con el entorno virtual activado:
+
+```bash
+python -m pip install -r requirements-workbench.txt
+cd frontend
+pnpm install --frozen-lockfile
+pnpm build
+cd ..
+python run_workbench.py
+```
+
+Abra [la mesa documental local](http://127.0.0.1:8000). Los mismos comandos funcionan en PowerShell después de activar `.venv`.
+
+Si no tiene pnpm, puede instalar la versión utilizada con `npm install --global pnpm@11.25.0`. No se requiere Node para ejecutar Python después de construir el frontend.
+
+Los originales, resultados y revisiones se guardan en `data/workbench/reviews.sqlite3`, fuera de Git. Navegar, cambiar zoom, registrar revisión y exportar no repiten el análisis ni solicitan contenido al LLM. Las versiones sustituidas deben indicarse explícitamente al cargar; no se infieren por nombre de archivo. El contraste identifica diferencias textuales, no contradicciones jurídicas.
+
+Cada revisión nueva conserva la copia exacta de su taxonomía en esa base. La misma copia se utiliza en todos los documentos, en el corpus y en la contextualización asistida; puede descargarse desde «Alcance y trazabilidad de esta lectura». Editar el YAML no modifica revisiones anteriores. El cotejo entre versiones considera todas las evidencias identificadas, no solo el fragmento representativo; mover o repetir un fragmento en otra página no se presenta como cambio de su contenido.
+
+**Alcance de despliegue:** esta mesa es un piloto local de un solo servidor, sin autenticación institucional. No exponga el puerto en Internet ni en una red compartida. La identidad `Revisor local` es una etiqueta, no una identidad verificada. Antes de un despliegue compartido se necesitan autenticación, permisos, retención, respaldo y pruebas de concurrencia.
+
+### Streamlit: compatibilidad existente
 
 ```bash
 python -m streamlit run app.py
@@ -106,9 +134,22 @@ Luego abra la URL local que indique Streamlit, usualmente `http://localhost:8501
 
 Usar `python -m streamlit` evita problemas de rutas internas del entorno virtual en Windows, macOS y Linux.
 
+Streamlit sigue disponible y conserva compatibilidad con Community Cloud. La nueva mesa React/API requiere otro entorno de despliegue; no reemplaza automáticamente la aplicación publicada.
+
 ## Configuración LLM Opcional
 
 Edite `.env` solo si desea habilitar procesamiento asistido.
+
+En la mesa nueva se permiten por defecto **dos solicitudes lógicas por expediente**: una síntesis y la explicación del primer aspecto. Se guardan también los fallos para evitar reintentos al navegar. Cada solicitud tiene límite de salida y timeout, sin reintentos implícitos del SDK. El proveedor puede facturar una solicitud fallida o interrumpida; el límite no es una estimación monetaria.
+
+```env
+INTEGRITY_ASSISTED_ENABLED=true
+INTEGRITY_LLM_MAX_CALLS=2
+# Opcional: cambiar la ubicación de la base local
+# INTEGRITY_STORE_PATH=data/workbench/reviews.sqlite3
+```
+
+Use `INTEGRITY_ASSISTED_ENABLED=false` para mantener todo el flujo determinístico. Las respuestas utilizadas registran proveedor, modelo, versión y huella de prompt, tiempo y consumo reportado por el proveedor. No se almacenan claves ni deliberaciones del modelo. La redacción asistida no verifica hechos externos por sí sola.
 
 OpenAI directo:
 
@@ -170,31 +211,45 @@ Los archivos en `data/` no se versionan por defecto. Esto evita publicar PDFs o 
 
 ```text
 app.py
+run_workbench.py
+requirements-workbench.txt
+frontend/
+  src/
+  pnpm-lock.yaml
 assets/styles.css
 pages/Ayuda.py
 src/analyzer/
+  review_pipeline.py
+  workbench_service.py
+  review_store.py
+  case_review.py
   detector.py
   prioritizer.py
   llm_reviewer.py
   observation_filter.py
   schedule_analyzer.py
   patterns/risk_taxonomy.yaml
+src/workbench_api.py
 docs/
   architecture.md
   technical_and_conceptual_framework.md
 tests/
 ```
 
-Los archivos `agent.py`, `agent_runner.py`, `db.py` y `tools.py` corresponden a capacidades experimentales de procesamiento batch. No son necesarios para ejecutar la demo Streamlit.
+Los archivos `agent.py`, `agent_runner.py`, `db.py` y `tools.py` son experimentales y no participan en ninguna de las dos interfaces. No son parte del motor institucional compartido.
 
 ## Validación
 
 ```bash
-python -m compileall app.py src tests pages
-pytest -q
+python -m compileall -q app.py src tests pages run_workbench.py
+python -m pytest -q
+cd frontend
+pnpm build
 ```
 
-Estado de referencia de esta rama: `57 passed`.
+La suite cubre metadata y verificación por contenido, negaciones, equivalencias locales, conservación de páginas, requisitos habituales, motor compartido, caché versionada, copias verificables de la taxonomía, cotejo de todas las evidencias entre versiones, expediente, estados persistentes, API y exportaciones. Las pruebas de API requieren `requirements-workbench.txt`. Las pruebas de redacción asistida utilizan respuestas simuladas y no necesitan consumir recursos del proveedor.
+
+Cada análisis exporta la huella SHA-256 del documento, la versión del motor, la versión y huella de la taxonomía y la fecha de ejecución. Estos datos permiten identificar qué documento y reglas produjeron una observación.
 
 ## Referencias conceptuales y metodológicas
 
@@ -202,6 +257,7 @@ La arquitectura conceptual, los principios analíticos, el enfoque metodológico
 
 - [Marco técnico y conceptual](docs/technical_and_conceptual_framework.md)
 - [Arquitectura del pipeline documental](docs/architecture.md)
+- [Decisiones de UX y transición a mesa documental](docs/workbench_ux.md)
 
 Estos documentos explican el enfoque de neutralidad competitiva, trazabilidad, revisión humana, corpus histórico, uso prudente de LLM y mitigación de falsos positivos.
 

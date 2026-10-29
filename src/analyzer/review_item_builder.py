@@ -8,7 +8,7 @@ import pandas as pd
 
 from .domain_models import ConsolidatedFinding, ReviewItem
 from .prioritizer import review_priority_from_score
-from .text_utils import unique_strings
+from .text_utils import is_substantive_evidence_text, looks_like_structural_text, unique_strings
 
 PROHIBITED_VISIBLE_TERMS = [
     "corrupción",
@@ -25,20 +25,24 @@ PRIORITY_DISPLAY = {"alta": "revisión prioritaria", "media": "revisión sugerid
 ATTENTION_DISPLAY = {"alta": "Alto", "media": "Medio", "baja": "Bajo"}
 
 
-def build_review_items(findings: list[ConsolidatedFinding], max_items: int = 18) -> list[ReviewItem]:
+def build_review_items(findings: list[ConsolidatedFinding], max_items: int | None = None) -> list[ReviewItem]:
     items = [_build_item(finding) for finding in findings]
     items = [item for item in items if item.allowed_language_only and _has_substantive_item_evidence(item)]
-    return items[:max_items]
+    return items[:max_items] if max_items is not None else items
 
 
-def review_items_to_dataframe(items: list[ReviewItem], document_name: str) -> pd.DataFrame:
+def review_items_to_dataframe(items: list[ReviewItem], document_name: str, analysis_context: dict | None = None) -> pd.DataFrame:
     rows = [_item_to_row(item, document_name) for item in items]
+    if analysis_context:
+        for row in rows:
+            row.update(analysis_context)
     return pd.DataFrame(rows)
 
 
 def _build_item(finding: ConsolidatedFinding) -> ReviewItem:
     priority = review_priority_from_score(finding.internal_ranking_score)
-    evidence_summary = _evidence_summary(finding)
+    representative = _representative_evidence(finding)
+    evidence_summary = str(representative.get("text", ""))
     questions = _questions(finding)
     why = _safe_visible_text(_why_it_matters(finding))
     title = _safe_visible_text(finding.title or "Aspecto sugerido para revisión")
@@ -63,11 +67,19 @@ def _build_item(finding: ConsolidatedFinding) -> ReviewItem:
             "duplicate_count": finding.duplicate_count,
             "internal_ranking_score": finding.internal_ranking_score,
             "ranking_factors": finding.ranking_factors,
+            "restriction_factors": unique_strings([
+                factor for signal in finding.signals
+                for factor in signal.metadata.get("restriction_factors", [])
+            ]),
+            "rule_version": next((str(signal.metadata.get("taxonomy_pattern", {}).get("taxonomy_version"))
+                                  for signal in finding.signals
+                                  if signal.metadata.get("taxonomy_pattern", {}).get("taxonomy_version")), "No disponible"),
             "historical_context": finding.historical_context,
             "detected_mitigants": finding.detected_mitigants,
             "missing_mitigants": finding.missing_mitigants,
             "consolidation_key": finding.consolidation_key,
-            "additional_excerpts": _additional_excerpts(finding, evidence_summary),
+            "representative_evidence": representative,
+            "additional_excerpts": _additional_excerpts(finding, representative),
             "consolidated_from_finding_ids": [finding.finding_id],
             "consolidated_from_signal_ids": [signal.signal_id for signal in finding.signals],
             "aggregated_sources": _aggregated_sources(finding),
@@ -76,7 +88,7 @@ def _build_item(finding: ConsolidatedFinding) -> ReviewItem:
 
 
 def _item_to_row(item: ReviewItem, document_name: str) -> dict[str, Any]:
-    evidence = item.evidence_items[0] if item.evidence_items else {}
+    evidence = item.metadata.get("representative_evidence") or (item.evidence_items[0] if item.evidence_items else {})
     pages = sorted({int(ev.get("page", 0)) for ev in item.evidence_items if ev.get("page")})
     frequency = item.metadata.get("historical_context", {}).get("frequency_label", "No disponible")
     rarity = item.metadata.get("historical_context", {}).get("rarity", "Sin histórico")
@@ -89,6 +101,11 @@ def _item_to_row(item: ReviewItem, document_name: str) -> dict[str, Any]:
         "id": item.review_item_id,
         "signal_id": item.review_item_id,
         "pattern_id": item.metadata.get("pattern_id", "No disponible"),
+        "rule_id": item.metadata.get("pattern_id", "No disponible"),
+        "rule_version": item.metadata.get("rule_version", "No disponible"),
+        "engine_version": item.metadata.get("engine_version", "No disponible"),
+        "timestamp_analisis": item.metadata.get("timestamp_analisis", "No disponible"),
+        "taxonomy_sha256": item.metadata.get("taxonomy_sha256", "No disponible"),
         "pattern_name": item.title,
         "title": item.title,
         "competition_dimension": item.competition_dimension,
@@ -102,7 +119,7 @@ def _item_to_row(item: ReviewItem, document_name: str) -> dict[str, Any]:
         "prioridad de revisión": priority_label,
         "severity": "contextual" if item.review_priority == "alta" else "low" if item.review_priority == "baja" else "medium",
         "mitigating_factors": item.metadata.get("detected_mitigants", []),
-        "escalation_factors": item.metadata.get("ranking_factors", []),
+        "escalation_factors": item.metadata.get("restriction_factors", []),
         "suggested_questions": questions,
         "human_review_questions": questions,
         "possible_legitimate_justifications": [],
@@ -116,7 +133,8 @@ def _item_to_row(item: ReviewItem, document_name: str) -> dict[str, Any]:
         "categoria": item.display_group,
         "tema de revisión": item.display_group,
         "documento origen": document_name,
-        "página": pages[0] if pages else evidence.get("page", ""),
+        "página": evidence.get("page", pages[0] if pages else ""),
+        "evidence_items": item.evidence_items,
         "related_pages": pages,
         "páginas relacionadas": ", ".join(str(page) for page in pages),
         "occurrence_count": item.metadata.get("duplicate_count", len(item.evidence_items)),
@@ -169,32 +187,11 @@ def _has_substantive_item_evidence(item: ReviewItem) -> bool:
 
 
 def _is_substantive_evidence_text(text: str) -> bool:
-    normalized = text.lower().translate(str.maketrans("áéíóúñü", "aeiounu"))
-    normalized = " ".join(normalized.split())
-    if not normalized:
-        return False
-    if _looks_like_structural_text(normalized):
-        return False
-    generic_timeline = [
-        "segun cronograma",
-        "conforme al cronograma",
-        "consta en el cronograma",
-        "establecido en el cronograma",
-        "cronograma del procedimiento",
-    ]
-    if any(term in normalized for term in generic_timeline) and not _has_concrete_requirement_detail(normalized):
-        return False
-    if len(normalized.split()) <= 4:
-        return False
-    return True
+    return is_substantive_evidence_text(text)
 
 
 def _looks_like_structural_text(text: str) -> bool:
-    if "indice financiero" in text:
-        return False
-    if any(term in text for term in ["tabla de contenido", "sumario", "portada", "version"]):
-        return True
-    return bool(re.match(r"^(indice|contenido)(\s|:|$)", text))
+    return looks_like_structural_text(text)
 
 def _has_concrete_requirement_detail(text: str) -> bool:
     if re.search(r"\b\d+\s*(dias|dia|horas|hora|calendario|laborables|habiles|habiles)\b", text):
@@ -237,7 +234,7 @@ def _evidence_rank(evidence: dict[str, Any]) -> tuple[int, int, int, str]:
     text = " ".join(str(evidence.get("text", "")).split())
     lower = text.lower()
     structural_penalty = 0
-    if any(term in lower for term in ["índice", "indice", "tabla de contenido", "portada", "versión", "version"]):
+    if looks_like_structural_text(lower):
         structural_penalty += 10
     if len(text) < 25:
         structural_penalty += 4
@@ -249,12 +246,13 @@ def _evidence_rank(evidence: dict[str, Any]) -> tuple[int, int, int, str]:
     return (structural_penalty, direct_requirement, -density, text[:220])
 
 
-def _additional_excerpts(finding: ConsolidatedFinding, representative: str) -> list[dict[str, Any]]:
+def _additional_excerpts(finding: ConsolidatedFinding, representative: dict) -> list[dict[str, Any]]:
     output: list[dict[str, Any]] = []
-    seen = {representative}
+    seen = {(representative.get("page"), " ".join(str(representative.get("text", "")).split()))}
     for evidence in sorted(finding.evidence_items, key=_evidence_rank):
         text = " ".join(str(evidence.get("text", "")).split())
-        if not text or text in seen:
+        key = (evidence.get("page"), text)
+        if not text or key in seen:
             continue
         output.append({
             "page": evidence.get("page", ""),
@@ -262,7 +260,7 @@ def _additional_excerpts(finding: ConsolidatedFinding, representative: str) -> l
             "text": text,
             "matched_text": evidence.get("matched_text", ""),
         })
-        seen.add(text)
+        seen.add(key)
     return output
 
 

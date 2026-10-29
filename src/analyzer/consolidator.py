@@ -26,7 +26,6 @@ def consolidate_candidates(
         mitigants = unique_strings([item for candidate in group for item in candidate.detected_mitigants])
         missing = unique_strings([item for candidate in group for item in candidate.missing_mitigants])
         historical = _choose_historical(group)
-        score, factors = _ranking_score(group, mitigants, missing, historical, group_clauses)
         representative = group[0]
         finding_id = hashlib.sha1(f"finding|{key}".encode("utf-8")).hexdigest()[:12]
         findings.append(
@@ -42,8 +41,8 @@ def consolidate_candidates(
                 historical_context=historical,
                 consolidation_key=key,
                 duplicate_count=len(signals),
-                internal_ranking_score=score,
-                ranking_factors=factors,
+                internal_ranking_score=0,
+                ranking_factors=[],
                 pattern_id=representative.pattern_id,
                 title=_finding_title(representative, len(signals)),
                 missing_mitigants=missing,
@@ -121,49 +120,6 @@ def _dedupe_evidence(items: list[dict]) -> list[dict]:
     return output
 
 
-def _ranking_score(
-    group: list[FindingCandidate],
-    mitigants: list[str],
-    missing: list[str],
-    historical: dict,
-    clauses: list[Clause],
-) -> tuple[int, list[str]]:
-    score = 0
-    factors: list[str] = []
-    if missing:
-        score += 3
-        factors.append("No se identificó mitigante textual.")
-    if mitigants:
-        score -= 2
-        factors.append("Mitigantes textuales identificados.")
-    if historical.get("rarity") == "Poco frecuente":
-        score += 3
-        factors.append("Baja frecuencia histórica disponible.")
-    elif historical.get("rarity") == "Habitual":
-        score -= 3
-        factors.append("Patrón frecuente en corpus histórico.")
-    if any(clause.section_type in {"technical_requirements", "qualification"} for clause in clauses):
-        score += 2
-        factors.append("Ubicación en sección sustantiva del pliego.")
-    if len(group) > 1:
-        score += min(len(group), 3)
-        factors.append("Múltiples señales relacionadas consolidadas.")
-    if any(_mandatory_language(candidate.requirement_text) for candidate in group):
-        score += 2
-        factors.append("Lenguaje obligatorio en el requisito.")
-    if any(
-        signal.detector_name == "schedule_interval_detector_v1"
-        for candidate in group
-        for signal in candidate.signals
-    ):
-        score += 3
-        factors.append("Intervalo de cronograma calculado a partir de fechas concretas.")
-    return score, factors
-
-
-def _mandatory_language(text: str) -> bool:
-    normalized = text.lower()
-    return any(term in normalized for term in ["deberá", "debera", "obligatorio", "se requiere", "debe ser", "solo se acept"])
 
 
 def _choose_historical(group: list[FindingCandidate]) -> dict:
@@ -171,7 +127,7 @@ def _choose_historical(group: list[FindingCandidate]) -> dict:
 
 
 def _finding_title(candidate: FindingCandidate, count: int) -> str:
-    name = candidate.signals[0].metadata.get("pattern_name") if candidate.signals else "Aspecto sugerido para revisión"
+    name = str(candidate.signals[0].metadata.get("pattern_name") or "Aspecto sugerido para revisión") if candidate.signals else "Aspecto sugerido para revisión"
     if count > 1 and ("plazo" in name.lower() or "cronograma" in candidate.family.lower()):
         return "Consideraciones sobre cronograma y plazos"
     return str(name or "Aspecto sugerido para revisión")

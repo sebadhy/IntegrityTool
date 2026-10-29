@@ -16,7 +16,7 @@ from .finding_model import (
     SEVERITY_MEDIUM,
 )
 from .patterns.competitive_neutrality_patterns import PATTERNS
-from .text_utils import unique_strings
+from .text_utils import affirmed_terms, is_negated_match, unique_strings
 from src.config import APP_DEFAULT_CONTEXT_CHARS
 
 from .document_segmenter import DocumentSection, section_for_page
@@ -106,6 +106,10 @@ GOODS_NOT_AUTOMATICALLY_RESTRICTIVE = (
 
 STRONG_RESTRICTIVE_TERMS = [
     "exclusivo",
+    "exclusiva",
+    "exclusivos",
+    "exclusivas",
+    "exclusivamente",
     "único",
     "unico",
     "solo se aceptará",
@@ -115,7 +119,11 @@ STRONG_RESTRICTIVE_TERMS = [
     "sin equivalente",
     "sin equivalentes",
     "no se aceptan equivalentes",
+    "no se aceptarán equivalentes",
+    "no se aceptarán alternativas equivalentes",
     "no admite equivalentes",
+    "no se admiten equivalentes",
+    "no se admiten alternativas equivalentes",
     "marca específica",
     "marca x",
     "fabricante x",
@@ -1131,7 +1139,7 @@ def _normalize_whitespace(text: str) -> str:
 
 
 def _pattern_regex(pattern: str) -> str:
-    escaped = re.escape(pattern)
+    escaped = r"\s+".join(re.escape(part) for part in pattern.split())
     if pattern and pattern[0].isalnum() and pattern[-1].isalnum():
         return rf"(?<!\w){escaped}(?!\w)"
     return escaped
@@ -1346,25 +1354,28 @@ def _slug(value: str) -> str:
 # This deterministic API is the preferred pipeline entry point. The legacy detect_patterns
 # function above remains for backward compatibility with older tests/corpus utilities.
 
-def detect_signals(clauses: list[Clause]) -> list[Signal]:
+def detect_signals(clauses: list[Clause], patterns: list[TaxonomyPattern] | None = None) -> list[Signal]:
     """Extract textual Signals from active clauses using the editable taxonomy.
 
     This function only observes textual evidence. It does not prioritize, consolidate,
     produce user-visible language, or decide legal/technical conclusions.
     """
-    patterns = load_taxonomy().patterns
+    patterns = load_taxonomy().patterns if patterns is None else patterns
     signals: list[Signal] = []
     for clause in clauses:
         if clause.exclude_from_detection:
             continue
         for pattern in patterns:
-            matches = find_terms(clause.text, pattern.textual_signals)
+            matches = [match for match in find_terms(clause.text, pattern.textual_signals)
+                       if not is_negated_match(clause.text, match[1], match[2])]
             if not matches:
                 continue
             term, start, end = sorted(matches, key=lambda item: (item[1], -len(item[0])))[0]
             evidence = extract_context_window(clause.text, start, end, context_chars=APP_DEFAULT_CONTEXT_CHARS)
             if pattern.id == COMMERCIAL_CONFIGURATION_PATTERN_ID and not _supports_commercial_product_configuration(evidence):
                 continue
+            restrictions = affirmed_terms(evidence, STRONG_RESTRICTIVE_TERMS)
+            common_in_goods = _is_goods_common_pattern(pattern) and _is_goods_procurement_context(evidence)
             signal_id = _finding_id(f"signal-{pattern.id}-{clause.clause_id}", clause.page, evidence)
             signals.append(
                 Signal(
@@ -1380,7 +1391,14 @@ def detect_signals(clauses: list[Clause]) -> list[Signal]:
                     section_title=clause.section_title,
                     detector_name="taxonomy_textual_detector_v1",
                     confidence=pattern.confidence_guidance,
-                    metadata={"pattern_name": pattern.name, "taxonomy_pattern": pattern.to_dict()},
+                    metadata={
+                        "pattern_name": pattern.name,
+                        "taxonomy_pattern": pattern.to_dict(),
+                        "is_common_in_goods_procurement": common_in_goods,
+                        "restriction_factors": restrictions,
+                        "match_start": start,
+                        "match_end": end,
+                    },
                 )
             )
     return signals

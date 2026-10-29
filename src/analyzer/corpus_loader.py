@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import csv
 import json
 import math
 import re
@@ -23,9 +22,12 @@ from .corpus_validator import (
     validate_corpus,
     validation_issues,
 )
-from .detector import detect_patterns
-from .document_segmenter import segment_document
-from .pdf_extractor import PageText, extract_text_by_page
+from .review_pipeline import analyze_document_pages
+from .taxonomy_loader import TaxonomyLoadResult, load_taxonomy
+from .metadata_reader import read_process_metadata
+from .pdf_extractor import PageStatus, PageText, extract_text_by_page
+
+EXTRACTION_CACHE_VERSION = 3
 
 
 RAW_METADATA_PATH = APP_CORPUS_METADATA_PATH
@@ -52,26 +54,8 @@ class CorpusDocument:
 
 def load_process_metadata(metadata_path: Path = RAW_METADATA_PATH) -> list[dict[str, str]]:
     """Read and normalize process metadata from procesos.csv."""
-    if not metadata_path.exists():
-        return []
-
-    with metadata_path.open("r", encoding="utf-8-sig", newline="") as csv_file:
-        sample = csv_file.read(4096)
-        csv_file.seek(0)
-        dialect = csv.Sniffer().sniff(sample, delimiters=";,")
-        reader = csv.DictReader(csv_file, dialect=dialect)
-        rows = []
-        for raw_row in reader:
-            row = {
-                _clean_text(key): _clean_text(value)
-                for key, value in raw_row.items()
-                if key and _clean_text(key)
-            }
-            row = {key: value for key, value in row.items() if not key.startswith("Unnamed")}
-            if row.get("process_id"):
-                rows.append(row)
-
-    return rows
+    rows = [{key: _clean_text(value) for key, value in row.items()} for row in read_process_metadata(metadata_path)]
+    return [row for row in rows if row.get("process_id")]
 
 
 def load_corpus_documents(force: bool = False) -> tuple[list[CorpusDocument], list[dict[str, str]]]:
@@ -141,6 +125,17 @@ def analyze_corpus_documents(documents: list[CorpusDocument]) -> dict[str, Any]:
     }
 
 
+def build_corpus_reference_context(documents: list[CorpusDocument], taxonomy_snapshot: TaxonomyLoadResult | None = None) -> dict[str, dict]:
+    """Stable pattern IDs, same engine, no corpus-pair similarity computation."""
+    total = len({document.process_id for document in documents})
+    rows = _pattern_frequency(_detect_corpus_findings(documents, taxonomy_snapshot), total)
+    return {row["pattern_id"]: {
+        "frequency_label": f"{row['procesos con patrón']} de {total} procesos",
+        "rarity": row["rareza"], "frequency": row["frecuencia"],
+        "comparative_comment": row["comentario_comparativo"],
+    } for row in rows}
+
+
 def calculate_document_similarity(
     documents: list[CorpusDocument],
     top_n: int = 20,
@@ -182,14 +177,25 @@ def calculate_document_similarity(
     return sorted(similarities, key=lambda item: item["similitud_coseno"], reverse=True)[:top_n]
 
 
-def _detect_corpus_findings(documents: list[CorpusDocument]) -> list[dict[str, Any]]:
+def _detect_corpus_findings(documents: list[CorpusDocument], taxonomy_snapshot: TaxonomyLoadResult | None = None) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
+    taxonomy = taxonomy_snapshot if taxonomy_snapshot is not None else load_taxonomy()
 
     for document in documents:
-        sections = segment_document(document.paginas)
-        detections = detect_patterns(document.paginas, sections=sections)
-        for detection in detections:
-            item = detection.to_dict()
+        result = analyze_document_pages(document.paginas, {}, f"doc-{document.sha256}", document.filename_original, taxonomy)
+        # Corpus frequency measures presence of the same primary signals, not visibility
+        # or prioritization. Otherwise historical context would become circular.
+        seen = set()
+        for signal in result.signals:
+            if signal.pattern_id in seen:
+                continue
+            seen.add(signal.pattern_id)
+            item = {
+                "pattern_id": signal.pattern_id,
+                "patrón detectado": signal.metadata.get("pattern_name") or signal.pattern_id,
+                "categoría": signal.family,
+                "número de coincidencias": sum(s.pattern_id == signal.pattern_id for s in result.signals),
+            }
             item.update(
                 {
                     "process_id": document.process_id,
@@ -217,10 +223,10 @@ def _add_comparative_context(
     processes_by_pattern: dict[str, set[str]] = defaultdict(set)
 
     for finding in findings:
-        processes_by_pattern[finding["patrón detectado"]].add(finding["process_id"])
+        processes_by_pattern[finding["pattern_id"]].add(finding["process_id"])
 
     for finding in findings:
-        pattern = finding["patrón detectado"]
+        pattern = finding["pattern_id"]
         process_count = len(processes_by_pattern[pattern])
         frequency = process_count / total_processes if total_processes else 0
         finding["frecuencia_corpus"] = (
@@ -240,7 +246,7 @@ def _pattern_frequency(
     occurrences_by_pattern: Counter[str] = Counter()
 
     for finding in findings:
-        pattern = finding["patrón detectado"]
+        pattern = finding["pattern_id"]
         processes_by_pattern[pattern].add(finding["process_id"])
         occurrences_by_pattern[pattern] += int(finding.get("número de coincidencias", 1))
 
@@ -250,7 +256,8 @@ def _pattern_frequency(
         frequency = process_count / total_processes if total_processes else 0
         rows.append(
             {
-                "patrón detectado": pattern,
+                "pattern_id": pattern,
+                "patrón detectado": next(item["patrón detectado"] for item in findings if item["pattern_id"] == pattern),
                 "procesos con patrón": process_count,
                 "total procesos": total_processes,
                 "frecuencia": round(frequency, 4),
@@ -298,9 +305,10 @@ def _load_or_extract_document(
     cache_path = _cache_path(process_metadata["process_id"], tipo_documento)
     if cache_path.exists() and not force:
         payload = json.loads(cache_path.read_text(encoding="utf-8"))
-        if payload.get("sha256") == trace.sha256:
+        if payload.get("sha256") == trace.sha256 and payload.get("extraction_cache_version") == EXTRACTION_CACHE_VERSION:
             pages = [
-                PageText(page_number=int(page["pagina"]), text=str(page["texto"]))
+                PageText(page_number=int(page["pagina"]), text=str(page["texto"]),
+                         status=PageStatus(page.get("status", "ok")), ocr_attempted=bool(page.get("ocr_attempted")))
                 for page in payload.get("paginas", [])
             ]
             return CorpusDocument(
@@ -325,6 +333,7 @@ def _load_or_extract_document(
         json.dumps(
             {
                 "document_id": trace.document_id,
+                "extraction_cache_version": EXTRACTION_CACHE_VERSION,
                 "process_id": process_metadata["process_id"],
                 "tipo_documento": tipo_documento,
                 "path": str(trace.path_exacto),
@@ -335,7 +344,7 @@ def _load_or_extract_document(
                 "tamano_archivo": trace.tamano_archivo,
                 "texto": extracted_text,
                 "paginas": [
-                    {"pagina": page.page_number, "texto": page.text}
+                    {"pagina": page.page_number, "texto": page.text, "status": page.status.value, "ocr_attempted": page.ocr_attempted}
                     for page in pages
                 ],
             },

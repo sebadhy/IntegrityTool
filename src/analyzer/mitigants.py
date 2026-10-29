@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from .domain_models import Clause, Signal
 from .taxonomy_loader import TaxonomyPattern
-from .text_utils import normalize_text_es, unique_strings
+from .text_utils import affirmed_terms, normalize_text_es
 
 GLOBAL_MITIGANTS = [
     "o equivalente",
@@ -33,12 +33,13 @@ STRONG_MITIGANTS = [
 
 
 def detect_mitigants(signal: Signal, clause: Clause, pattern: TaxonomyPattern) -> list[str]:
-    text = f"{clause.normalized_text} {signal.evidence_text.lower()}"
     terms = GLOBAL_MITIGANTS + pattern.mitigating_factors
-    return unique_strings([term for term in terms if _contains(text, term)])
+    return affirmed_terms(signal.evidence_text, terms)
 
 
 def missing_mitigants(signal: Signal, detected: list[str]) -> list[str]:
+    if signal.metadata.get("is_common_in_goods_procurement") and not signal.metadata.get("restriction_factors"):
+        return []
     if has_strong_mitigant(detected):
         return []
     if signal.competition_dimension in {
@@ -59,8 +60,4 @@ def missing_mitigants(signal: Signal, detected: list[str]) -> list[str]:
 def has_strong_mitigant(mitigants: list[str]) -> bool:
     normalized = [normalize_text_es(item) for item in mitigants]
     return any(normalize_text_es(term) in normalized for term in STRONG_MITIGANTS)
-
-
-def _contains(text: str, term: str) -> bool:
-    return normalize_text_es(term) in normalize_text_es(text)
 

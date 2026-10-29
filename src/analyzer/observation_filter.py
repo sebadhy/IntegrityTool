@@ -5,11 +5,13 @@ from typing import Any
 
 import pandas as pd
 
+from .boilerplate_filter import is_placeholder_text
 from .text_utils import (
     list_field,
     normalize_text_es,
     has_concrete_requirement_detail,
     looks_like_structural_text,
+    unique_strings,
 )
 from .review_row_schema import (
     REVIEW_PRIORITY_ORDER,
@@ -90,9 +92,13 @@ def _semantic_group_key(df: pd.DataFrame) -> pd.Series:
 
 def _consolidate_group(group: pd.DataFrame) -> dict[str, Any]:
     group = group.copy()
-    representative = group.sort_values("_visibility_score", ascending=False).iloc[0].copy()
-    pages = _sorted_pages(group["página"].tolist())
-    representative_excerpt = _representative_excerpt(group)
+    group["_priority_order"] = group["review_priority"].map(REVIEW_PRIORITY_ORDER).fillna(1)
+    representative = group.sort_values(["_priority_order", "_visibility_score"], ascending=[True, False]).iloc[0].copy()
+    pages = _sorted_pages([
+        page for _, row in group.iterrows()
+        for page in list_field(row.get("related_pages", [])) + [row.get("página")]
+    ])
+    representative_excerpt = str(representative.get("fragmento textual") or representative.get("clause_excerpt") or "").strip()
     occurrence_count = int(group.get("número de coincidencias", pd.Series([1] * len(group))).apply(_safe_int).sum())
     if occurrence_count < len(group):
         occurrence_count = len(group)
@@ -105,6 +111,26 @@ def _consolidate_group(group: pd.DataFrame) -> dict[str, Any]:
     representative["fragmento textual"] = representative_excerpt
     representative["clause_excerpt"] = representative_excerpt
     representative["número de coincidencias"] = occurrence_count
+
+    additional = []
+    seen = {(str(representative.get("página")), " ".join(representative_excerpt.split()))}
+    for _, row in group.iterrows():
+        evidence = [{"page": row.get("página"), "section": row.get("document_section", "No determinada"),
+                     "text": row.get("fragmento textual", ""), "matched_text": row.get("matched_text", "")}]
+        raw_additional = row.get("additional_excerpts", [])
+        if isinstance(raw_additional, list):
+            evidence.extend(item for item in raw_additional if isinstance(item, dict))
+        for item in evidence:
+            key = (str(item.get("page")), " ".join(str(item.get("text", "")).split()))
+            if key[1] and key not in seen:
+                additional.append(item)
+                seen.add(key)
+    representative["additional_excerpts"] = additional
+    representative["fragmentos adicionales"] = additional
+    for field in ("mitigating_factors", "human_review_questions", "suggested_questions", "fuentes agregadas",
+                  "consolidated_from_finding_ids", "consolidated_from_signal_ids"):
+        if field in group:
+            representative[field] = unique_strings([value for raw in group[field] for value in list_field(raw)])
 
     if len(group) > 1:
         title = _consolidated_title(str(representative.get("patrón detectado", "Aspecto sugerido para revisión")))
@@ -166,7 +192,7 @@ def _is_boilerplate_row(row: pd.Series) -> bool:
     pattern = _local_normalize(str(row.get("patrón detectado", row.get("pattern_name", ""))))
     if not fragment and not pattern:
         return True
-    if any(expr in fragment for expr in BOILERPLATE_EXPRESSIONS):
+    if is_placeholder_text(fragment):
         return True
     if _is_structural_or_reference_fragment(fragment):
         return True

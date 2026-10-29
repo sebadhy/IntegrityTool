@@ -4,11 +4,10 @@ import hashlib
 import re
 from dataclasses import dataclass
 from datetime import date, timedelta
-from functools import lru_cache
 
 from .domain_models import Clause, Signal
-from .taxonomy_loader import load_taxonomy
-from .text_utils import normalize_text_es
+from .taxonomy_loader import TaxonomyPattern, load_taxonomy
+from .text_utils import affirmed_terms, normalize_text_es
 
 SCHEDULE_PATTERN_ID = "cn-short-submission-deadline"
 VISIT_PATTERN_ID = "cn-mandatory-technical-visit"
@@ -70,7 +69,7 @@ class ScheduleEvent:
     evidence_text: str
 
 
-def detect_schedule_signals(clauses: list[Clause]) -> list[Signal]:
+def detect_schedule_signals(clauses: list[Clause], patterns: list[TaxonomyPattern] | None = None) -> list[Signal]:
     """Detect concrete schedule intervals that may merit human review.
 
     This module is deterministic and evidence-first: it does not emit a signal for
@@ -81,10 +80,12 @@ def detect_schedule_signals(clauses: list[Clause]) -> list[Signal]:
     events = _extract_events(clauses)
     if not events:
         return []
+    configured = load_taxonomy().patterns if patterns is None else patterns
+    pattern_lookup = {pattern.id: pattern.to_dict() for pattern in configured}
 
     signals: list[Signal] = []
-    signals.extend(_submission_interval_signals(events))
-    signals.extend(_technical_visit_interval_signals(events))
+    signals.extend(_submission_interval_signals(events, pattern_lookup))
+    signals.extend(_technical_visit_interval_signals(events, pattern_lookup))
     return _dedupe_signals(signals)
 
 
@@ -216,7 +217,9 @@ def _event_type(text: str) -> tuple[str, str]:
     return "", ""
 
 
-def _submission_interval_signals(events: list[ScheduleEvent]) -> list[Signal]:
+def _submission_interval_signals(events: list[ScheduleEvent], patterns: dict[str, dict]) -> list[Signal]:
+    if SCHEDULE_PATTERN_ID not in patterns:
+        return []
     publications = sorted([event for event in events if event.event_type == "publication"], key=lambda item: item.event_date)
     offers = sorted([event for event in events if event.event_type == "offer_submission"], key=lambda item: item.event_date)
     signals: list[Signal] = []
@@ -242,12 +245,15 @@ def _submission_interval_signals(events: list[ScheduleEvent]) -> list[Signal]:
                         f"Evidencia: {publication.evidence_text} / {offer.evidence_text}"
                     ),
                     semantic_group="schedule-submission-interval",
+                    taxonomy_pattern=patterns[SCHEDULE_PATTERN_ID],
                 )
             )
     return signals
 
 
-def _technical_visit_interval_signals(events: list[ScheduleEvent]) -> list[Signal]:
+def _technical_visit_interval_signals(events: list[ScheduleEvent], patterns: dict[str, dict]) -> list[Signal]:
+    if VISIT_PATTERN_ID not in patterns:
+        return []
     visits = sorted([event for event in events if event.event_type == "technical_visit"], key=lambda item: item.event_date)
     offers = sorted([event for event in events if event.event_type == "offer_submission"], key=lambda item: item.event_date)
     signals: list[Signal] = []
@@ -271,6 +277,7 @@ def _technical_visit_interval_signals(events: list[ScheduleEvent]) -> list[Signa
                         f"{calendar_days} día(s) calendario. Evidencia: {visit.evidence_text} / {offer.evidence_text}"
                     ),
                     semantic_group="mandatory-visit-near-submission",
+                    taxonomy_pattern=patterns[VISIT_PATTERN_ID],
                 )
             )
     return signals
@@ -284,6 +291,7 @@ def _build_signal(
     matched_text: str,
     evidence_text: str,
     semantic_group: str,
+    taxonomy_pattern: dict,
 ) -> Signal:
     digest = hashlib.sha1(f"{pattern_id}|{event.clause.clause_id}|{counterpart.clause.clause_id}|{evidence_text}".encode("utf-8")).hexdigest()[:12]
     return Signal(
@@ -294,32 +302,33 @@ def _build_signal(
         competition_dimension="barreras_de_entrada",
         signal_type="contextual_schedule_signal",
         matched_text=matched_text,
-        evidence_text=evidence_text,
+        evidence_text=event.evidence_text,
         page=event.clause.page,
         section_title=event.clause.section_title,
         detector_name="schedule_interval_detector_v1",
         confidence="medium",
         metadata={
+            "pattern_name": taxonomy_pattern.get("name", "Consideración sobre cronograma y plazos"),
             "semantic_group_key": semantic_group,
-            "schedule_analysis_note": "Intervalo calculado a partir de fechas concretas del cronograma extraído.",
-            "taxonomy_pattern": _taxonomy_payload(pattern_id),
+            "schedule_analysis_note": evidence_text.split(" Evidencia:", 1)[0],
+            "evidence_items": [
+                {
+                    "signal_id": f"signal-schedule-{digest}",
+                    "clause_id": item.clause.clause_id,
+                    "page": item.clause.page,
+                    "section": item.clause.section_title,
+                    "pattern_id": pattern_id,
+                    "pattern_name": taxonomy_pattern.get("name", "Consideración sobre cronograma y plazos"),
+                    "matched_text": item.evidence_text,
+                    "text": item.evidence_text,
+                }
+                for item in (event, counterpart)
+            ],
+            "taxonomy_pattern": taxonomy_pattern,
         },
     )
 
 
-@lru_cache(maxsize=8)
-def _taxonomy_payload(pattern_id: str) -> dict:
-    for pattern in load_taxonomy().patterns:
-        if pattern.id == pattern_id:
-            return pattern.to_dict()
-    return {
-        "id": pattern_id,
-        "name": "Consideración sobre cronograma y plazos",
-        "human_review_questions": [
-            "¿El intervalo del cronograma permite preparar ofertas de forma razonable?",
-            "¿El plazo es proporcional a la complejidad documental y logística del procedimiento?",
-        ],
-    }
 
 
 def _business_days_between(start: date, end: date) -> int:
@@ -335,8 +344,7 @@ def _business_days_between(start: date, end: date) -> int:
 
 
 def _is_mandatory_visit(text: str) -> bool:
-    normalized = normalize_text_es(text)
-    return any(normalize_text_es(term) in normalized for term in MANDATORY_VISIT_TERMS)
+    return bool(affirmed_terms(text, list(MANDATORY_VISIT_TERMS)))
 
 
 def _clean_evidence(text: str) -> str:

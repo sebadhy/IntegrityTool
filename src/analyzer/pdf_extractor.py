@@ -13,6 +13,7 @@ del proyecto no necesita cambios.
 from __future__ import annotations
 
 import logging
+import math
 import shutil
 from dataclasses import dataclass, field
 from enum import Enum
@@ -225,7 +226,8 @@ def _ocr_page(page: fitz.Page, page_number: int) -> str:
         import io
 
         # Renderizar la página como imagen (300 DPI para buena calidad OCR)
-        matrix = fitz.Matrix(300 / 72, 300 / 72)  # 300 DPI
+        scale = min(300 / 72, math.sqrt(16_000_000 / max(1, page.rect.width * page.rect.height)))
+        matrix = fitz.Matrix(scale, scale)
         pixmap = page.get_pixmap(matrix=matrix)
 
         # Convertir pixmap a imagen PIL
@@ -237,6 +239,7 @@ def _ocr_page(page: fitz.Page, page_number: int) -> str:
             image,
             lang="spa+eng",
             config="--psm 3",  # modo automático de segmentación de página
+            timeout=20,
         )
 
         return text.strip()

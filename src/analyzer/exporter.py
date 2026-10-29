@@ -13,6 +13,8 @@ LLM_COLUMNS = [
 
 EXPORT_COLUMNS = [
     "finding_id",
+    "document_id",
+    "document_sha256",
     "title",
     "pattern_id",
     "pattern_name",
@@ -43,6 +45,8 @@ EXPORT_COLUMNS = [
     "occurrence_count",
     "occurrencias relacionadas",
     "representative_excerpt",
+    "additional_excerpts",
+    "evidence_items",
     "rule_id",
     "rule_version",
     "timestamp_analisis",

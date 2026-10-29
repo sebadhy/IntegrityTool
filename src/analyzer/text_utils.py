@@ -61,6 +61,53 @@ def normalize_text_es(value: str) -> str:
     return re.sub(r"\s+", " ", value.lower().translate(replacements)).strip(" .,:;-")
 
 
+def is_negated_match(text: str, start: int, end: int | None = None) -> bool:
+    """Identify explicit local negation, resetting scope at contrastive clauses.
+
+    This is a conservative textual check, not a semantic or legal conclusion.
+    Lists joined by 'ni' retain the negation; 'pero' starts a new scope.
+    """
+    normalized = text.lower().translate(str.maketrans("áéíóúñü", "aeiounu"))
+    if end is not None:
+        suffix = re.sub(r"[,:-]\s*(?=no\b)", " ", normalized[end:end + 140])
+        if re.match(
+            r"^\s*(?:(?!no\b|y\b|se\b|pero\b|debe\b)[\w./()-]+\s+){0,5}"
+            r"no\s+(?:(?:sera|seran|es|son)\s+)?"
+            r"(?:requerid[oa]s?|exigid[oa]s?|obligatori[oa]s?|necesari[oa]s?|aceptad[oa]s?|admitid[oa]s?)\b",
+            suffix,
+        ):
+            return True
+    prefix = normalized[:start]
+    prefix = re.split(r"[.;!?]|\b(?:pero|sin embargo|no obstante|aunque|excepto|salvo)\b", prefix)[-1]
+    prefix = " ".join(prefix.split())[-220:]
+    if re.search(r"\b(?:no|nunca|tampoco)\s*$", prefix):
+        return True
+    if re.search(r"\bsin\s*$", prefix):
+        return True
+    if re.search(r"\bsin\s+(?!(?:perjuicio|embargo)\b)(?:\w+\s+){0,3}$", prefix):
+        return True
+    return bool(re.search(
+        r"\b(?:no|nunca|tampoco)\s+(?:se\s+)?(?:"
+        r"requ\w*|exig\w*|solicit\w*|necesit\w*|acept\w*|admit\w*|permit\w*|"
+        r"es\b|son\b|sera\b|seran\b|debe\w*|resulta\w*|tiene\w*)\b",
+        prefix,
+    ))
+
+
+def affirmed_terms(text: str, terms: list[str]) -> list[str]:
+    """Return terms with at least one non-negated occurrence in local context."""
+    normalized = text.lower().translate(str.maketrans("áéíóúñü", "aeiounu"))
+    found = []
+    for term in terms:
+        term_text = normalize_text_es(term)
+        expression = re.escape(term_text).replace(r"\ ", r"\s+")
+        if any(not is_negated_match(normalized, match.start(), match.end()) for match in re.finditer(
+            rf"(?<!\w){expression}(?!\w)", normalized,
+        )):
+            found.append(term)
+    return unique_strings(found)
+
+
 def has_concrete_requirement_detail(text: str) -> bool:
     """Check if text contains concrete dates, durations, or mandatory language."""
     if re.search(r"\b\d+\s*(dias|dia|horas|hora|calendario|laborables|habiles|hábiles)\b", text):
@@ -77,9 +124,13 @@ def looks_like_structural_text(text: str) -> bool:
     """Detect table-of-contents, index pages, or metadata headers."""
     if "indice financiero" in text:
         return False
-    if any(term in text for term in ["tabla de contenido", "sumario", "portada", "version"]):
+    text = normalize_text_es(text)
+    if re.fullmatch(r"(?:version|codigo|fecha de impresion)\s*:?\s*[\w./-]+", text):
         return True
-    return bool(re.match(r"^(indice|contenido)(\s|:|$)", text))
+    return bool(
+        re.match(r"^(?:indice|contenido|tabla de contenido|sumario|portada)(\s|:|$)", text)
+        and not has_concrete_requirement_detail(text)
+    )
 
 
 def is_substantive_evidence_text(text: str) -> bool:
@@ -99,6 +150,6 @@ def is_substantive_evidence_text(text: str) -> bool:
     ]
     if any(term in normalized for term in generic_timeline) and not has_concrete_requirement_detail(normalized):
         return False
-    if len(normalized.split()) <= 4:
+    if len(normalized.split()) <= 4 and not has_concrete_requirement_detail(normalized):
         return False
     return True

@@ -54,6 +54,8 @@ def build_corpus_context(corpus_analysis: dict[str, Any], total_processes: int) 
             "rarity": _rarity_from_frequency(frequency),
             "comparative_comment": _comparative_comment(frequency),
         }
+        if row.get("pattern_id"):
+            context[row["pattern_id"]] = context[pattern]
     return context
 
 

@@ -33,8 +33,7 @@ def _run_text_pipeline(texts, corpus_context=None):
     signals = detect_signals(active) + detect_schedule_signals(active)
     candidates = build_finding_candidates(signals, clauses, corpus_context or {})
     consolidated = consolidate_candidates(candidates, clauses, "doc-test")
-    relevant = filter_relevant_findings(consolidated)
-    prioritized = prioritize_consolidated_findings(relevant)
+    prioritized = filter_relevant_findings(prioritize_consolidated_findings(consolidated))
     items = build_review_items(prioritized)
     return clauses, signals, candidates, consolidated, items
 

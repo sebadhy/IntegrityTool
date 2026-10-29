@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import ast
 import base64
+import hashlib
+import json
+import logging
 import os
 from datetime import datetime
 from html import escape
@@ -11,6 +14,9 @@ import fitz
 
 import pandas as pd
 import streamlit as st
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).parent / ".env")
 
 from src.analyzer.corpus_loader import (
     analyze_corpus_documents,
@@ -20,17 +26,21 @@ from src.analyzer.corpus_loader import (
 from src.analyzer.exporter import ordered_export
 from src.analyzer.feedback_store import save_reviewer_feedback
 from src.analyzer.llm_reviewer import (
-    extract_pliego_metadata_assisted,
+    generate_document_brief,
     explain_priority_with_llm,
-    test_llm_connection,
+    _llm_available,
+    _provider_name,
+    _model,
+    PROMPT_VERSION,
 )
 from src.analyzer.metadata_extractor import (
-    apply_assisted_metadata,
     extract_pliego_metadata,
-    first_pages_text,
 )
 from notifier import send_alert_email
-from src.analyzer.review_pipeline import analyze_document_bytes
+from src.analyzer.review_pipeline import DocumentReadError, TaxonomyUnavailableError, analyze_document_bytes
+from src.analyzer.taxonomy_loader import taxonomy_sha256
+from src.analyzer import ENGINE_VERSION
+from src.config import APP_CORPUS_METADATA_PATH, APP_CORPUS_PLIEGOS_DIR, APP_CORPUS_ESPECIFICACIONES_DIR
 from src.analyzer.review_synthesis import (
     THEME_ORDER,
     build_corpus_context,
@@ -41,6 +51,7 @@ from src.analyzer.review_synthesis import (
 
 APP_DIR = Path(__file__).parent
 STYLE_PATH = APP_DIR / "assets" / "styles.css"
+LOGGER = logging.getLogger(__name__)
 
 DIMENSION_LABELS = {
     "neutralidad_competitiva": "Neutralidad competitiva",
@@ -76,7 +87,8 @@ def cached_explain_priority_with_llm(
 
 @st.cache_data(show_spinner=False, ttl=300)
 def cached_llm_connection_status() -> tuple[bool, str]:
-    return test_llm_connection()
+    """Configuration check only; never spends a request to test availability."""
+    return _llm_available(), "Disponibilidad según configuración local; conexión no probada."
 
 
 def llm_configured_by_env() -> bool:
@@ -97,21 +109,21 @@ def render_llm_usage_note(message: str, active: bool = True) -> None:
 
 
 def corpus_cache_signature() -> tuple[tuple[str, int, int], ...]:
-    paths = [APP_DIR / "data" / "raw" / "metadata" / "procesos.csv"]
+    paths = [APP_DIR / APP_CORPUS_METADATA_PATH]
     for folder in (
-        APP_DIR / "data" / "raw" / "pliegos",
-        APP_DIR / "data" / "raw" / "especificaciones",
+        APP_DIR / APP_CORPUS_PLIEGOS_DIR,
+        APP_DIR / APP_CORPUS_ESPECIFICACIONES_DIR,
     ):
         if folder.exists():
             paths.extend(sorted(path for path in folder.iterdir() if path.is_file() and path.suffix.lower() == ".pdf"))
 
-    signature = []
+    signature = [("engine:" + ENGINE_VERSION, 0, 0), ("taxonomy:" + taxonomy_sha256(), 0, 0)]
     for path in paths:
         if not path.exists():
-            signature.append((str(path.relative_to(APP_DIR)), 0, 0))
+            signature.append((str(path.resolve()), 0, 0))
             continue
         stat = path.stat()
-        signature.append((str(path.relative_to(APP_DIR)), int(stat.st_mtime_ns), int(stat.st_size)))
+        signature.append((str(path.resolve()), int(stat.st_mtime_ns), int(stat.st_size)))
     return tuple(signature)
 
 
@@ -594,7 +606,7 @@ def render_pliego_summary(
     st.subheader("Lectura para decisión")
     st.caption("Síntesis breve para entender qué tipo de revisión conviene hacer. Los datos formales están arriba.")
     if assisted_summary:
-        render_llm_usage_note("Modelo LLM utilizado en esta etapa: validó/corrigió metadata candidata y apoyó la síntesis preliminar. Las observaciones provienen de reglas y taxonomía.")
+        render_llm_usage_note("Modelo LLM utilizado solo para redactar la síntesis contextual. La metadata y las observaciones provienen de extracción, reglas y taxonomía.")
     elif llm_configured_by_env():
         render_llm_usage_note("Modelo LLM configurado, pero esta síntesis se muestra con lectura determinística porque no hubo salida asistida disponible.", active=False)
     else:
@@ -738,16 +750,21 @@ def corpus_context_sentence(row: pd.Series) -> str:
 
 def integrated_contextual_explanation(row: pd.Series, corpus_context: dict | None = None) -> str:
     fallback = _deterministic_contextual_explanation(row)
-    if not cached_llm_connection_status()[0]:
+    signal_id = str(row.get("signal_id", ""))
+    if not cached_llm_connection_status()[0] or signal_id not in st.session_state.get("llm_allowed_signal_ids", []):
         return fallback
+    priority = row.to_dict()
+    # Audit timestamps must not invalidate an otherwise identical explanation.
+    priority.pop("timestamp_analisis", None)
     explanation = cached_explain_priority_with_llm(
-        row.to_dict(),
+        priority,
         corpus_context,
-        os.getenv("OPENAI_MODEL", ""),
-        os.getenv("OPENAI_BASE_URL", ""),
+        f"{_provider_name()}|{_model()}|{PROMPT_VERSION}",
+        "|".join(os.getenv(name, "") for name in ("OPENAI_BASE_URL", "OPENAI_API_VERSION", "OLLAMA_BASE_URL")),
     )
     if explanation.get("llm_available") is False or explanation.get("llm_error"):
         return fallback
+    st.session_state.setdefault("assisted_signal_ids", set()).add(signal_id)
     plain = str(explanation.get("plain_language_explanation") or "").strip()
     why = str(explanation.get("why_it_matters") or "").strip()
     parts = [part for part in [plain, why] if _is_useful_text(part) and "no disponible" not in part.lower()]
@@ -1122,11 +1139,12 @@ def _render_aspect_rows(
         )
         st.markdown('<div class="review-item-body">', unsafe_allow_html=True)
         st.markdown("**Lectura contextual**")
-        if cached_llm_connection_status()[0]:
+        contextual_text = integrated_contextual_explanation(row, corpus_context)
+        if str(row.get("signal_id", "")) in st.session_state.get("assisted_signal_ids", set()):
             render_llm_usage_note("Modelo LLM usado aquí: redacta una explicación breve a partir del fragmento, la taxonomía y mitigantes ya detectados. No agrega ni elimina observaciones.")
         else:
             render_llm_usage_note("Sin modelo LLM aquí: la explicación proviene de reglas, taxonomía y contexto documental.", active=False)
-        st.write(integrated_contextual_explanation(row, corpus_context))
+        st.write(contextual_text)
         mitigants = display_list(row.get("mitigating_factors", []))
         if mitigants:
             st.markdown('<div class="mitigant-strip"><strong>Mitigantes identificados:</strong> ' + safe_text("; ".join(mitigants[:3])) + '</div>', unsafe_allow_html=True)
@@ -1774,17 +1792,29 @@ def render_review_flow() -> None:
 
     with st.spinner("Preparando mesa de revisión..."):
         try:
-            review_result = analyze_document_bytes(
-                uploaded_file_bytes,
-                corpus_context=corpus_payload["context"],
-                total_processes=corpus_payload["total_processes"],
-                document_name=uploaded_file_name,
-            )
+            analysis_key = hashlib.sha256(uploaded_file_bytes + json.dumps(
+                [ENGINE_VERSION, taxonomy_sha256(), uploaded_file_name, corpus_payload["context"]],
+                sort_keys=True, default=str,
+            ).encode()).hexdigest()
+            if st.session_state.get("analysis_key") != analysis_key:
+                review_result = analyze_document_bytes(
+                    uploaded_file_bytes, corpus_context=corpus_payload["context"],
+                    total_processes=corpus_payload["total_processes"], document_name=uploaded_file_name,
+                )
+                st.session_state["analysis_result"] = review_result
+                st.session_state["analysis_key"] = analysis_key
+                st.session_state["assisted_signal_ids"] = set()
+            review_result = st.session_state["analysis_result"]
+        except (DocumentReadError, TaxonomyUnavailableError) as exc:
+            st.error(str(exc))
+            st.stop()
         except Exception:
-            st.error("No se pudo leer el PDF. Verifique que el archivo sea válido y no esté protegido.")
+            LOGGER.exception("Error al preparar la revisión documental.")
+            st.error("No se pudo completar la revisión documental. Se produjo un error de análisis; el archivo no necesariamente está dañado.")
             st.stop()
 
     pages = review_result.pages
+    validation_messages.extend(review_result.validation_messages)
     document_text = review_result.document_text
     enriched_df = review_result.enriched_df
     visible_df = enriched_df
@@ -1793,7 +1823,7 @@ def render_review_flow() -> None:
     if not document_text.strip():
         st.stop()
 
-    metadata = extract_pliego_metadata(uploaded_file_name, document_text, APP_DIR)
+    metadata = extract_pliego_metadata(uploaded_file_name, document_text, APP_DIR, hashlib.sha256(uploaded_file_bytes).hexdigest())
 
     if review_result.results_df.empty or visible_df.empty:
         render_document_header(uploaded_file_name, metadata, 0)
@@ -1804,17 +1834,18 @@ def render_review_flow() -> None:
 
     signal_count = len(reviewable_signals(visible_df))
     assisted_summary: list[str] = []
+    st.session_state["llm_allowed_signal_ids"] = visible_df.head(1)["signal_id"].astype(str).tolist() if enable_ai_reading else []
     if enable_ai_reading:
         if not cached_llm_connection_status()[0]:
             validation_messages.append("Análisis asistido no configurado en este entorno.")
         else:
-            with st.spinner("Validando metadata y resumen preliminar..."):
-                assisted_metadata = extract_pliego_metadata_assisted(
-                    document_text=document_text,
-                    heuristic_candidates=metadata,
-                    first_pages=first_pages_text(pages),
-                )
-            metadata, assisted_summary = apply_assisted_metadata(metadata, assisted_metadata)
+            summary_key = f"summary:{analysis_key}:{_provider_name()}:{_model()}:{PROMPT_VERSION}"
+            if summary_key not in st.session_state:
+                with st.spinner("Preparando síntesis contextual..."):
+                    st.session_state[summary_key] = generate_document_brief("", visible_df.head(3).to_dict("records"), corpus_payload["context"])
+            assisted_brief = st.session_state[summary_key]
+            if assisted_brief.get("llm_available"):
+                assisted_summary = [assisted_brief["document_summary"]]
 
     ai_brief = None
 

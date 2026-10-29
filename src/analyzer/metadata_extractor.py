@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import csv
+import hashlib
+import logging
 import re
 from pathlib import Path
 
-import pandas as pd
+from src.config import APP_CORPUS_METADATA_PATH, APP_CORPUS_PLIEGOS_DIR, APP_CORPUS_ESPECIFICACIONES_DIR
 
-from src.config import APP_CORPUS_METADATA_PATH
+from .metadata_reader import read_process_metadata
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 DEFAULT_METADATA = {
@@ -31,36 +37,46 @@ def extract_pliego_metadata(
     document_name: str,
     document_text: str,
     app_dir: Path,
+    document_sha256: str | None = None,
 ) -> dict[str, str]:
     """Build deterministic pliego metadata before any optional assisted processing."""
-    metadata = document_metadata_from_name(document_name, app_dir)
+    metadata = document_metadata_from_name(document_name, app_dir, document_sha256)
     metadata = enrich_metadata_from_text(metadata, document_text)
     return validate_metadata(metadata)
 
 
-def document_metadata_from_name(document_name: str, app_dir: Path) -> dict[str, str]:
+def document_metadata_from_name(document_name: str, app_dir: Path, document_sha256: str | None = None) -> dict[str, str]:
     metadata = DEFAULT_METADATA.copy()
     metadata_path = app_dir / APP_CORPUS_METADATA_PATH
     if not metadata_path.exists():
         return metadata
     try:
-        df = pd.read_csv(metadata_path)
-    except Exception:
+        rows = read_process_metadata(metadata_path)
+    except (OSError, UnicodeError, ValueError, csv.Error) as exc:
+        LOGGER.warning("No se pudo leer metadata estructurada: %s", exc)
         return metadata
     normalized_name = _normalize_file_key(document_name)
-    candidate_columns = [column for column in ("pliego_file", "especificaciones_file") if column in df.columns]
-    if not candidate_columns:
+    matches = [row for row in rows if any(
+        _normalize_file_key(row.get(column, "")) == normalized_name
+        for column in ("pliego_file", "especificaciones_file")
+    )]
+    if len(matches) != 1:
+        if matches:
+            LOGGER.warning("Metadata ambigua: más de un proceso referencia el documento cargado.")
         return metadata
-    matches = pd.DataFrame()
-    for column in candidate_columns:
-        normalized_column = df[column].map(_normalize_file_key)
-        column_matches = df[normalized_column == normalized_name]
-        if not column_matches.empty:
-            matches = column_matches
-            break
-    if matches.empty:
-        return metadata
-    row = matches.iloc[0]
+    row = matches[0]
+    if document_sha256:
+        verified = False
+        for column, folder in (("pliego_file", APP_CORPUS_PLIEGOS_DIR), ("especificaciones_file", APP_CORPUS_ESPECIFICACIONES_DIR)):
+            filename = str(row.get(column, ""))
+            if _normalize_file_key(filename) != normalized_name or Path(filename).name != filename:
+                continue
+            candidate = app_dir / folder / filename
+            if candidate.is_file() and hashlib.sha256(candidate.read_bytes()).hexdigest() == document_sha256:
+                verified = True
+        if not verified:
+            LOGGER.info("La metadata por nombre no se reutilizó: el contenido cargado no coincide con el archivo de referencia.")
+            return metadata
     aliases = {
         "entidad": ["entidad", "entidad_contratante", "contratante", "institucion", "institución"],
         "objeto": ["objeto", "objeto_contratacion", "objeto de contratación", "descripcion", "descripción"],
@@ -68,7 +84,7 @@ def document_metadata_from_name(document_name: str, app_dir: Path) -> dict[str, 
         "presupuesto": ["presupuesto", "presupuesto_referencial", "monto", "monto_referencial", "valor"],
         "fecha": ["fecha", "fecha_publicacion", "fecha_publicación"],
     }
-    lower_columns = {str(column).strip().lower(): column for column in df.columns}
+    lower_columns = {str(column).strip().lower(): column for column in row}
     for target, candidates in aliases.items():
         for candidate in candidates:
             column = lower_columns.get(candidate.lower())
@@ -186,7 +202,7 @@ def first_pages_text(pages: list, limit: int = 4) -> str:
 
 def clean_metadata_value(value: object, fallback: str = "No identificado") -> str:
     text = " ".join(str(value or "").replace("\n", " ").split()).strip(" ,.;:-")
-    if not text or text.lower() in {"nan", "none", "no disponible", "no identificado"}:
+    if not text or re.fullmatch(r"#+", text) or text.lower() in {"nan", "none", "no disponible", "no identificado", "n/a", "no aplica", "sin datos"}:
         return fallback
     return text
 
@@ -208,6 +224,8 @@ def normalize_procedure(value: object) -> str:
     text = clean_metadata_value(value, "")
     if not text:
         return "No identificado"
+    if re.match(r"^SIE[-_]", text, flags=re.IGNORECASE):
+        return "Subasta Inversa Electrónica"
     normalized = re.sub(r"\b(DE|DEL|PROCEDIMIENTO|PROCESO)\b", " ", text, flags=re.IGNORECASE)
     normalized = " ".join(normalized.split()).strip(" -:")
     lower = normalized.lower()
