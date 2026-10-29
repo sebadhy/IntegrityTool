@@ -1,4 +1,6 @@
-import fitz
+from pathlib import Path
+
+import pymupdf as fitz
 import pytest
 import streamlit as st
 
@@ -23,7 +25,7 @@ def _pdf():
 
 def _processed_app(monkeypatch):
     monkeypatch.setattr("src.analyzer.llm_reviewer._llm_available", lambda: False)
-    app = AppTest.from_file("app.py", default_timeout=30)
+    app = AppTest.from_file(Path(__file__).resolve().parents[1] / "app.py", default_timeout=30)
     app.session_state["document_processed"] = True
     app.session_state["uploaded_file_bytes"] = _pdf()
     app.session_state["uploaded_file_name"] = "prueba.pdf"
@@ -90,3 +92,38 @@ def test_streamlit_navigation_reuses_analysis_without_reprocessing(monkeypatch):
     app.selectbox(key="original_pdf_zoom_label").select("Muy grande").run()
     assert not app.exception
     assert len(calls) == 1
+
+
+def test_single_contextual_summary_is_preserved_even_when_it_mentions_the_object(monkeypatch):
+    summary = "Conviene verificar la proporcionalidad de los requisitos y su relación con el objeto contractual."
+    app = _processed_app(monkeypatch)
+    app.session_state["enable_ai_reading"] = True
+    monkeypatch.setattr("src.analyzer.llm_reviewer._llm_available", lambda: True)
+    monkeypatch.setattr("src.analyzer.llm_reviewer.generate_document_brief", lambda *args: {
+        "llm_available": True, "document_summary": summary,
+    })
+    monkeypatch.setattr("src.analyzer.llm_reviewer.explain_priority_with_llm", lambda *args: {
+        "plain_language_explanation": "Conviene validar las equivalencias.",
+        "why_it_matters": "La lectura conserva la evidencia documental.",
+    })
+    app.run()
+    assert not app.exception
+    assert any(summary in item.value for item in app.markdown)
+
+
+def test_assisted_summary_does_not_repeat_metadata_labels(monkeypatch):
+    summary = "Entidad contratante: texto que no debe repetirse en la síntesis."
+    app = _processed_app(monkeypatch)
+    app.session_state["enable_ai_reading"] = True
+    monkeypatch.setattr("src.analyzer.llm_reviewer._llm_available", lambda: True)
+    monkeypatch.setattr("src.analyzer.llm_reviewer.generate_document_brief", lambda *args: {
+        "llm_available": True, "document_summary": summary,
+    })
+    monkeypatch.setattr("src.analyzer.llm_reviewer.explain_priority_with_llm", lambda *args: {
+        "plain_language_explanation": "Conviene validar las equivalencias.",
+        "why_it_matters": "La lectura conserva la evidencia documental.",
+    })
+    app.run()
+    assert not app.exception
+    assert not any(summary in item.value for item in app.markdown)
+    assert not any("Modelo LLM utilizado solo para redactar la síntesis contextual" in item.value for item in app.markdown)

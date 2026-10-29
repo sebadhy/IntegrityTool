@@ -17,7 +17,6 @@ import json
 import hashlib
 import logging
 import os
-import random
 import time
 from typing import Any
 
@@ -51,8 +50,6 @@ SYSTEM_PROMPT = (
 DEFAULT_MODEL = OPENAI_MODEL
 UNAVAILABLE = "No disponible"
 MAX_DOCUMENT_CHARS = APP_MAX_DOCUMENT_CHARS
-MAX_RETRIES = 1
-BASE_DELAY = 2.0
 PROMPT_VERSION = "2026.10.contextual-v2"
 REQUEST_TIMEOUT = 20.0
 MAX_OUTPUT_TOKENS = 1600
@@ -165,43 +162,14 @@ def _response_format(schema: dict) -> dict:
     return schema
 
 
-# ---------------------------------------------------------------------------
-# Retry con backoff exponencial ante rate limit
-# ---------------------------------------------------------------------------
-
-def _is_rate_limit(exc: Exception) -> bool:
-    msg = str(exc).lower()
-    return "429" in msg or "rate_limit" in msg or "ratelimit" in msg or "too many requests" in msg
-
-
-def _call_with_retry(fn):
-    """Ejecuta fn() con hasta MAX_RETRIES reintentos ante rate limit (429)."""
-    last_exc: Exception | None = None
-    for attempt in range(MAX_RETRIES):
-        try:
-            return fn()
-        except Exception as exc:
-            last_exc = exc
-            if _is_rate_limit(exc) and attempt < MAX_RETRIES - 1:
-                delay = BASE_DELAY * (2 ** attempt) + random.uniform(0, 0.5)
-                LOGGER.warning(
-                    "Rate limit detectado. Reintentando en %.1fs (intento %d/%d).",
-                    delay, attempt + 1, MAX_RETRIES,
-                )
-                time.sleep(delay)
-            else:
-                raise
-    raise last_exc  # type: ignore[misc]
-
-
 def _request_json(prompt: str, schema: dict, system: str = SYSTEM_PROMPT) -> tuple[dict, dict]:
     """Bounded request with factual provenance, never model deliberations."""
     client = _client().with_options(timeout=REQUEST_TIMEOUT, max_retries=0)
     started = time.monotonic()
-    response = _call_with_retry(lambda: client.chat.completions.create(
+    response = client.chat.completions.create(
         model=_model(), messages=[{"role": "system", "content": system}, {"role": "user", "content": prompt[:22000]}],
         response_format=_response_format(schema), max_completion_tokens=MAX_OUTPUT_TOKENS,
-    ))
+    )
     choice = response.choices[0]
     if choice.finish_reason != "stop" or getattr(choice.message, "refusal", None):
         raise ValueError("La respuesta asistida no se completó o no pudo ser validada.")
@@ -459,15 +427,14 @@ def test_llm_connection() -> tuple[bool, str]:
         client = _client().with_options(timeout=REQUEST_TIMEOUT, max_retries=0)
         model = _model()
 
-        def _call():
-            return client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": "Responde de forma breve y técnica."},
-                    {"role": "user", "content": "Responde exactamente: OK"},
-                ],
-            )
-        response = _call_with_retry(_call)
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": "Responde de forma breve y técnica."},
+                {"role": "user", "content": "Responde exactamente: OK"},
+            ],
+            max_completion_tokens=32,
+        )
         content = (response.choices[0].message.content or "").strip()
         if content:
             return True, f"Conexión LLM OK ({_provider_name()} · {_model()})"

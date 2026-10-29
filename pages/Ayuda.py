@@ -96,8 +96,9 @@ Luego consolida observaciones similares y las presenta con evidencia, mitigantes
 <li>Presentación de evidencia y preguntas sugeridas.</li>
 </ol>
 <p>
-Si existe procesamiento asistido configurado, se utiliza como apoyo para validar metadata y redactar síntesis contextual.
-No decide por sí solo qué observaciones se muestran ni reemplaza la revisión humana.
+Si existe procesamiento asistido configurado, se utiliza como apoyo para redactar síntesis y explicaciones contextuales.
+La metadata se extrae sin modelos de lenguaje. El procesamiento asistido no decide qué observaciones se muestran,
+su prioridad ni reemplaza la revisión humana.
 </p>
 </div>
 """,

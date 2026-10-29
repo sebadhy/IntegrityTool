@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 from types import SimpleNamespace
 
-import fitz
+import pymupdf as fitz
 import pytest
 
 from src.analyzer.case_review import consolidate_case
@@ -369,3 +369,36 @@ def test_llm_rejects_truncated_or_prohibited_responses(monkeypatch):
     response.choices[0].message.content = json.dumps({"text": "fraude"})
     with pytest.raises(ValueError, match="lenguaje"):
         llm._request_json("Texto", {})
+
+
+def test_llm_rate_limit_does_not_trigger_hidden_retries(monkeypatch):
+    from src.analyzer import llm_reviewer as llm
+    calls = []
+    def fail(**kwargs):
+        calls.append(kwargs)
+        raise RuntimeError("429 rate_limit")
+    fake = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=fail)))
+    options = []
+    def configure(**kwargs):
+        options.append(kwargs)
+        return fake
+    monkeypatch.setattr(llm, "_client", lambda: SimpleNamespace(with_options=configure))
+    with pytest.raises(RuntimeError, match="429"):
+        llm._request_json("Texto de prueba", {})
+    assert len(calls) == 1
+    assert options == [{"timeout": llm.REQUEST_TIMEOUT, "max_retries": 0}]
+
+
+def test_groq_provider_uses_the_existing_openai_client(monkeypatch):
+    import openai
+    from src.analyzer import llm_reviewer as llm
+    monkeypatch.setenv("LLM_PROVIDER", "groq")
+    monkeypatch.setenv("GROQ_API_KEY", "test-key-not-a-secret")
+    parameters = []
+    fake = object()
+    def client(**kwargs):
+        parameters.append(kwargs)
+        return fake
+    monkeypatch.setattr(openai, "OpenAI", client)
+    assert llm._client() is fake
+    assert parameters == [{"api_key": "test-key-not-a-secret", "base_url": "https://api.groq.com/openai/v1"}]

@@ -1,14 +1,2 @@
-streamlit>=1.35.0
-PyMuPDF>=1.24.5
-pandas>=2.2.2
-openai>=1.109.0
-groq>=0.11.0
-python-dotenv>=1.0.1
-PyYAML>=6.0.2
-pytest>=8.2.0
-# OCR opcional — requiere también tesseract instalado en el sistema
-# Mac: brew install tesseract tesseract-lang
-# Linux: sudo apt install tesseract-ocr tesseract-ocr-spa
-# Windows: https://github.com/UB-Mannheim/tesseract/wiki
-pytesseract>=0.3.10
-Pillow>=10.0.0
+-r requirements-core.txt
+streamlit>=1.57,<2

@@ -1,7 +1,7 @@
 import csv
 from pathlib import Path
 
-import fitz
+import pymupdf as fitz
 import pytest
 
 from src.analyzer.boilerplate_filter import classify_clauses

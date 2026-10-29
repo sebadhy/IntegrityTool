@@ -68,12 +68,13 @@ Estas dimensiones son una propuesta metodológica inicial y pueden ajustarse med
 
 ## Instalación
 
+Prepare un entorno con Python 3.11 o superior. Si ya tiene `.env`, consérvelo: no reemplace sus claves ni configuración.
+
 macOS / Linux:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
 cp .env.example .env
 ```
 
@@ -82,18 +83,16 @@ Windows PowerShell:
 ```powershell
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
 copy .env.example .env
 ```
 
-Si PowerShell bloquea la activación, no es necesario cambiar la política del equipo. Use el ejecutable del entorno directamente:
+Si PowerShell bloquea la activación, no es necesario cambiar la política del equipo. Use el ejecutable del entorno directamente en lugar de `python`, por ejemplo:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m streamlit run app.py
+.\.venv\Scripts\python.exe -m pip install -r requirements-workbench.txt
 ```
 
-La aplicación funciona sin configurar un LLM. En ese caso se muestran resultados basados en reglas, taxonomía y comparación documental local cuando exista corpus disponible.
+Instale las dependencias de la interfaz elegida con las instrucciones siguientes. La aplicación funciona sin configurar un LLM: mantiene reglas, taxonomía y comparación documental local cuando exista corpus disponible.
 
 OCR en Windows es opcional. Solo hace falta instalar Tesseract si se van a analizar PDFs escaneados como imagen. Para PDFs con texto seleccionable no es necesario.
 
@@ -127,6 +126,7 @@ Cada revisión nueva conserva la copia exacta de su taxonomía en esa base. La m
 ### Streamlit: compatibilidad existente
 
 ```bash
+python -m pip install -r requirements.txt
 python -m streamlit run app.py
 ```
 
@@ -150,6 +150,8 @@ INTEGRITY_LLM_MAX_CALLS=2
 ```
 
 Use `INTEGRITY_ASSISTED_ENABLED=false` para mantener todo el flujo determinístico. Las respuestas utilizadas registran proveedor, modelo, versión y huella de prompt, tiempo y consumo reportado por el proveedor. No se almacenan claves ni deliberaciones del modelo. La redacción asistida no verifica hechos externos por sí sola.
+
+Puede seleccionar un proveedor con `LLM_PROVIDER=openai`, `azure`, `groq` u `ollama` si tiene más de una configuración. Groq utiliza el cliente compatible con OpenAI; no requiere instalar otro SDK.
 
 OpenAI directo:
 
@@ -213,6 +215,8 @@ Los archivos en `data/` no se versionan por defecto. Esto evita publicar PDFs o 
 app.py
 run_workbench.py
 requirements-workbench.txt
+requirements-core.txt
+requirements-dev.txt
 frontend/
   src/
   pnpm-lock.yaml
@@ -236,18 +240,23 @@ docs/
 tests/
 ```
 
-Los archivos `agent.py`, `agent_runner.py`, `db.py` y `tools.py` son experimentales y no participan en ninguna de las dos interfaces. No son parte del motor institucional compartido.
+La mesa documental y Streamlit comparten el motor `src/analyzer/review_pipeline.py`. Los experimentos anteriores de agentes y SQL Server se retiraron; su código permanece recuperable en el historial Git. La persistencia activa de la mesa documental es SQLite local.
+
+Las dependencias se separan por uso: `requirements-core.txt` contiene el motor; `requirements-workbench.txt`, la API de la mesa; `requirements.txt`, la interfaz Streamlit; y `requirements-dev.txt`, las pruebas de ambas interfaces. Ejecutar la mesa no exige instalar Streamlit, pytest ni el SDK de Groq.
 
 ## Validación
 
 ```bash
+python -m pip install -r requirements-dev.txt
 python -m compileall -q app.py src tests pages run_workbench.py
 python -m pytest -q
 cd frontend
 pnpm build
 ```
 
-La suite cubre metadata y verificación por contenido, negaciones, equivalencias locales, conservación de páginas, requisitos habituales, motor compartido, caché versionada, copias verificables de la taxonomía, cotejo de todas las evidencias entre versiones, expediente, estados persistentes, API y exportaciones. Las pruebas de API requieren `requirements-workbench.txt`. Las pruebas de redacción asistida utilizan respuestas simuladas y no necesitan consumir recursos del proveedor.
+La suite cubre metadata y verificación por contenido, negaciones, equivalencias locales, conservación de páginas, requisitos habituales, motor compartido, caché versionada, copias verificables de la taxonomía, cotejo de evidencias entre versiones, expediente, estados persistentes, API y exportaciones. También verifica los límites entre dependencias de ejecución, desarrollo e interfaz. Las pruebas de redacción asistida utilizan respuestas simuladas y no necesitan consumir recursos del proveedor.
+
+GitHub Actions ejecuta la suite en Linux y Windows, con Python 3.11 y 3.13, y compila el frontend con comprobaciones TypeScript de código no utilizado. El resultado de CI es una comprobación técnica, no una validación metodológica o institucional de la herramienta.
 
 Cada análisis exporta la huella SHA-256 del documento, la versión del motor, la versión y huella de la taxonomía y la fecha de ejecución. Estos datos permiten identificar qué documento y reglas produjeron una observación.
 

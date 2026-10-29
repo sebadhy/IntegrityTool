@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from pathlib import Path
 
-import fitz
+import pymupdf as fitz
 
 from . import ENGINE_VERSION
 from .case_review import consolidate_case

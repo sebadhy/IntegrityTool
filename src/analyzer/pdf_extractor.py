@@ -15,10 +15,10 @@ from __future__ import annotations
 import logging
 import math
 import shutil
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
-import fitz  # PyMuPDF
+import pymupdf as fitz
 
 LOGGER = logging.getLogger(__name__)
 

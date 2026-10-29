@@ -108,3 +108,13 @@ El servidor se enlaza a loopback, rechaza hosts y mutaciones de origen ajeno y n
 ## Evaluación pendiente
 
 Las pruebas sintéticas verifican contratos, no precisión de revisión institucional. Quedan pendientes benchmark etiquetado, prueba real en Windows, accesibilidad con tecnología asistiva, concurrencia, recuperación/respaldos, aislamiento de PDFs no confiables, licenciamiento de PyMuPDF y selección normativa vigente. La revisión comercial no consulta un mercado exhaustivo ni demuestra exclusividad.
+
+## Mantenimiento de la base pre-PoC
+
+Se retiraron los experimentos de agentes, SQL Server y feedback JSONL sin conexión con la interfaz activa, junto con las vistas Streamlit no alcanzables. El historial Git conserva su código; no se eliminaron corpus, originales ni revisiones locales. La función de correo de Streamlit se conserva porque tiene una ruta activa.
+
+El motor no importa Streamlit ni el SDK de Groq. La mesa instala solo dependencias comunes y de API; Streamlit y pytest se incorporan al instalar sus requisitos específicos. Groq continúa disponible mediante el cliente compatible con OpenAI. No hay bucle de reintentos alrededor del modelo ni reintentos implícitos del SDK.
+
+Las pruebas verifican estos límites y que las funciones de la interfaz Streamlit tengan una ruta de ejecución. TypeScript rechaza variables e imports sin uso. La prueba de Streamlit identifica `app.py` con una ruta absoluta derivada del archivo de prueba, sin depender de cómo una versión del framework resuelva rutas relativas.
+
+Las APIs tabulares anteriores se conservan temporalmente porque todavía tienen pruebas de regresión específicas. Retirarlas exige migrar esos casos al contrato `ReviewItem` y comprobar equivalencia; no se eliminaron pruebas para reducir artificialmente la superficie mantenida. Esta limpieza no amplía el catálogo de detección ni constituye calibración de precisión con SERCOP.

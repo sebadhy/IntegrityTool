@@ -4,7 +4,7 @@ import hashlib
 import re
 from collections import defaultdict
 
-from .domain_models import Clause, ConsolidatedFinding, FindingCandidate, Signal
+from .domain_models import Clause, ConsolidatedFinding, FindingCandidate
 from .text_utils import unique_strings
 
 
