@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import yaml
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -84,3 +86,11 @@ def test_readme_relative_document_links_exist():
     local = [target.split("#", 1)[0] for target in targets if "://" not in target and not target.startswith("#")]
     assert local
     assert all((ROOT / target).is_file() for target in local)
+
+
+def test_ci_actions_use_explicit_commit_references():
+    workflow = yaml.safe_load((ROOT / ".github/workflows/validate.yml").read_text(encoding="utf-8"))
+    references = [step["uses"] for job in workflow["jobs"].values()
+                  for step in job["steps"] if "uses" in step]
+    assert references
+    assert all(re.fullmatch(r"actions/[\w-]+@[a-f0-9]{40}", reference) for reference in references)

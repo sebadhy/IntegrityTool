@@ -117,4 +117,6 @@ El motor no importa Streamlit ni el SDK de Groq. La mesa instala solo dependenci
 
 Las pruebas verifican estos límites y que las funciones de la interfaz Streamlit tengan una ruta de ejecución. TypeScript rechaza variables e imports sin uso. La prueba de Streamlit identifica `app.py` con una ruta absoluta derivada del archivo de prueba, sin depender de cómo una versión del framework resuelva rutas relativas.
 
+Las acciones oficiales de CI se fijan por commit, con la versión de referencia anotada, y usan Node 24. La descarga del repositorio no conserva credenciales Git en el entorno de las pruebas. Las actualizaciones de estas acciones deben ser explícitas y volver a pasar validación.
+
 Las APIs tabulares anteriores se conservan temporalmente porque todavía tienen pruebas de regresión específicas. Retirarlas exige migrar esos casos al contrato `ReviewItem` y comprobar equivalencia; no se eliminaron pruebas para reducir artificialmente la superficie mantenida. Esta limpieza no amplía el catálogo de detección ni constituye calibración de precisión con SERCOP.

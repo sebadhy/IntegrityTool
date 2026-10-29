@@ -33,9 +33,23 @@ def wait_for_case(service, case_id):
     for _ in range(200):
         case = service.store.get_case(case_id)
         if case["status"] in {"ready", "failed"} and case_id not in service.pending:
-            return case
+            # Narration can finish between this read and the pending check.
+            return service.store.get_case(case_id)
         time.sleep(.03)
     raise AssertionError("review did not finish")
+
+
+def test_wait_for_case_rereads_after_worker_finishes():
+    pending = {"case-1"}
+    snapshots = iter([
+        {"status": "ready", "result": {}},
+        {"status": "ready", "result": {"assisted_summary": "Resultado final"}},
+    ])
+    def read(case_id):
+        pending.discard(case_id)
+        return next(snapshots)
+    service = SimpleNamespace(store=SimpleNamespace(get_case=read), pending=pending)
+    assert wait_for_case(service, "case-1")["result"]["assisted_summary"] == "Resultado final"
 
 
 def create(service, files=None, key="request-1"):
