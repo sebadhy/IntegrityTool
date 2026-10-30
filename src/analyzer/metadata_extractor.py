@@ -210,7 +210,7 @@ def clean_metadata_value(value: object, fallback: str = "No identificado") -> st
 def is_invalid_entity(value: object) -> bool:
     text = clean_metadata_value(value, "")
     lower = f" {text.lower()} "
-    if not text or len(text) > 120:
+    if len(text) < 4 or len(text) > 120:
         return True
     if any(verb in lower for verb in ENTITY_BAD_VERBS):
         return True
@@ -269,12 +269,12 @@ def _extract_field_from_text(document_text: str, labels: list[str], max_chars: i
         clean = line.strip(" :-\t")
         if not clean:
             continue
-        lower = clean.lower()
         for label in labels:
-            label_lower = label.lower()
-            if label_lower in lower:
-                pattern = re.compile(rf"{re.escape(label)}\s*[:\-]?\s*(.+)$", re.IGNORECASE)
-                match = pattern.search(clean)
+            # Metadata labels must be headings, not words inside an operative clause.
+            heading = re.match(rf"^(?:\d+(?:\.\d+)*[.)]?\s+)?{re.escape(label)}(?!\w)\s*[:\-]?\s*(.*)$",
+                               clean, re.IGNORECASE)
+            if heading:
+                match = heading
                 if match and _is_useful_text(match.group(1)):
                     return match.group(1).strip()[:max_chars]
                 for following in lines[index + 1 : index + 4]:
