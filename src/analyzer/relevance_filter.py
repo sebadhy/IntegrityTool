@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from .domain_models import ConsolidatedFinding
+from .detector import COMMERCIAL_CONFIGURATION_PATTERN_ID, _supports_commercial_product_configuration
 from .mitigants import has_strong_mitigant
 from .text_utils import is_substantive_evidence_text, normalize_text_es
 
@@ -43,6 +44,10 @@ def filter_relevant_findings(findings: list[ConsolidatedFinding]) -> list[Consol
 
 
 def _supports_interpretation(finding: ConsolidatedFinding) -> bool:
+    # Semantic proposals cannot bypass the evidence controls used by the detector.
+    if finding.pattern_id == COMMERCIAL_CONFIGURATION_PATTERN_ID:
+        return any(_supports_commercial_product_configuration(str(item.get("text", "")))
+                   for item in finding.evidence_items)
     if finding.pattern_id not in {"cn-short-submission-deadline", "cn-limited-execution-delivery-deadline"}:
         return True
     # A mandatory reference to a calendar does not establish a short deadline.

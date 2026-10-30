@@ -1,6 +1,6 @@
 # Arquitectura del pipeline documental
 
-Integrity Tool usa un pipeline determinístico primero y procesamiento asistido solo como apoyo de redacción/contexto. La herramienta no determina irregularidades, responsabilidades ni conclusiones legales.
+Integrity Tool conserva un pipeline determinístico primero. En la mesa React puede complementarse con propuestas semánticas acotadas que deben superar validación documental y las mismas etapas de consolidación, relevancia y prioridad. La herramienta no determina irregularidades, responsabilidades ni conclusiones legales.
 
 ## Flujo principal
 
@@ -54,7 +54,7 @@ PDF
 - No todo indicio textual se muestra al usuario.
 - Boilerplate y placeholders se conservan para auditoría pero se excluyen de observaciones visibles.
 - La frecuencia alta en corpus funciona como contexto mitigante, no como observación independiente.
-- El LLM no decide visibilidad, prioridad ni conclusiones.
+- El LLM puede proponer candidatos, pero no asigna prioridad ni determina visibilidad final o conclusiones. Una cita comprobada no demuestra que la interpretación sea correcta.
 - El usuario ve pocos aspectos accionables, con evidencia, mitigantes, preguntas y limitaciones.
 
 ## Controles de confiabilidad
@@ -95,9 +95,23 @@ El cotejo compara el conjunto de textos de todas las evidencias por patrón y di
 
 ## Procesamiento asistido acotado
 
-El resultado determinístico se guarda antes de la redacción asistida. Por defecto hay una síntesis y una explicación; el máximo configurable es tres solicitudes lógicas por expediente. Solo se envían fragmentos y patrones pertinentes, no el documento completo ni el catálogo entero. El encabezado no se reescribe mediante LLM. La salida se valida por estructura, completitud y lenguaje; no es un verificador factual independiente.
+El resultado determinístico se guarda antes del procesamiento asistido. En la mesa hay por defecto una solicitud semántica y una síntesis; el máximo configurable es tres solicitudes lógicas compartidas. El tercer cupo puede usarse para una explicación. Desactivar la semántica conserva la ruta de narración anterior. El encabezado no se reescribe mediante LLM. La salida se valida por estructura, completitud y lenguaje; no es un verificador factual independiente.
 
 Cada solicitud tiene timeout y máximo de tokens de salida. El SDK no reintenta implícitamente. Éxitos y fallos se guardan por contenido, configuración de proveedor/modelo y versión de prompt/reglas. Se registra uso reportado por el proveedor; un error de transporte no permite asegurar que no haya facturación. No se realiza una llamada adicional para probar conexión. La interfaz distingue redacción efectivamente utilizada de configuración meramente disponible.
+
+### Propuestas semánticas: primera entrega
+
+`semantic_analyzer.py` selecciona cláusulas activas por documento/sección, excluye versiones sustituidas y limita texto a 12.000 caracteres, 24 cláusulas y 19.000 caracteres de contexto serializado. Las cláusulas mayores de 1.600 caracteres no se truncan: quedan fuera de esta selección y se contabilizan. El catálogo resumido también tiene límite; cualquier patrón no enviado queda registrado. Selección, IDs, cobertura y límites se conservan en `semantic_review.coverage`.
+
+`analyze_clauses_with_llm()` devuelve hasta cuatro propuestas con patrón, cláusula, cita, explicación breve y confianza. El prompt trata el documento como datos no confiables como instrucciones. Esto es una salvaguarda, no una garantía contra inyección de instrucciones. No hay herramientas de ejecución ni navegación habilitadas para el modelo.
+
+`validate_semantic_proposals()` comprueba el contrato, identidad de cláusula enviada/activa, patrón permitido, cita literal con normalización de espacios, negación textual explícita, lenguaje y duplicados patrón/cláusula. La comprobación no demuestra pertinencia semántica; esa calidad debe evaluarse con especialistas. Confianza no se convierte en prioridad. Los mitigantes se calculan con las funciones existentes desde la cláusula completa, no desde el fragmento que el modelo elija omitir ni de mitigantes que afirme libremente.
+
+Los Signals validados pasan a `build_finding_candidates()` y `finalize_candidates()`, compartidos con las reglas. Se reconstruye el resultado antes de reemplazar la base: un fallo no elimina la revisión determinística. La fuente se conserva en Signals, ReviewItems y agregación del expediente. Se registran tanto decisiones aceptadas/rechazadas como integración visible o filtrado posterior por las reglas del dominio.
+
+El análisis básico cacheado guarda `Clause[]` y `Signal[]`, incluidos estados de exclusión, dentro del JSON transaccional existente. No requiere migrar resultados anteriores. La versión del servicio cambia para no confundir cachés anteriores sin cláusulas. Los originales y revisiones previas no se reinterpretan al abrirlos.
+
+El corpus sigue evaluándose con reglas; una propuesta semántica nueva no recibe un aumento por rareza de un detector distinto. Esta entrega no implementa inferencia de contradicciones entre documentos, búsqueda comercial ni lectura exhaustiva. Streamlit conserva su ruta actual. La identidad institucional y el despliegue compartido siguen pendientes.
 
 ## Interfaz y despliegue
 

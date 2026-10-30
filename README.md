@@ -12,7 +12,7 @@ La herramienta busca responder:
 
 > ¿Qué aspectos de este pliego convendría revisar primero y por qué?
 
-Para eso combina extracción documental, reglas determinísticas, una taxonomía editable de señales y, cuando está configurado, procesamiento asistido para redactar resúmenes o explicaciones contextuales.
+Para eso combina extracción documental, reglas determinísticas, una taxonomía editable y, cuando está configurado, propuestas semánticas y explicaciones contextuales asistidas. Las capacidades dependen de la interfaz y configuración; no se presupone lectura exhaustiva.
 
 ## Cómo funciona
 
@@ -27,7 +27,7 @@ El flujo principal es determinístico:
 7. Prioriza revisión humana como `revisión general`, `revisión sugerida` o `revisión prioritaria`.
 8. Muestra evidencia textual y visual asociada a cada observación.
 
-El LLM es opcional y solo apoya la síntesis contextual y redacción de explicaciones. La metadata del encabezado, detección, consolidación, visibilidad y prioridad se resuelven sin modelos de lenguaje. Un fallo del proveedor no elimina los resultados documentales.
+El motor de reglas funciona sin modelos de lenguaje. En la mesa React, el procesamiento asistido opcional puede además proponer candidatos sobre una selección de cláusulas, aunque no coincidan literalmente con keywords. Deben pertenecer a la taxonomía utilizada y aportar una cita comprobable; se integran en la misma consolidación y priorización. Comprobar una cita no valida la interpretación, que requiere revisión humana. Un fallo del proveedor no elimina los resultados basados en reglas. Streamlit conserva por ahora su ruta de reglas y redacción.
 
 ### Cursograma general
 
@@ -44,8 +44,10 @@ flowchart TD
     I --> J["Priorización para revisión humana"]
     J --> K["Observaciones visibles con evidencia y preguntas sugeridas"]
 
-    L["Procesamiento asistido opcional"] -. "Redacta síntesis contextual" .-> K
-    L -. "No decide visibilidad ni prioridad" .-> K
+    D -. "Selección acotada, mesa React" .-> L["Propuestas semánticas opcionales"]
+    L --> M["Validación de cita, cláusula activa y taxonomía"]
+    M --> I
+    N["Redacción asistida opcional"] -. "Síntesis y explicación" .-> K
 ```
 
 ## Qué analiza
@@ -140,16 +142,25 @@ Streamlit sigue disponible y conserva compatibilidad con Community Cloud. La nue
 
 Edite `.env` solo si desea habilitar procesamiento asistido.
 
-En la mesa nueva se permiten por defecto **dos solicitudes lógicas por expediente**: una síntesis y la explicación del primer aspecto. Se guardan también los fallos para evitar reintentos al navegar. Cada solicitud tiene límite de salida y timeout, sin reintentos implícitos del SDK. El proveedor puede facturar una solicitud fallida o interrumpida; el límite no es una estimación monetaria.
+En la mesa nueva se permiten por defecto **dos solicitudes lógicas por expediente**: una para propuestas semánticas y una síntesis si hay aspectos visibles. Un presupuesto de tres permite añadir una explicación. Desactivar solo la etapa semántica conserva el modo anterior de síntesis y explicación. Se guardan también los fallos para evitar reintentos al navegar. Cada solicitud tiene límite de salida y timeout, sin reintentos implícitos del SDK. El proveedor puede facturar una solicitud fallida o interrumpida; el límite no es una estimación monetaria.
 
 ```env
 INTEGRITY_ASSISTED_ENABLED=true
+INTEGRITY_SEMANTIC_ENABLED=true
 INTEGRITY_LLM_MAX_CALLS=2
 # Opcional: cambiar la ubicación de la base local
 # INTEGRITY_STORE_PATH=data/workbench/reviews.sqlite3
 ```
 
-Use `INTEGRITY_ASSISTED_ENABLED=false` para mantener todo el flujo determinístico. Las respuestas utilizadas registran proveedor, modelo, versión y huella de prompt, tiempo y consumo reportado por el proveedor. No se almacenan claves ni deliberaciones del modelo. La redacción asistida no verifica hechos externos por sí sola.
+Use `INTEGRITY_ASSISTED_ENABLED=false` para mantener todo el flujo determinístico, o `INTEGRITY_SEMANTIC_ENABLED=false` para desactivar solo las propuestas. Las solicitudes registran proveedor, modelo, versión y huellas de prompt/sistema, tiempo y consumo reportado por el proveedor. No se almacenan claves ni deliberaciones del modelo. Sin modelo se mantiene la revisión por reglas, no necesariamente la misma cobertura contextual.
+
+### Alcance de la primera etapa semántica
+
+La mesa conserva las cláusulas y señales de reglas de cada revisión nueva. Selecciona por documento/sección hasta 24 cláusulas activas, con máximo 12.000 caracteres de texto; no recorta una cláusula larga para simular lectura completa. Excluye versiones marcadas como sustituidas y registra IDs enviados, cobertura, patrones omitidos y límites. Puede solicitar propuestas incluso si las reglas no encontraron observaciones.
+
+Se permiten hasta cuatro propuestas por solicitud. Se rechazan citas inexistentes, cláusulas excluidas, patrones fuera del catálogo enviado, confianza baja, prioridades sugeridas por el modelo y duplicados del mismo patrón/cláusula. Los mitigantes y factores de prioridad se calculan desde la evidencia, no desde una afirmación del modelo. Las frecuencias de un corpus analizado solo con reglas no se utilizan para declarar rara una propuesta semántica nueva.
+
+La exportación JSON conserva propuestas aceptadas/rechazadas y el motivo; distingue validación de cita de integración visible. HTML/CSV identifican el origen de las observaciones. Los resultados anteriores no se modifican. Esta etapa es experimental: no es lectura exhaustiva, contraste semántico completo entre documentos, consulta del mercado ni validación jurídica. Falta evaluar precisión con especialistas de SERCOP.
 
 Puede seleccionar un proveedor con `LLM_PROVIDER=openai`, `azure`, `groq` u `ollama` si tiene más de una configuración. Groq utiliza el cliente compatible con OpenAI; no requiere instalar otro SDK.
 
@@ -224,6 +235,7 @@ assets/styles.css
 pages/Ayuda.py
 src/analyzer/
   review_pipeline.py
+  semantic_analyzer.py
   workbench_service.py
   review_store.py
   case_review.py
@@ -254,7 +266,7 @@ cd frontend
 pnpm build
 ```
 
-La suite cubre metadata y verificación por contenido, negaciones, equivalencias locales, conservación de páginas, requisitos habituales, motor compartido, caché versionada, copias verificables de la taxonomía, cotejo de evidencias entre versiones, expediente, estados persistentes, API y exportaciones. También verifica los límites entre dependencias de ejecución, desarrollo e interfaz. Las pruebas de redacción asistida utilizan respuestas simuladas y no necesitan consumir recursos del proveedor.
+La suite cubre metadata y verificación por contenido, negaciones, equivalencias locales, conservación de páginas, requisitos habituales, motor compartido, caché versionada, copias verificables de la taxonomía, cotejo de evidencias entre versiones, expediente, estados persistentes, API y exportaciones. Incluye propuestas semánticas con citas válidas/falsas, cobertura acotada y presupuesto compartido. También verifica los límites entre dependencias de ejecución, desarrollo e interfaz. Las pruebas asistidas utilizan respuestas simuladas y no necesitan consumir recursos del proveedor; no demuestran precisión institucional de un modelo real.
 
 GitHub Actions ejecuta la suite en Linux y Windows, con Python 3.11 y 3.13, y compila el frontend con comprobaciones TypeScript de código no utilizado. El resultado de CI es una comprobación técnica, no una validación metodológica o institucional de la herramienta.
 
@@ -266,6 +278,7 @@ La arquitectura conceptual, los principios analíticos, el enfoque metodológico
 
 - [Marco técnico y conceptual](docs/technical_and_conceptual_framework.md)
 - [Arquitectura del pipeline documental](docs/architecture.md)
+- [Protocolo inicial de evaluación de la PoC](docs/poc_evaluation.md)
 - [Decisiones de UX y transición a mesa documental](docs/workbench_ux.md)
 
 Estos documentos explican el enfoque de neutralidad competitiva, trazabilidad, revisión humana, corpus histórico, uso prudente de LLM y mitigación de falsos positivos.

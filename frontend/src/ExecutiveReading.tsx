@@ -21,9 +21,16 @@ export function ExecutiveReading({
         <p>{result.assisted_summary || result.summary}</p>
         <span className="reading-provenance">
           {result.assisted_summary
-            ? "Síntesis redactada con apoyo de un modelo de lenguaje; observaciones determinadas por reglas."
-            : "Síntesis basada en reglas y evidencia documental."}
+            ? "Síntesis redactada con apoyo de un modelo de lenguaje, sobre aspectos sustentados en evidencia."
+            : "Síntesis estructurada a partir de los aspectos y la evidencia documental."}
         </span>
+        {result.semantic_review?.coverage && result.semantic_review.status === "completed" && (
+          <p className="reading-provenance">
+            Lectura contextual adicional sobre {result.semantic_review.coverage.selected_clause_count}
+            {" de "}{result.semantic_review.coverage.active_clause_count} cláusulas activas.
+            {" "}Las propuestas requieren validación humana; no es una revisión semántica completa.
+          </p>
+        )}
       </section>
       <section className="priorities-section">
         <div className="section-heading">
@@ -67,7 +74,7 @@ export function ExecutiveReading({
           </div>
         ) : (
           <p className="neutral-empty">
-            No hay aspectos priorizados con las reglas disponibles. Puede
+            No hay aspectos priorizados con el alcance de esta revisión. Puede
             continuar con la lectura de los originales.
           </p>
         )}
@@ -113,7 +120,7 @@ export function ExecutiveReading({
           expediente. La ausencia de observaciones no acredita cumplimiento.
         </p>
         <p>
-          La priorización considera contenido sustantivo, obligatoriedad,
+          La priorización aplica criterios explícitos sobre contenido sustantivo, obligatoriedad,
           mitigantes y contexto histórico disponible; la repetición no aumenta
           la prioridad.
         </p>
@@ -137,15 +144,15 @@ export function ExecutiveReading({
               "Esta revisión anterior no conserva una copia de las reglas."
             )}
           </dd>
-          <dt>Redacción asistida</dt>
+          <dt>Procesamiento asistido</dt>
           <dd>
             {
               result.assistance.calls.filter(
                 (call) => call.status === "completed",
               ).length
             }{" "}
-            respuestas utilizadas. No decide detección, consolidación ni
-            prioridad.
+            solicitudes completadas. Puede proponer candidatos con citas verificadas;
+            no asigna la prioridad final ni reemplaza la revisión humana.
           </dd>
         </dl>
       </details>

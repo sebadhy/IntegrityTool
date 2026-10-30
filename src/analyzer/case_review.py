@@ -42,6 +42,7 @@ def consolidate_case(documents: list[dict]) -> tuple[list[dict], list[dict]]:
             "limitations": unique_strings([q for _, item in entries for q in item["limitations"]]),
             "priority_factors": unique_strings([q for _, item in entries for q in item["metadata"].get("ranking_factors", [])]),
             "sources": unique_strings([q for _, item in entries for q in item["metadata"].get("aggregated_sources", [])]),
+            "analysis_methods": unique_strings([q for _, item in entries for q in item["metadata"].get("analysis_methods", ["deterministic_rules"])]),
             "historical_context": base["metadata"].get("historical_context", {}),
             "source_finding_ids": unique_strings([q for _, item in entries for q in item["source_finding_ids"]]),
         })

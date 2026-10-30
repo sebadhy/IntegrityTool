@@ -27,6 +27,7 @@ export type ReviewItem = {
   limitations: string[];
   priority_factors: string[];
   sources: string[];
+  analysis_methods?: string[];
   historical_context: {
     frequency_label?: string;
     comparative_comment?: string;
@@ -71,6 +72,18 @@ export type ReviewCase = CaseSummary & {
     items: ReviewItem[];
     summary: string;
     assisted_summary?: string;
+    semantic_review?: {
+      status: string;
+      accepted_count?: number;
+      rejected_count?: number;
+      visible_semantic_item_count?: number;
+      coverage: null | {
+        active_clause_count: number;
+        selected_clause_count: number;
+        partial: boolean;
+        limitation: string;
+      };
+    };
     messages: string[];
     provenance: {
       engine_version: string;

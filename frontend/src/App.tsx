@@ -370,8 +370,8 @@ export default function App() {
                     <aside className="review-detail">
                       <h2>Lectura manual</h2>
                       <p>
-                        No se identificaron aspectos priorizados con las reglas
-                        disponibles. Puede consultar los documentos completos.
+                        No se identificaron aspectos priorizados con el alcance
+                        de esta revisión. Puede consultar los documentos completos.
                       </p>
                     </aside>
                   )}

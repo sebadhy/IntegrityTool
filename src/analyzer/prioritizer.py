@@ -391,7 +391,10 @@ def prioritize_consolidated_findings(findings: list) -> list:
             scoped = replace(finding, signals=[signal],
                              clauses=[c for c in finding.clauses if c.clause_id == signal.clause_id],
                              detected_mitigants=signal.metadata["local_mitigants"],
-                             missing_mitigants=signal.metadata["local_missing_mitigants"])
+                             missing_mitigants=signal.metadata["local_missing_mitigants"],
+                             historical_context=({"rarity": "Sin histórico"}
+                                                 if signal.metadata.get("analysis_source") == "semantic_assisted"
+                                                 else finding.historical_context))
             local.append(_rank_consolidated(scoped))
         score, factors = max(local, key=lambda pair: pair[0]) if local else _rank_consolidated(finding)
         if len({entry[0] for entry in local}) > 1:

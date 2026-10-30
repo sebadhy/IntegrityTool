@@ -270,9 +270,10 @@ export function UploadWorkspace({
             <p>
               La comparación con el corpus disponible aporta contexto, no
               acredita que un requisito sea adecuado. Cuando hay un modelo de
-              lenguaje configurado, puede apoyar la redacción de la síntesis y
-              explicaciones, sin cambiar detección ni prioridad. La metodología
-              aplicada queda registrada en cada observación.
+              lenguaje configurado, puede proponer aspectos adicionales sobre
+              una selección de cláusulas y apoyar su explicación. Las citas se
+              comprueban y las propuestas pasan por los mismos criterios de
+              consolidación y prioridad; su interpretación requiere revisión humana.
             </p>
             <p>
               Las dimensiones analíticas son una propuesta inicial sujeta a

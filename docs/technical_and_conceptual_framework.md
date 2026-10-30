@@ -4,6 +4,12 @@
 
 Versión preliminar de trabajo
 
+## Estado de implementación: 30 de octubre de 2026
+
+La mesa React incorpora una primera etapa experimental de propuestas semánticas, además de la redacción asistida. El modelo puede identificar candidatos dentro de la taxonomía sobre una selección registrada de cláusulas activas. Se comprueban citas y origen documental; los candidatos pasan por la consolidación y prioridad existentes. Comprobar una cita no valida la interpretación ni reemplaza el juicio técnico o jurídico.
+
+La selección es acotada, no una lectura semántica completa del expediente. Esta entrega no implementa contraste semántico integral entre documentos ni búsqueda de mercado. La referencia operativa actual es [Arquitectura del pipeline](architecture.md); el [Protocolo de evaluación de la PoC](poc_evaluation.md) distingue funcionamiento técnico de precisión institucional aún no demostrada. Las capacidades futuras descritas en este documento no deben presentarse como implementadas.
+
 # 1. Resumen Ejecutivo
 
 El presente documento describe una propuesta preliminar para explorar el uso de capacidades avanzadas de análisis documental e inteligencia artificial generativa aplicadas a procesos de contratación pública en Ecuador. La iniciativa se concibe como una línea de trabajo exploratoria y prudente orientada a fortalecer capacidades institucionales de revisión documental, particularmente en contextos caracterizados por alto volumen de información, complejidad técnica y necesidad de priorización analítica.
@@ -1174,7 +1180,7 @@ Posibles líneas futuras:
 
 ## 16.1 Rol de la IA dentro de la arquitectura
 
-La arquitectura propuesta contempla el uso de inteligencia artificial generativa exclusivamente como una capa de asistencia analítica y contextualización. La IA no constituye el núcleo principal del sistema ni reemplaza los mecanismos trazables de extracción documental, comparación histórica y reglas analíticas.
+La arquitectura propuesta contempla el uso de modelos como asistencia analítica, con propuestas semánticas sustentadas en citas y contextualización narrativa. No actúan como autoridad autónoma ni reemplazan los mecanismos trazables de extracción, verificación de evidencias, consolidación y priorización. Su aporte adicional debe evaluarse frente a la base sin modelo.
 
 Conceptualmente, la herramienta se apoya sobre una arquitectura híbrida compuesta por:
 

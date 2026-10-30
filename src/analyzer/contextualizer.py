@@ -30,6 +30,11 @@ def build_finding_candidates(
         signal = replace(signal, metadata={**signal.metadata,
                          "local_mitigants": mitigants, "local_missing_mitigants": missing})
         historical = _historical_context(pattern, corpus_context or {})
+        semantic = signal.metadata.get("analysis_source") == "semantic_assisted"
+        if semantic:
+            # Rule-only frequencies are not a semantic prevalence benchmark.
+            historical = {"frequency_label": "No disponible", "rarity": "Sin histórico",
+                          "comparative_comment": "El corpus se examinó con reglas; no se atribuye rareza a esta propuesta semántica."}
         normalized_requirement = normalize_text_es(signal.evidence_text)
         candidate_id = hashlib.sha1(f"{signal.signal_id}|{normalized_requirement[:160]}".encode("utf-8")).hexdigest()[:12]
         evidence = signal.metadata.get("evidence_items") or [_evidence_item(signal, clause, pattern)]
@@ -46,8 +51,12 @@ def build_finding_candidates(
                 detected_mitigants=mitigants,
                 missing_mitigants=missing,
                 historical_context=historical,
-                candidate_rationale=_candidate_rationale(signal, pattern, mitigants, missing, historical),
-                limitations=_limitations(clause, historical),
+                candidate_rationale=("Propuesta de lectura contextual: " + signal.metadata["semantic_review_note"]
+                                     if semantic else _candidate_rationale(signal, pattern, mitigants, missing, historical)),
+                limitations=_limitations(clause, historical) + ([
+                    "Propuesta semántica con cita comprobada; la interpretación requiere validación humana.",
+                    "El modelo no revisó todas las cláusulas ni determina que falten justificaciones fuera del fragmento.",
+                ] if semantic else []),
             )
         )
     return candidates

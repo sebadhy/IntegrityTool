@@ -93,10 +93,7 @@ def analyze_document_pages(
     active = active_clauses(clauses)
     signals = detect_signals(active, patterns=taxonomy.patterns) + detect_schedule_signals(active, patterns=taxonomy.patterns)
     candidates = build_finding_candidates(signals, clauses, corpus_context, taxonomy_patterns=taxonomy.patterns)
-    consolidated = consolidate_candidates(candidates, clauses, document_id)
-    ranked = prioritize_consolidated_findings(consolidated)
-    prioritized = filter_relevant_findings(ranked)
-    review_items = build_review_items(prioritized)
+    prioritized, review_items = finalize_candidates(candidates, clauses, document_id)
     analysis_context = {
         "document_id": document_id,
         "document_sha256": document_id.removeprefix("doc-"),
@@ -125,6 +122,15 @@ def analyze_document_pages(
         validation_messages=taxonomy.messages,
         provenance=analysis_context,
     )
+
+
+def finalize_candidates(candidates: list[FindingCandidate], clauses: list[Clause], document_id: str
+                        ) -> tuple[list[ConsolidatedFinding], list[ReviewItem]]:
+    """Shared final stages for rule candidates and evidence-validated proposals."""
+    consolidated = consolidate_candidates(candidates, clauses, document_id)
+    ranked = prioritize_consolidated_findings(consolidated)
+    relevant = filter_relevant_findings(ranked)
+    return relevant, build_review_items(relevant)
 
 
 def _document_id(document_name: str, pdf_bytes: bytes) -> str:

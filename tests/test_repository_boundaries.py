@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 
 import yaml
+import httpx
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,6 +31,13 @@ def test_runtime_dependencies_are_separate_from_development_and_legacy_ui():
     assert {"fastapi", "uvicorn", "pymupdf", "openai"} <= runtime
     assert not {"streamlit", "pytest", "groq", "pyodbc"} & runtime
     assert {"pytest", "streamlit", "fastapi", "httpx"} <= _requirements("requirements-dev.txt")
+
+
+def test_unit_tests_cannot_open_external_http_connections():
+    transport = httpx.HTTPTransport()
+    with pytest.raises(AssertionError, match="External HTTP is disabled"):
+        transport.handle_request(httpx.Request("GET", "https://example.invalid/"))
+    transport.close()
 
 
 def test_workbench_imports_without_streamlit_or_groq_sdk():

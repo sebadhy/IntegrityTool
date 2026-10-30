@@ -1,6 +1,6 @@
-"""One local worker, versioned deterministic results and bounded optional narration.
+"""One local worker, archived clauses and bounded optional semantic assistance.
 
-No agents, external queues or model-controlled detection decisions. Local pilot only.
+No agents or external queues. Models propose; domain rules control final items.
 """
 from __future__ import annotations
 
@@ -18,13 +18,16 @@ import pymupdf as fitz
 
 from . import ENGINE_VERSION
 from .case_review import consolidate_case
+from .contextualizer import build_finding_candidates
+from .domain_models import Clause, Signal
 from .metadata_extractor import extract_pliego_metadata
-from .review_pipeline import TaxonomyUnavailableError, analyze_document_bytes
+from .review_pipeline import TaxonomyUnavailableError, analyze_document_bytes, finalize_candidates
 from .review_store import ReviewStore, utc_now
 from .taxonomy_loader import TaxonomyLoadResult, load_taxonomy
+from .semantic_analyzer import SEMANTIC_VERSION, select_semantic_context, validate_semantic_proposals
 
 LOGGER = logging.getLogger(__name__)
-SERVICE_VERSION = "2026.10.workbench-v2"
+SERVICE_VERSION = "2026.10.workbench-v3"
 ROLES = {"pliego", "especificaciones", "adenda", "anexo"}
 MAX_DOCUMENTS, MAX_FILE_BYTES, MAX_TOTAL_BYTES, MAX_PAGES = 8, 25 * 1024**2, 100 * 1024**2, 400
 
@@ -122,6 +125,8 @@ class WorkbenchService:
                         raise ValueError(f"{doc['name']}: no se pudo extraer texto. Se requiere una versión con texto u OCR disponible.")
                     analysis = {
                         "items": [asdict(item) for item in result.review_items],
+                        "clauses": [asdict(clause) for clause in result.clauses],
+                        "signals": [asdict(signal) for signal in result.signals],
                         "document_text": result.document_text,
                         "page_count": len(result.pages),
                         "page_statuses": [{"page": p.page_number, "status": p.status.value} for p in result.pages],
@@ -147,13 +152,20 @@ class WorkbenchService:
                 "provenance": {"engine_version": ENGINE_VERSION, "taxonomy_sha256": taxonomy.source_sha256,
                                "rule_version": str(taxonomy.metadata.get("version") or "No disponible"),
                                "taxonomy_archived": True, "service_version": SERVICE_VERSION, "finished_at": utc_now()},
-                "taxonomy_context": {p.id: p.to_dict() for p in taxonomy.patterns
-                                     if any(item["pattern_id"] == p.id for item in items)},
-                "assistance": {"status": "pending" if self.assisted and items else "disabled", "calls": []},
+                "taxonomy_context": {p.id: p.to_dict() for p in taxonomy.patterns},
+                "semantic_review": {"version": SEMANTIC_VERSION, "status": "pending" if self.assisted else "disabled",
+                                    "decisions": [], "coverage": None},
+                "assistance": {"status": "pending" if self.assisted else "disabled", "calls": []},
             }
             # Rules and evidence are committed before optional language generation.
             self.store.update_case(case_id, "ready", result)
-            if self.assisted and items:
+            if self.assisted:
+                try:
+                    self._analyze_semantics(case_id, result, taxonomy, context)
+                except Exception:
+                    LOGGER.exception("Semantic stage failed; deterministic result retained")
+                    result["semantic_review"]["status"] = "unavailable"
+                    result["messages"].append("El análisis contextual adicional no se completó; se conserva la lectura basada en reglas.")
                 try:
                     self._narrate(case_id, result)
                 except Exception:
@@ -174,9 +186,13 @@ class WorkbenchService:
             result["assistance"]["status"] = "not_configured"
             self.store.update_case(case_id, "ready", result)
             return
-        limit = max(0, min(3, int(os.getenv("INTEGRITY_LLM_MAX_CALLS", "2"))))
-        if limit == 0:
-            result["assistance"]["status"] = "disabled"
+        limit = _llm_call_limit() - len(result["assistance"]["calls"])
+        if limit <= 0:
+            result["assistance"]["status"] = _assistance_status(result)
+            self.store.update_case(case_id, "ready", result)
+            return
+        if not result["items"]:
+            result["assistance"]["status"] = _assistance_status(result)
             self.store.update_case(case_id, "ready", result)
             return
         result["assistance"]["status"] = "running"
@@ -209,7 +225,80 @@ class WorkbenchService:
                     item["assisted_explanation"] = payload["plain_language_explanation"]
                 else:
                     result["assisted_summary"] = payload["document_summary"]
-        result["assistance"]["status"] = "completed" if any(c["status"] == "completed" for c in result["assistance"]["calls"]) else "unavailable"
+        result["assistance"]["status"] = _assistance_status(result)
+        self.store.update_case(case_id, "ready", result)
+
+    def _analyze_semantics(self, case_id: str, result: dict, taxonomy: TaxonomyLoadResult, corpus_context: dict):
+        from .llm_reviewer import _llm_available, _model, _provider_name, analyze_clauses_with_llm
+        semantic = result["semantic_review"]
+        if os.getenv("INTEGRITY_SEMANTIC_ENABLED", "true").lower() != "true" or _llm_call_limit() == 0:
+            semantic["status"] = "disabled"
+            return
+        if not _llm_available():
+            semantic["status"] = "not_configured"
+            return
+        selection = select_semantic_context(result["documents"], taxonomy)
+        semantic["coverage"] = selection.coverage
+        if not selection.clauses or not selection.patterns:
+            semantic["status"] = "no_eligible_context"
+            return
+        result["assistance"]["status"] = "running"
+        semantic["status"] = "running"
+        self.store.update_case(case_id, "ready", result)
+        cache_key = fingerprint([SEMANTIC_VERSION, taxonomy.source_sha256, _provider_name(), _model(),
+                                 os.getenv("OPENAI_BASE_URL", ""), os.getenv("OLLAMA_BASE_URL", ""),
+                                 os.getenv("OPENAI_API_VERSION", ""), selection.payload])
+        payload = self.store.cache_get(cache_key)
+        cached = payload is not None
+        if payload is None:
+            try:
+                payload = analyze_clauses_with_llm(selection.payload)
+            except Exception:
+                LOGGER.exception("Semantic request unavailable")
+                payload = {"llm_available": False, "candidates": []}
+            self.store.cache_put(cache_key, payload)
+        result["assistance"]["calls"].append({**payload.get("provenance", {}),
+            "purpose": "semantic_analysis", "item_id": None, "cached": cached,
+            "status": "completed" if payload.get("llm_available") else "unavailable",
+            "semantic_version": SEMANTIC_VERSION})
+        if not payload.get("llm_available"):
+            semantic["status"] = "unavailable"
+            result["messages"].append("El análisis contextual adicional no está disponible; se conserva la lectura basada en reglas.")
+            return
+        existing = [Signal(**raw) for doc in result["documents"] for raw in doc["analysis"].get("signals", [])]
+        signals, semantic["decisions"] = validate_semantic_proposals(payload, selection, existing)
+        semantic["accepted_count"] = sum(d["status"] == "accepted" for d in semantic["decisions"])
+        semantic["rejected_count"] = sum(d["status"] == "rejected" for d in semantic["decisions"])
+        # Prepare all results before replacing the baseline, so a failure is atomic.
+        updated_documents = []
+        for doc in result["documents"]:
+            clauses = [Clause(**raw) for raw in doc["analysis"].get("clauses", [])]
+            clause_ids = {c.clause_id for c in clauses}
+            added = [s for s in signals if s.clause_id in clause_ids]
+            if not added:
+                updated_documents.append(doc)
+                continue
+            base_signals = [Signal(**raw) for raw in doc["analysis"]["signals"]]
+            candidates = build_finding_candidates(base_signals, clauses, corpus_context, taxonomy.patterns)
+            semantic_candidates = build_finding_candidates(added, clauses, {}, taxonomy.patterns)
+            _, items = finalize_candidates(candidates + semantic_candidates, clauses, clauses[0].document_id)
+            analysis = {**doc["analysis"], "items": [asdict(item) for item in items],
+                        "semantic_signals": [asdict(signal) for signal in added],
+                        "semantic_signal_count": len(added)}
+            original = self.store.document(case_id, doc["id"])
+            _attach_evidence_coordinates(analysis, original["content"])
+            updated_documents.append({**doc, "analysis": analysis})
+        items, changes = consolidate_case(updated_documents)
+        for decision in semantic["decisions"]:
+            if decision["status"] == "accepted":
+                visible = next((item for item in items if item["pattern_id"] == decision["pattern_id"]
+                                and any(ev.get("clause_id") == decision["clause_id"] for ev in item["evidence"])), None)
+                decision["review_item_id"] = visible["id"] if visible else None
+                decision["integration_status"] = "visible" if visible else "filtered_by_domain_rules"
+        semantic.update(status="completed", visible_semantic_item_count=sum(
+            "análisis semántico asistido" in item["sources"] for item in items))
+        result.update(documents=updated_documents, items=items, version_changes=changes,
+                      summary=_deterministic_summary(items, updated_documents))
         self.store.update_case(case_id, "ready", result)
 
     def _corpus_context(self, excluded_hashes: set[str], taxonomy_snapshot: TaxonomyLoadResult | None = None) -> tuple[dict, dict]:
@@ -231,6 +320,20 @@ class WorkbenchService:
         except Exception:
             LOGGER.exception("Optional corpus comparison unavailable")
             return {}, {"snapshot": "unavailable", "total_processes": 0, "messages": ["Comparación documental no disponible en este entorno."]}
+
+
+def _llm_call_limit() -> int:
+    try:
+        return max(0, min(3, int(os.getenv("INTEGRITY_LLM_MAX_CALLS", "2"))))
+    except ValueError:
+        return 0
+
+
+def _assistance_status(result: dict) -> str:
+    calls = result["assistance"]["calls"]
+    if not calls:
+        return "disabled"
+    return "completed" if any(call["status"] == "completed" for call in calls) else "unavailable"
 
 
 def _attach_evidence_coordinates(analysis: dict, content: bytes):
