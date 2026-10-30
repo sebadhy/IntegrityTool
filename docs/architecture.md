@@ -19,7 +19,7 @@ PDF
 → relevance filtering
 → ReviewItem generation
 → expediente / resultado versionado
-→ React + PDF.js o adaptador Streamlit
+→ API FastAPI y React + PDF.js
 → export
 ```
 
@@ -29,7 +29,7 @@ PDF
 - `Signal`: indicio textual detectado por taxonomía en una cláusula activa.
 - `FindingCandidate`: señal enriquecida con contexto, mitigantes y contexto histórico.
 - `ConsolidatedFinding`: agrupación determinística de señales equivalentes o relacionadas.
-- `ReviewItem`: objeto visible para el usuario. Es lo único que debería renderizar Streamlit como observación principal.
+- `ReviewItem`: objeto visible para el usuario. La API agrega estos objetos al expediente y la interfaz los muestra con sus evidencias.
 
 ## Responsabilidades
 
@@ -45,8 +45,10 @@ PDF
 - `consolidator.py`: deduplica y agrupa señales en `ConsolidatedFinding[]`.
 - `relevance_filter.py`: decide qué findings pasan a revisión visible.
 - `prioritizer.py`: ordena internamente sin exponer scores de riesgo.
-- `review_item_builder.py`: construye `ReviewItem[]` y DataFrame compatible con UI/export.
-- `app.py`: renderiza resultados. No debe importar detector, mitigantes, consolidator, relevance filter ni prioritizer.
+- `review_item_builder.py`: construye `ReviewItem[]` y el adaptador tabular del motor.
+- `workbench_service.py`: coordina el análisis, la asistencia opcional y la persistencia del expediente.
+- `src/workbench_api.py`: recibe solicitudes y sirve resultados, originales y exportaciones. No importa detector, mitigantes, consolidator, relevance filter ni prioritizer.
+- `frontend/src/`: renderiza el resultado guardado y permite revisar evidencia; no calcula detección ni prioridad.
 
 ## Principios
 
@@ -71,9 +73,9 @@ PDF
 
 `analyze_document_pages()` es la entrada común para corpus y documentos cargados. `analyze_document_bytes()` agrega únicamente lectura del PDF e identidad por SHA-256. El corpus calcula presencia por `pattern_id` a partir de las señales del mismo motor, no de un detector alternativo ni de la visibilidad final. La frecuencia cuenta procesos distintos, no matches. El workbench excluye del histórico el proceso cuyo documento ya está cargado, para evitar autocomparación.
 
-`consolidator.py` agrupa y conserva evidencia; no calcula prioridad. `prioritizer.py` es la etapa de ranking, con mitigantes locales por requisito y máximo contextual entre sus ocurrencias. Una aceptación de equivalentes en otra cláusula no neutraliza una exigencia exclusiva. El motor ya no vuelve a pasar por una segunda consolidación tabular. `observation_filter.py`, `detect_patterns()` y la síntesis tabular anterior quedan como compatibilidad para consumidores antiguos; no deciden la salida de las rutas principales.
+`consolidator.py` agrupa y conserva evidencia; no calcula prioridad. `prioritizer.py` es la etapa de ranking, con mitigantes locales por requisito y máximo contextual entre sus ocurrencias. Una aceptación de equivalentes en otra cláusula no neutraliza una exigencia exclusiva. El motor no vuelve a pasar por una segunda consolidación tabular. `observation_filter.py` y `detect_patterns()` conservan contratos tabulares con pruebas de regresión; no deciden la salida del pipeline activo. La síntesis y el exportador exclusivos de la interfaz retirada se eliminaron.
 
-Los agrupamientos por patrón son temas de revisión, no prueba de que dos exigencias sean idénticas. Se conservan todos los fragmentos para distinguir requisitos dentro del tema. Los aliases de DataFrame siguen existiendo solo para la interfaz/exportación anterior; su retirada puede hacerse después de validar la mesa nueva.
+Los agrupamientos por patrón son temas de revisión, no prueba de que dos exigencias sean idénticas. Se conservan todos los fragmentos para distinguir requisitos dentro del tema. Los aliases de DataFrame quedan como adaptador interno de compatibilidad del motor y sus pruebas, no como una segunda interfaz. La API y sus exportaciones usan el resultado del expediente.
 
 ## Ejecución local y persistencia
 
@@ -83,7 +85,7 @@ La clave del análisis incluye SHA-256 completo, versión de motor/servicio, hue
 
 Al comenzar una revisión se lee una única copia del YAML y se conserva su contenido exacto y SHA-256 en `taxonomy_snapshots`. Detección, cronograma, corpus y contexto enviado al modelo reciben esa misma copia. El cotejo y las descargas posteriores no vuelven a leer el YAML actual. Las revisiones creadas antes de esta funcionalidad no se completan retroactivamente con reglas de otra fecha. La copia permite inspeccionar el catálogo usado, pero no archiva el código del motor ni el entorno Python: la reproducción íntegra exige conservar también esos componentes y el corpus de referencia.
 
-Las acciones de navegación, PDF, revisión y exportación usan el resultado guardado. Streamlit también conserva el resultado de la ejecución en sesión; sus widgets ya no vuelven a ejecutar el motor completo.
+Las acciones de navegación, PDF, revisión y exportación usan el resultado guardado. No ejecutan de nuevo el motor ni solicitan contenido al modelo.
 
 ## Expediente y versiones
 
@@ -111,13 +113,13 @@ Los Signals validados pasan a `build_finding_candidates()` y `finalize_candidate
 
 El análisis básico cacheado guarda `Clause[]` y `Signal[]`, incluidos estados de exclusión, dentro del JSON transaccional existente. No requiere migrar resultados anteriores. La versión del servicio cambia para no confundir cachés anteriores sin cláusulas. Los originales y revisiones previas no se reinterpretan al abrirlos.
 
-El corpus sigue evaluándose con reglas; una propuesta semántica nueva no recibe un aumento por rareza de un detector distinto. Esta entrega no implementa inferencia de contradicciones entre documentos, búsqueda comercial ni lectura exhaustiva. Streamlit conserva su ruta actual. La identidad institucional y el despliegue compartido siguen pendientes.
+El corpus sigue evaluándose con reglas; una propuesta semántica nueva no recibe un aumento por rareza de un detector distinto. Esta entrega no implementa inferencia de contradicciones entre documentos, búsqueda comercial ni lectura exhaustiva. La identidad institucional y el despliegue compartido siguen pendientes.
 
 ## Interfaz y despliegue
 
 `src/workbench_api.py` expone una API local con carga acotada, estados, originales, revisión y exportación HTML/CSV/JSON. `frontend/` contiene React/TypeScript y PDF.js; el PDF se carga al entrar en lectura detallada, solo se rasteriza la página consultada y el navegador reutiliza el documento. Los resaltados diferencian fragmento localizado de término coincidente; una ubicación no confirmada no se inventa.
 
-El servidor se enlaza a loopback, rechaza hosts y mutaciones de origen ajeno y no habilita CORS abierto. Esto no sustituye autenticación. Los archivos y comentarios son locales, sin identidad institucional verificada, cifrado de base ni administración de retención. No publicar esta API en Internet sin diseñar control de acceso y operación. Streamlit Community Cloud conserva la ruta existente; la mesa nueva necesita otro despliegue.
+El servidor se enlaza a loopback, rechaza hosts y mutaciones de origen ajeno y no habilita CORS abierto. Esto no sustituye autenticación. Los archivos y comentarios son locales, sin identidad institucional verificada, cifrado de base ni administración de retención. No publicar esta API en Internet sin diseñar control de acceso y operación. La configuración de proveedores no equivale a habilitar un despliegue compartido.
 
 ## Evaluación pendiente
 
@@ -125,12 +127,12 @@ Las pruebas sintéticas verifican contratos, no precisión de revisión instituc
 
 ## Mantenimiento de la base pre-PoC
 
-Se retiraron los experimentos de agentes, SQL Server y feedback JSONL sin conexión con la interfaz activa, junto con las vistas Streamlit no alcanzables. El historial Git conserva su código; no se eliminaron corpus, originales ni revisiones locales. La función de correo de Streamlit se conserva porque tiene una ruta activa.
+Se retiraron los experimentos de agentes, SQL Server y feedback JSONL sin conexión con la interfaz activa. También se retiró la interfaz anterior completa: entrada, ayuda, estilos, correo SMTP y síntesis/exportador exclusivos de esa ruta. El historial Git conserva su código; no se eliminaron corpus, originales, configuración privada ni revisiones locales.
 
-El motor no importa Streamlit ni el SDK de Groq. La mesa instala solo dependencias comunes y de API; Streamlit y pytest se incorporan al instalar sus requisitos específicos. Groq continúa disponible mediante el cliente compatible con OpenAI. No hay bucle de reintentos alrededor del modelo ni reintentos implícitos del SDK.
+Existe una sola instalación de ejecución: `requirements.txt`. `requirements-dev.txt` agrega únicamente pytest y httpx para pruebas. El motor no importa la interfaz retirada ni el SDK de Groq. Groq continúa disponible mediante el cliente compatible con OpenAI. No hay bucle de reintentos alrededor del modelo ni reintentos implícitos del SDK.
 
-Las pruebas verifican estos límites y que las funciones de la interfaz Streamlit tengan una ruta de ejecución. TypeScript rechaza variables e imports sin uso. La prueba de Streamlit identifica `app.py` con una ruta absoluta derivada del archivo de prueba, sin depender de cómo una versión del framework resuelva rutas relativas.
+Las pruebas verifican estos límites, la ausencia de las entradas retiradas y que los recorridos documentados apunten a la aplicación activa. Las comprobaciones de exportación, navegación sin reprocesamiento y errores de motor/taxonomía cubren la API actual. TypeScript rechaza variables e imports sin uso.
 
 Las acciones oficiales de CI se fijan por commit, con la versión de referencia anotada, y usan Node 24. La descarga del repositorio no conserva credenciales Git en el entorno de las pruebas. Las actualizaciones de estas acciones deben ser explícitas y volver a pasar validación.
 
-Las APIs tabulares anteriores se conservan temporalmente porque todavía tienen pruebas de regresión específicas. Retirarlas exige migrar esos casos al contrato `ReviewItem` y comprobar equivalencia; no se eliminaron pruebas para reducir artificialmente la superficie mantenida. Esta limpieza no amplía el catálogo de detección ni constituye calibración de precisión con SERCOP.
+Las APIs tabulares del detector y del filtro anterior se conservan temporalmente porque todavía tienen pruebas de regresión específicas. Retirarlas exige migrar esos casos al contrato `ReviewItem` y comprobar equivalencia. Esta limpieza no cambia reglas, prioridades, claves de caché ni resultados existentes, no amplía el catálogo y no constituye calibración de precisión con SERCOP.

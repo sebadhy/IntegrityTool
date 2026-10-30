@@ -27,7 +27,7 @@ La vista general es deliberadamente distinta de la mesa de trabajo. La primera p
 
 ## Tradeoffs y límites
 
-- React/PDF.js permiten controlar la interacción documental, a cambio de una compilación frontend y una API adicional. El motor y la taxonomía no se reescriben. Streamlit permanece como vía de compatibilidad.
+- React/PDF.js permiten controlar la interacción documental, a cambio de una compilación frontend y una API. El motor y la taxonomía no se reescriben. La interfaz anterior se retiró; la mesa documental es la única aplicación soportada.
 - La consulta por páginas limita memoria y latencia. No se implementó scroll continuo virtualizado ni capa de texto seleccionable; el fragmento textual sí está disponible junto al original.
 - Los resaltados por texto extraído no son coordenadas OCR verificadas. Si solo se localiza un término, la interfaz lo indica; no se presenta como ubicación exacta de toda la cláusula.
 - Persistencia local no equivale a gestión institucional multiusuario. Antes de compartir el servidor hacen falta identidad, permisos, política de conservación y respaldo.

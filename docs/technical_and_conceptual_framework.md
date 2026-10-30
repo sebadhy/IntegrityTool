@@ -1616,25 +1616,31 @@ En consecuencia, la propuesta prioriza:
 
 ## Stack actual exploratorio
 
-- Python;
+- Python y FastAPI para el motor y la API;
 
-- Streamlit;
+- React, TypeScript y PDF.js para la revisión documental;
 
-- OpenAI API;
+- PyMuPDF para extracción de texto;
 
-- PyMuPDF;
+- SQLite local para originales, revisiones y trazabilidad;
 
-- análisis comparativo.
+- taxonomía YAML y comparación documental determinística;
 
-## Posibles evoluciones futuras
+- procesamiento asistido opcional mediante proveedores compatibles.
 
-- Reflex/FastAPI;
+La aplicación se ejecuta como una única mesa documental. No se mantiene una segunda interfaz de ejecución. El catálogo de señales, las reglas de prioridad y la validación de evidencia permanecen independientes del proveedor asistido.
 
-- APIs desacopladas;
+## Evolución condicionada a la PoC
 
-- almacenamiento vectorial;
+- acceso institucional y permisos antes del despliegue compartido;
 
-- pipelines automatizados.
+- persistencia, respaldo y restauración verificables;
+
+- evaluación con un conjunto documental validado por especialistas;
+
+- mejoras de cobertura y contraste entre documentos según los resultados de esa evaluación.
+
+No se presupone la necesidad de agentes, bases vectoriales ni infraestructura adicional. Las incorporaciones deben responder a una limitación comprobada y mantener trazabilidad y revisión humana.
 
 ## Principios tecnológicos
 

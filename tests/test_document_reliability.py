@@ -11,7 +11,6 @@ from src.analyzer.contextualizer import build_finding_candidates
 from src.analyzer.detector import detect_signals
 from src.analyzer.document_segmenter import segment_document
 from src.analyzer.domain_models import ConsolidatedFinding
-from src.analyzer.exporter import ordered_export
 from src.analyzer.metadata_extractor import document_metadata_from_name
 from src.analyzer.metadata_extractor import validate_metadata
 from src.analyzer.corpus_loader import load_process_metadata
@@ -187,9 +186,10 @@ def test_goods_authorization_is_general_until_supported_by_restrictive_condition
     assert "habitual" in row["reason_for_review"].lower()
 
 
-def test_export_contains_populated_document_and_analysis_provenance():
+def test_review_dataframe_contains_populated_document_and_analysis_provenance():
     result = _analyze(["Debe ser distribuidor autorizado exclusivo del fabricante X."])
-    row = ordered_export(result.enriched_df).iloc[0]
+    assert result.enriched_df.columns.is_unique
+    row = result.enriched_df.iloc[0]
     for key in ["rule_id", "rule_version", "timestamp_analisis", "engine_version", "taxonomy_sha256", "document_sha256"]:
         assert row[key] and row[key] != "No disponible"
     assert len(row["document_sha256"]) == 64

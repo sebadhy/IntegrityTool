@@ -1,4 +1,4 @@
-"""Loopback-first API for the review workbench; Streamlit remains optional."""
+"""Loopback-first API serving the React/PDF.js document review workbench."""
 from __future__ import annotations
 
 import csv

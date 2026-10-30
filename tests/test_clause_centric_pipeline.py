@@ -198,8 +198,9 @@ def test_review_item_dataframe_contains_legacy_summary_columns():
     assert "atención sugerida" in df.columns
     assert "clasificación histórica" in df.columns
 
-def test_streamlit_app_does_not_import_internal_detection_pipeline_modules():
-    app_source = Path("app.py").read_text(encoding="utf-8")
+def test_api_does_not_import_internal_detection_pipeline_modules():
+    source = Path(__file__).resolve().parents[1] / "src/workbench_api.py"
+    app_source = source.read_text(encoding="utf-8")
     forbidden = [
         "src.analyzer.detector",
         "src.analyzer.mitigants",

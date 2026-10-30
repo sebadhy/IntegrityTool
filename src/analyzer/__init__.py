@@ -12,5 +12,5 @@ __all__ = [
     "patterns",
     "pdf_extractor",
     "prioritizer",
-    "review_synthesis",
+    "review_pipeline",
 ]
