@@ -55,6 +55,7 @@ export type Review = {
   comment: string;
   reviewer: string;
   updated_at: string;
+  revision?: number;
 };
 export type CaseSummary = {
   id: string;

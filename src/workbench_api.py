@@ -24,6 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .analyzer.workbench_service import MAX_FILE_BYTES, MAX_TOTAL_BYTES, WorkbenchService
+from .analyzer.review_store import StorageConflict
 
 LOGGER = logging.getLogger(__name__)
 
@@ -32,14 +33,19 @@ class ReviewUpdate(BaseModel):
     state: Literal["pending", "confirmed", "discarded", "followup"]
     comment: str = Field(default="", max_length=4000)
     reviewer: str = Field(default="Revisor local", min_length=1, max_length=120)
+    expected_revision: int = Field(ge=0)
 
 
 def create_app(storage: Path | None = None, assisted: bool | None = None, corpus_provider=None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app):
-        service = WorkbenchService(ROOT, storage or Path(os.getenv("INTEGRITY_STORE_PATH", ROOT / "data/workbench/reviews.sqlite3")),
-                                   assisted=assisted if assisted is not None else os.getenv("INTEGRITY_ASSISTED_ENABLED", "true").lower() == "true", corpus_provider=corpus_provider)
-        service.store.interrupt_unfinished()
+        worker_mode = os.getenv("INTEGRITY_WORKER_MODE", "embedded").lower()
+        if worker_mode not in {"embedded", "external"}:
+            raise ValueError("INTEGRITY_WORKER_MODE debe ser embedded o external.")
+        service = WorkbenchService(ROOT, storage,
+            assisted=assisted if assisted is not None else os.getenv("INTEGRITY_ASSISTED_ENABLED", "true").lower() == "true",
+            corpus_provider=corpus_provider,
+            embedded_worker=worker_mode == "embedded")
         app.state.service = service
         yield
         service.close()
@@ -68,6 +74,10 @@ def create_app(storage: Path | None = None, assisted: bool | None = None, corpus
     @app.exception_handler(ValueError)
     async def invalid_request(request, exc):
         return JSONResponse({"detail": str(exc)}, status_code=400)
+
+    @app.exception_handler(StorageConflict)
+    async def storage_conflict(request, exc):
+        return JSONResponse({"detail": str(exc)}, status_code=409)
 
     @app.exception_handler(Exception)
     async def unexpected(request, exc):
@@ -105,17 +115,17 @@ def create_app(storage: Path | None = None, assisted: bool | None = None, corpus
             if len(content) > MAX_FILE_BYTES or total > MAX_TOTAL_BYTES:
                 raise HTTPException(413, "Cada PDF admite hasta 25 MB; el expediente completo, hasta 100 MB.")
             entries.append({**info[index], "name": upload.filename or "documento.pdf", "content": content})
-        return app.state.service.create(title, request_key, entries)
+        return _public_case(app.state.service.create(title, request_key, entries))
 
     @app.get("/api/cases/{case_id}")
     def case_detail(case_id: str):
-        return get_case(case_id)
+        return _public_case(get_case(case_id))
 
     @app.post("/api/cases/{case_id}/retry", status_code=202)
     def retry(case_id: str):
         get_case(case_id)
         app.state.service.retry(case_id)
-        return get_case(case_id)
+        return _public_case(get_case(case_id))
 
     @app.get("/api/cases/{case_id}/documents/{document_id}")
     def document(case_id: str, document_id: str):
@@ -129,7 +139,8 @@ def create_app(storage: Path | None = None, assisted: bool | None = None, corpus
         case = get_case(case_id)
         if not any(item["id"] == item_id for item in (case["result"] or {}).get("items", [])):
             raise HTTPException(404, "La observación no pertenece a esta revisión.")
-        app.state.service.store.save_review(case_id, item_id, update.state, update.comment, update.reviewer.strip())
+        app.state.service.store.save_review(case_id, item_id, update.state, update.comment,
+            update.reviewer.strip(), expected_revision=update.expected_revision)
         return get_case(case_id)["reviews"][item_id]
 
     @app.get("/api/cases/{case_id}/history")
@@ -181,6 +192,22 @@ def create_app(storage: Path | None = None, assisted: bool | None = None, corpus
         def index():
             return FileResponse(dist / "index.html")
     return app
+
+
+def _public_case(case):
+    """Navigation needs the review, not every internal clause and rule."""
+    if not case["result"]:
+        return case
+    result = {key: value for key, value in case["result"].items() if key != "taxonomy_context"}
+    result["documents"] = []
+    for document in case["result"].get("documents", []):
+        analysis = document.get("analysis", {})
+        result["documents"].append({**document, "analysis": {
+            key: value for key, value in analysis.items()
+            if key not in {"clauses", "signals", "semantic_signals", "items"}}})
+    if "semantic_review" in result:
+        result["semantic_review"] = {key: value for key, value in result["semantic_review"].items() if key != "decisions"}
+    return {**case, "result": result}
 
 
 def _csv_cell(value):

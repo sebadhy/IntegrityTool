@@ -79,13 +79,21 @@ Los agrupamientos por patrón son temas de revisión, no prueba de que dos exige
 
 ## Ejecución local y persistencia
 
-`workbench_service.py` coordina una secuencia fija, con un trabajador y hasta cuatro revisiones en curso o espera. No utiliza agentes ni colas externas. `review_store.py` conserva SQLite transaccional: originales, casos, resultados, caché y eventos de revisión. Un reinicio marca los trabajos incompletos como interrumpidos, sin fingir que terminaron. No hay recuperación automática ni cancelación fuerte del proceso de extracción.
+`workbench_service.py` coordina la misma secuencia fija. `review_store.py` utiliza SQLAlchemy Core con SQLite o PostgreSQL; `document_storage.py` conserva los originales nuevos fuera de la base, en archivos o Azure Blob Storage por SHA-256. Los originales binarios de la pre-PoC siguen siendo legibles. No se introducen agentes ni microservicios.
+
+`analysis_jobs` es la cola persistente. `review_worker.py` reserva un trabajo mediante transacción, propietario, token de reserva y vencimiento. PostgreSQL utiliza bloqueo de fila con SKIP LOCKED; SQLite serializa las transacciones locales. Un heartbeat renueva la reserva y un trabajador vencido no puede publicar resultados. El arranque de la API no interrumpe trabajos de otras instancias.
+
+Las reservas vencidas se recuperan con un máximo de tres intentos. Si ya existe un resultado determinístico comprometido, se conserva y no se repiten solicitudes asistidas inciertas. Una ejecución sin resultado puede reanudarse desde cachés verificables. No hay cancelación fuerte de extracción ni promesa de entrega exactamente una vez.
+
+En local se integra un trabajador. Con `INTEGRITY_WORKER_MODE=external`, la API solo registra trabajo y `python -m src.review_worker` lo procesa. El límite de admisión de la aplicación es preventivo, no un mecanismo de cuotas distribuido. Detalles operativos y límites: [persistencia compartida](shared_storage.md).
 
 La clave del análisis incluye SHA-256 completo, versión de motor/servicio, huella de taxonomía y snapshot del corpus. El nombre de archivo no identifica el contenido. La metadata estructurada por nombre solo se reutiliza si el hash del original coincide. El cache de extracción del corpus conserva estado OCR y versión del extractor. El OCR tiene tiempo máximo por página y límite de píxeles; no hay certificación de exactitud OCR.
 
 Al comenzar una revisión se lee una única copia del YAML y se conserva su contenido exacto y SHA-256 en `taxonomy_snapshots`. Detección, cronograma, corpus y contexto enviado al modelo reciben esa misma copia. El cotejo y las descargas posteriores no vuelven a leer el YAML actual. Las revisiones creadas antes de esta funcionalidad no se completan retroactivamente con reglas de otra fecha. La copia permite inspeccionar el catálogo usado, pero no archiva el código del motor ni el entorno Python: la reproducción íntegra exige conservar también esos componentes y el corpus de referencia.
 
-Las acciones de navegación, PDF, revisión y exportación usan el resultado guardado. No ejecutan de nuevo el motor ni solicitan contenido al modelo.
+Las acciones de navegación, PDF, revisión y exportación usan el resultado guardado. No ejecutan de nuevo el motor ni solicitan contenido al modelo. La respuesta de navegación omite el catálogo y las cláusulas/señales internas completas; la exportación JSON conserva el anexo técnico. La base todavía lee un snapshot completo para armar esa respuesta: la optimización de consultas de detalle por demanda queda pendiente.
+
+`analysis_runs`, `review_findings` y `review_evidence` permiten consultar resultados por ejecución, patrón, prioridad y documento, conservando el snapshot. Comentarios y eventos se guardan en una transacción; el cliente envía la revisión esperada para evitar sobrescritura silenciosa. La identidad del actor sigue siendo local, no autenticada.
 
 ## Expediente y versiones
 
@@ -99,7 +107,7 @@ El cotejo compara el conjunto de textos de todas las evidencias por patrón y di
 
 El resultado determinístico se guarda antes del procesamiento asistido. En la mesa hay por defecto una solicitud semántica y una síntesis; el máximo configurable es tres solicitudes lógicas compartidas. El tercer cupo puede usarse para una explicación. Desactivar la semántica conserva la ruta de narración anterior. El encabezado no se reescribe mediante LLM. La salida se valida por estructura, completitud y lenguaje; no es un verificador factual independiente.
 
-Cada solicitud tiene timeout y máximo de tokens de salida. El SDK no reintenta implícitamente. Éxitos y fallos se guardan por contenido, configuración de proveedor/modelo y versión de prompt/reglas. Se registra uso reportado por el proveedor; un error de transporte no permite asegurar que no haya facturación. No se realiza una llamada adicional para probar conexión. La interfaz distingue redacción efectivamente utilizada de configuración meramente disponible.
+Cada solicitud tiene timeout y máximo de tokens de salida. El SDK no reintenta implícitamente. Éxitos y fallos se guardan por contenido, configuración de proveedor/modelo y versión de prompt/reglas. `assisted_requests` reserva la solicitud antes de contactar al proveedor: otra ejecución no repite una respuesta incierta. Se registra uso reportado por el proveedor; un error de transporte no permite asegurar que no haya facturación. No se realiza una llamada adicional para probar conexión. La interfaz distingue redacción efectivamente utilizada de configuración meramente disponible.
 
 ### Propuestas semánticas: primera entrega
 
@@ -129,7 +137,7 @@ Las pruebas sintéticas verifican contratos, no precisión de revisión instituc
 
 Se retiraron los experimentos de agentes, SQL Server y feedback JSONL sin conexión con la interfaz activa. También se retiró la interfaz anterior completa: entrada, ayuda, estilos, correo SMTP y síntesis/exportador exclusivos de esa ruta. El historial Git conserva su código; no se eliminaron corpus, originales, configuración privada ni revisiones locales.
 
-Existe una sola instalación de ejecución: `requirements.txt`. `requirements-dev.txt` agrega únicamente pytest y httpx para pruebas. El motor no importa la interfaz retirada ni el SDK de Groq. Groq continúa disponible mediante el cliente compatible con OpenAI. No hay bucle de reintentos alrededor del modelo ni reintentos implícitos del SDK.
+Existe una sola aplicación. `requirements.txt` instala su ejecución local; `requirements-dev.txt` agrega pytest y httpx. `requirements-azure.txt` incluye la misma base y únicamente los adaptadores de PostgreSQL y almacenamiento Azure. SQLAlchemy Core permite compartir consultas sin mantener dos motores de persistencia. El motor analítico no depende de la base elegida ni del SDK de Groq, que continúa disponible mediante el cliente compatible con OpenAI.
 
 Las pruebas verifican estos límites, la ausencia de las entradas retiradas y que los recorridos documentados apunten a la aplicación activa. Las comprobaciones de exportación, navegación sin reprocesamiento y errores de motor/taxonomía cubren la API actual. TypeScript rechaza variables e imports sin uso.
 

@@ -1,4 +1,4 @@
-"""One local worker, archived clauses and bounded optional semantic assistance.
+"""Persisted work, archived clauses and bounded optional semantic assistance.
 
 No agents or external queues. Models propose; domain rules control final items.
 """
@@ -8,9 +8,7 @@ import hashlib
 import json
 import logging
 import os
-import threading
 import uuid
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from pathlib import Path
 
@@ -22,7 +20,9 @@ from .contextualizer import build_finding_candidates
 from .domain_models import Clause, Signal
 from .metadata_extractor import extract_pliego_metadata
 from .review_pipeline import TaxonomyUnavailableError, analyze_document_bytes, finalize_candidates
-from .review_store import ReviewStore, utc_now
+from .review_store import JobLeaseLost, utc_now
+from .review_worker import ReviewWorker
+from .storage_settings import create_review_store
 from .taxonomy_loader import TaxonomyLoadResult, load_taxonomy
 from .semantic_analyzer import SEMANTIC_VERSION, select_semantic_context, validate_semantic_proposals
 
@@ -37,17 +37,24 @@ def fingerprint(value) -> str:
 
 
 class WorkbenchService:
-    def __init__(self, root: Path, storage: Path, assisted: bool = True, corpus_provider=None):
+    def __init__(self, root: Path, storage: Path | str | None, assisted: bool = True, corpus_provider=None,
+                 *, store=None, embedded_worker: bool = True):
         self.root = root
-        self.store = ReviewStore(storage)
+        self.store = store if store is not None else create_review_store(root, storage)
         self.assisted = assisted
         self.corpus_provider = corpus_provider
-        self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="integrity-review")
-        self.lock = threading.Lock()
-        self.pending: set[str] = set()
+        self.worker = ReviewWorker(self) if embedded_worker else None
+        if self.worker:
+            self.worker.start()
+
+    @property
+    def pending(self) -> set[str]:
+        return self.store.pending_cases()
 
     def close(self):
-        self.executor.shutdown(wait=True, cancel_futures=True)
+        if self.worker:
+            self.worker.close()
+        self.store.close()
 
     def create(self, title: str, request_key: str, files: list[dict]) -> dict:
         if not request_key or len(request_key) > 100:
@@ -78,31 +85,33 @@ class WorkbenchService:
             documents.append({"id": str(uuid.uuid4()), "name": name[:240], "role": role,
                               "version": str(file.get("version") or "1")[:40], "sha256": digest,
                               "supersedes": previous, "content": content})
-        with self.lock:
-            if len(self.pending) >= 4:
-                raise ValueError("Hay varias revisiones en curso. Espere a que termine una antes de iniciar otra.")
-            case_id = self.store.create_case(str(uuid.uuid4()), request_key, title.strip()[:200] or documents[0]["name"], documents)
-            case = self.store.get_case(case_id)
-            if case["status"] == "queued" and case_id not in self.pending:
-                self.pending.add(case_id)
-                self.executor.submit(self.run, case_id)
+        if len(self.pending) >= 100:
+            raise ValueError("Hay varias revisiones pendientes. Espere antes de cargar otra.")
+        case_id = self.store.create_case(str(uuid.uuid4()), request_key, title.strip()[:200] or documents[0]["name"], documents)
         return self.store.get_case(case_id)
 
     def retry(self, case_id: str):
-        with self.lock:
-            case = self.store.get_case(case_id)
-            if not case or case["status"] not in {"failed", "interrupted"} or case_id in self.pending:
-                raise ValueError("Esta revisión no puede reintentarse en su estado actual.")
-            if len(self.pending) >= 4:
-                raise ValueError("Espere a que termine una revisión en curso.")
-            self.store.update_case(case_id, "queued")
-            self.pending.add(case_id)
-            self.executor.submit(self.run, case_id)
+        self.store.retry_case(case_id)
 
     def run(self, case_id: str):
-        self.store.update_case(case_id, "running")
         try:
             case = self.store.get_case(case_id)
+            if case["result"] is not None:
+                # A committed deterministic baseline survives a lost worker.
+                # Never resume an uncertain, potentially billed call blindly.
+                result = case["result"]
+                unfinished = False
+                for section in ("assistance", "semantic_review"):
+                    stage = result.get(section, {})
+                    if stage.get("status") in {"pending", "running"}:
+                        stage["status"] = "unavailable"
+                        unfinished = True
+                if unfinished:
+                    result.setdefault("messages", []).append(
+                        "La lectura adicional se interrumpió. Se conserva el resultado guardado y no se repiten solicitudes asistidas inciertas.")
+                self.store.update_case(case_id, "ready", result)
+                return
+            self.store.update_case(case_id, "running")
             taxonomy = load_taxonomy()
             if not taxonomy.loaded or not taxonomy.patterns or not taxonomy.source_sha256:
                 raise TaxonomyUnavailableError("No se pudo cargar una copia verificable de las reglas. No se completó la revisión.")
@@ -162,23 +171,47 @@ class WorkbenchService:
             if self.assisted:
                 try:
                     self._analyze_semantics(case_id, result, taxonomy, context)
+                except JobLeaseLost:
+                    raise
                 except Exception:
                     LOGGER.exception("Semantic stage failed; deterministic result retained")
                     result["semantic_review"]["status"] = "unavailable"
                     result["messages"].append("El análisis contextual adicional no se completó; se conserva la lectura basada en reglas.")
                 try:
                     self._narrate(case_id, result)
+                except JobLeaseLost:
+                    raise
                 except Exception:
                     LOGGER.exception("Optional narration did not complete; deterministic review retained")
                     result["assistance"]["status"] = "unavailable"
                     self.store.update_case(case_id, "ready", result)
+        except JobLeaseLost:
+            raise
         except Exception as exc:
             LOGGER.exception("Review failed for case %s", case_id)
             message = str(exc) if isinstance(exc, (ValueError, TaxonomyUnavailableError)) else "No se pudo completar la revisión. Los documentos se conservaron para reintentar."
             self.store.update_case(case_id, "failed", error=message)
-        finally:
-            with self.lock:
-                self.pending.discard(case_id)
+
+    def _assisted_payload(self, key: str, callback, purpose: str):
+        payload = self.store.cache_get(key)
+        if payload is not None:
+            return payload, True
+        if not self.store.reserve_assisted_request(key, purpose):
+            return (self.store.cache_get(key) or {
+                "llm_available": False,
+                "llm_error": "Una solicitud anterior no tiene respuesta confirmada; no se reintentó automáticamente.",
+            }), True
+        try:
+            payload = callback()
+            if not isinstance(payload, dict):
+                raise ValueError("Invalid assisted response")
+        except JobLeaseLost:
+            raise
+        except Exception as exc:
+            LOGGER.warning("Assisted request unavailable (%s)", type(exc).__name__)
+            payload = {"llm_available": False, "llm_error": "La lectura adicional no está disponible."}
+        self.store.finish_assisted_request(key, payload)
+        return payload, False
 
     def _narrate(self, case_id: str, result: dict):
         from .llm_reviewer import PROMPT_VERSION, _llm_available, _model, _provider_name, explain_priority_with_llm, generate_document_brief
@@ -206,16 +239,7 @@ class WorkbenchService:
             cache_key = fingerprint(["llm", PROMPT_VERSION, ENGINE_VERSION, result["provenance"]["taxonomy_sha256"], _provider_name(), _model(),
                                      os.getenv("OPENAI_BASE_URL", ""), os.getenv("OLLAMA_BASE_URL", ""),
                                      os.getenv("OPENAI_API_VERSION", ""), rows if item is None else _llm_row(item, taxonomy_context)])
-            payload = self.store.cache_get(cache_key)
-            cached = payload is not None
-            if payload is None:
-                try:
-                    payload = callback()
-                except Exception:
-                    LOGGER.exception("Optional narration failed")
-                    payload = {"llm_available": False, "llm_error": "La explicación adicional no está disponible."}
-                # Persist failures as well: navigation/reopening must never retry billing.
-                self.store.cache_put(cache_key, payload)
+            payload, cached = self._assisted_payload(cache_key, callback, purpose)
             record = {"purpose": purpose, "item_id": item["id"] if item else None, "cached": cached,
                       "status": "completed" if payload.get("llm_available") else "unavailable",
                       **payload.get("provenance", {})}
@@ -248,15 +272,8 @@ class WorkbenchService:
         cache_key = fingerprint([SEMANTIC_VERSION, taxonomy.source_sha256, _provider_name(), _model(),
                                  os.getenv("OPENAI_BASE_URL", ""), os.getenv("OLLAMA_BASE_URL", ""),
                                  os.getenv("OPENAI_API_VERSION", ""), selection.payload])
-        payload = self.store.cache_get(cache_key)
-        cached = payload is not None
-        if payload is None:
-            try:
-                payload = analyze_clauses_with_llm(selection.payload)
-            except Exception:
-                LOGGER.exception("Semantic request unavailable")
-                payload = {"llm_available": False, "candidates": []}
-            self.store.cache_put(cache_key, payload)
+        payload, cached = self._assisted_payload(cache_key,
+            lambda: analyze_clauses_with_llm(selection.payload), "semantic_analysis")
         result["assistance"]["calls"].append({**payload.get("provenance", {}),
             "purpose": "semantic_analysis", "item_id": None, "cached": cached,
             "status": "completed" if payload.get("llm_available") else "unavailable",

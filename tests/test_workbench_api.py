@@ -37,7 +37,8 @@ def test_api_upload_review_pdf_and_export(client):
     response = client.get(f'/api/cases/{case["id"]}/documents/{doc_id}')
     assert response.content.startswith(b"%PDF-")
     item_id = case["result"]["items"][0]["id"]
-    response = client.put(f'/api/cases/{case["id"]}/items/{item_id}/review', json={"state": "followup", "comment": "Verificar soporte"})
+    response = client.put(f'/api/cases/{case["id"]}/items/{item_id}/review',
+        json={"state": "followup", "comment": "Verificar soporte", "expected_revision": 0})
     assert response.status_code == 200
     assert response.json()["state"] == "followup"
     for format in ["html", "csv", "json"]:
@@ -79,6 +80,45 @@ def test_navigation_and_exports_do_not_repeat_analysis_or_call_llm(client, monke
         f'/api/cases/{case["id"]}/export?format=json',
     ]:
         assert client.get(endpoint).status_code == 200
+
+
+def test_navigation_omits_internal_clauses_but_audit_export_retains_them(client):
+    case = create_case(client)
+    public = case["result"]
+    exported = client.get(f'/api/cases/{case["id"]}/export?format=json').json()["result"]
+    assert "taxonomy_context" not in public
+    assert "clauses" not in public["documents"][0]["analysis"]
+    assert exported["documents"][0]["analysis"]["clauses"]
+    assert exported["taxonomy_context"]
+
+
+def test_api_rejects_a_stale_review_revision(client):
+    case = create_case(client)
+    item_id = case["result"]["items"][0]["id"]
+    endpoint = f'/api/cases/{case["id"]}/items/{item_id}/review'
+    first = client.put(endpoint, json={"state": "followup", "comment": "Primera", "expected_revision": 0})
+    assert first.status_code == 200 and first.json()["revision"] == 1
+    stale = client.put(endpoint, json={"state": "discarded", "comment": "Desactualizada", "expected_revision": 0})
+    assert stale.status_code == 409
+    assert client.get(f'/api/cases/{case["id"]}').json()["reviews"][item_id]["comment"] == "Primera"
+    missing = client.put(endpoint, json={"state": "discarded", "comment": "Sin control de versión"})
+    assert missing.status_code == 422
+
+
+def test_two_api_instances_leave_durable_work_to_the_external_worker(tmp_path, monkeypatch):
+    from src.analyzer.review_worker import ReviewWorker
+    monkeypatch.setenv("INTEGRITY_WORKER_MODE", "external")
+    path = tmp_path / "shared.sqlite3"
+    corpus = lambda hashes: ({}, {"snapshot": "test", "total_processes": 0})
+    with TestClient(create_app(path, assisted=False, corpus_provider=corpus)) as first:
+        response = first.post("/api/cases", data={"manifest": '[{"role":"pliego"}]',
+            "request_key": "external-api"}, files=[("files", ("pliego.pdf", pdf(), "application/pdf"))])
+        case_id = response.json()["id"]
+        with TestClient(create_app(path, assisted=False, corpus_provider=corpus)) as second:
+            assert second.get(f"/api/cases/{case_id}").json()["status"] == "queued"
+            assert ReviewWorker(first.app.state.service).run_once()
+            case = second.get(f"/api/cases/{case_id}").json()
+            assert case["status"] == "ready" and case["result"]["items"]
 
 
 def test_api_reports_missing_taxonomy_without_success_or_export(client, monkeypatch):

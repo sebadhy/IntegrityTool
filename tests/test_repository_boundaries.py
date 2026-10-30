@@ -32,6 +32,7 @@ def test_runtime_dependencies_are_separate_from_development_and_legacy_ui():
     assert not {"streamlit", "pytest", "groq", "pyodbc"} & runtime
     development = _requirements("requirements-dev.txt")
     assert runtime | {"pytest", "httpx"} == development
+    assert runtime | {"psycopg", "azure-storage-blob", "azure-identity"} == _requirements("requirements-azure.txt")
 
 
 def test_unit_tests_cannot_open_external_http_connections():

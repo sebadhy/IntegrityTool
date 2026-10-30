@@ -39,3 +39,37 @@ jobs:
         working-directory: frontend
       - run: pnpm build
         working-directory: frontend
+  storage:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+        env:
+          POSTGRES_USER: integrity_test
+          POSTGRES_PASSWORD: local-test-only
+          POSTGRES_DB: integrity_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U integrity_test -d integrity_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      azurite:
+        image: mcr.microsoft.com/azure-storage/azurite@sha256:830430c1da1a2d537e08f3e6764dd1f5ae00cf0346bcaf625b968ec3f0971fd5
+        env:
+          AZURITE_ACCOUNTS: integritytest:bG9jYWwtdGVzdC1vbmx5LWtleQ==
+        ports:
+          - 10000:10000
+    env:
+      INTEGRITY_ASSISTED_ENABLED: 'false'
+      INTEGRITY_TEST_POSTGRES_URL: postgresql://integrity_test:local-test-only@127.0.0.1:5432/integrity_test
+      INTEGRITY_TEST_AZURITE_URL: http://127.0.0.1:10000/integritytest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+      - run: python -m pip install -r requirements-dev.txt -r requirements-azure.txt
+      - run: python -m pip check
+      - run: python -m pytest -q tests/test_storage_backends.py tests/test_storage_migration.py tests/test_document_storage.py tests/test_cloud_persistence.py

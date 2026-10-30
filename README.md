@@ -53,7 +53,9 @@ No se necesita una clave de modelos para iniciar la aplicación ni ejecutar el m
 
 Se admiten hasta ocho PDFs, de hasta 25 MB cada uno y 100 MB por expediente. Los PDFs con texto seleccionable no necesitan OCR. Para documentos escaneados se requiere Tesseract con el idioma correspondiente, instalado por separado; una extracción incompleta se informa como lectura parcial.
 
-Los originales, resultados, comentarios y copias de la taxonomía se guardan en `data/workbench/reviews.sqlite3`, fuera de Git. Navegar, cambiar zoom, revisar y exportar no repite el análisis ni vuelve a solicitar contenido al proveedor.
+En local, los resultados, comentarios y copias de taxonomía se guardan en `data/workbench/reviews.sqlite3`; los originales nuevos, en `data/workbench/documents/`. Los originales de revisiones anteriores siguen disponibles desde su almacenamiento previo. Todo queda fuera de Git. Navegar, cambiar zoom, revisar y exportar no repite el análisis ni vuelve a solicitar contenido al proveedor.
+
+La misma aplicación admite PostgreSQL y Azure Blob Storage, con trabajos persistentes y un proceso de análisis separado. Es una base de persistencia, no un despliegue institucional terminado: consulte [almacenamiento compartido y migración](docs/shared_storage.md).
 
 ## Cómo funciona
 
@@ -84,7 +86,7 @@ Si hay un proveedor configurado, la aplicación puede proponer candidatos con ci
 
 Por defecto se permiten dos solicitudes lógicas por expediente: propuestas semánticas y síntesis si hay observaciones visibles. Se seleccionan hasta 24 cláusulas activas y 12.000 caracteres de texto. La interfaz muestra cobertura y límites; no se presupone lectura exhaustiva.
 
-Los resultados y los fallos se conservan para evitar reintentos al navegar. Un fallo del proveedor no elimina el resultado determinístico. Se registra proveedor, modelo, versiones, cobertura y consumo reportado, sin claves ni deliberaciones internas. Consulte [configuración y límites](docs/configuration.md).
+Los resultados y los fallos se conservan para evitar reintentos al navegar. Una reserva persistente evita repetir automáticamente solicitudes cuya respuesta quedó incierta. Un fallo del proveedor no elimina el resultado determinístico. Se registra proveedor, modelo, versiones, cobertura y consumo reportado, sin claves ni deliberaciones internas. Consulte [configuración y límites](docs/configuration.md).
 
 ## Estructura
 
@@ -92,16 +94,22 @@ Los resultados y los fallos se conservan para evitar reintentos al navegar. Un f
 run_workbench.py                 Inicio local
 requirements.txt                Dependencias de ejecución
 requirements-dev.txt            Ejecución + herramientas de pruebas
+requirements-azure.txt          La misma aplicación + adaptadores PostgreSQL/Blob
 frontend/                       Interfaz React/TypeScript y PDF.js
 src/workbench_api.py             API, originales y exportaciones
 src/config.py                   Configuración del motor y corpus
 src/analyzer/
   review_pipeline.py            Pipeline documental compartido con el corpus
   workbench_service.py          Ejecución y asistencia acotada
-  review_store.py               Persistencia SQLite
+  review_store.py               Datos, resultados y trabajos transaccionales
+  storage_schema.py             Esquema SQLite/PostgreSQL versionado
+  document_storage.py           Originales por huella: archivos o Blob
+  review_worker.py              Reserva y ejecución de trabajos
   case_review.py                Consolidación del expediente y versiones
   patterns/risk_taxonomy.yaml    Catálogo de revisión
 tests/                          Pruebas de motor, API y contratos
+src/manage_storage.py           Inicialización y migración explícitas
+src/review_worker.py            Inicio del trabajador independiente
 docs/                           Arquitectura, metodología y evaluación
 data/                           Datos locales, no versionados
 ```
@@ -119,17 +127,18 @@ cd frontend
 pnpm build
 ```
 
-La suite cubre extracción, metadata, negaciones, mitigantes, consolidación, trazabilidad, versiones, caché, persistencia, API y exportaciones. Los casos asistidos utilizan respuestas simuladas; las pruebas bloquean conexiones HTTP externas para no consumir claves locales. CI verifica Python 3.11/3.13 en Linux y Windows, y la construcción del frontend.
+La suite cubre extracción, metadata, negaciones, mitigantes, consolidación, trazabilidad, versiones, caché, persistencia, API y exportaciones. Los casos asistidos utilizan respuestas simuladas; las pruebas bloquean HTTP externo para no consumir claves locales. CI verifica Python 3.11/3.13 en Linux y Windows, el frontend y la integración con PostgreSQL y Blob emulado. Las pruebas externas requieren [servicios de prueba explícitos](docs/shared_storage.md); nunca utilizan cuentas de Azure reales.
 
 ## Despliegue
 
-Esta versión es un piloto local de un solo servidor y un trabajador, sin autenticación institucional. No exponga el puerto en Internet ni en una red compartida. `Revisor local` es una etiqueta, no una identidad verificada.
+El inicio local utiliza un trabajador integrado. Para separar API y análisis existe un trabajador independiente con reservas persistentes. Sigue sin haber autenticación institucional: no exponga el puerto en Internet ni en una red compartida. `Revisor local` es una etiqueta, no una identidad verificada.
 
-Para publicarla en Azure u otro entorno compartido se deben resolver acceso autenticado, permisos, dominio autorizado, persistencia, respaldos, retención y pruebas de concurrencia. No es suficiente cambiar la dirección de escucha. La configuración del proveedor no equivale a un despliegue seguro.
+Antes de publicarla en Azure se deben resolver acceso autenticado, permisos, dominio autorizado, operación de la persistencia, respaldos y retención. Las pruebas locales de concurrencia no son una certificación de carga institucional. No es suficiente cambiar la dirección de escucha. La configuración de proveedores y almacenamiento no equivale a un despliegue seguro.
 
 ## Documentación
 
 - [Configuración: proveedores, corpus y almacenamiento](docs/configuration.md)
+- [Persistencia compartida, trabajos y migración](docs/shared_storage.md)
 - [Arquitectura del pipeline documental](docs/architecture.md)
 - [Marco técnico y conceptual](docs/technical_and_conceptual_framework.md)
 - [Protocolo inicial de evaluación de la PoC](docs/poc_evaluation.md)

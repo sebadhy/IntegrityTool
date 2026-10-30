@@ -1622,7 +1622,11 @@ En consecuencia, la propuesta prioriza:
 
 - PyMuPDF para extracción de texto;
 
-- SQLite local para originales, revisiones y trazabilidad;
+- SQLite local o PostgreSQL para resultados, revisiones y trazabilidad;
+
+- archivos privados o Azure Blob Storage para originales;
+
+- trabajos persistentes con un proceso de análisis separable de la API;
 
 - taxonomía YAML y comparación documental determinística;
 
@@ -1640,7 +1644,7 @@ La aplicación se ejecuta como una única mesa documental. No se mantiene una se
 
 - mejoras de cobertura y contraste entre documentos según los resultados de esa evaluación.
 
-No se presupone la necesidad de agentes, bases vectoriales ni infraestructura adicional. Las incorporaciones deben responder a una limitación comprobada y mantener trazabilidad y revisión humana.
+No se presupone la necesidad de agentes, bases vectoriales ni microservicios. La persistencia compartida y los trabajos durables resuelven límites concretos del piloto local; no acreditan por sí solos aislamiento multiusuario, precisión institucional ni capacidad de carga. Las incorporaciones deben responder a una limitación comprobada y mantener trazabilidad y revisión humana.
 
 ## Principios tecnológicos
 

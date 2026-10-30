@@ -75,7 +75,9 @@ Los candidatos deben pertenecer a la taxonomía archivada y citar una cláusula 
 INTEGRITY_STORE_PATH=data/workbench/reviews.sqlite3
 ```
 
-La base conserva originales, resultados, cláusulas, copias de taxonomía, caché y revisiones humanas. Está excluida de Git. No la borre al actualizar el código. Antes de compartir la aplicación, defina almacenamiento compatible con SQLite, respaldo y una prueba de restauración.
+La base conserva resultados, cláusulas, copias de taxonomía, caché, revisiones humanas y trabajos persistentes. Los originales nuevos se guardan en archivos por SHA-256 junto a la base; los PDFs internos de revisiones anteriores se siguen leyendo sin reanalizarlos. Base y originales están excluidos de Git: respalde ambos.
+
+Para PostgreSQL y Azure Blob Storage, consulte [persistencia compartida y migración](shared_storage.md). No es suficiente apuntar una ruta SQLite a una carpeta de red.
 
 ## Corpus documental opcional
 

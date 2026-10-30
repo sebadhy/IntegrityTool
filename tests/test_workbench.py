@@ -305,8 +305,10 @@ def test_duplicate_pdf_content_is_rejected(service):
 
 
 def test_idempotent_creation_does_not_duplicate_cases(service):
-    first = create(service)
-    second = create(service)
+    content = pdf()
+    files = [{"name": "pliego.pdf", "content": content, "role": "pliego"}]
+    first = create(service, files)
+    second = create(service, files)
     assert second["id"] == first["id"]
     assert len(service.store.list_cases()) == 1
 
@@ -356,11 +358,14 @@ def test_invalid_or_empty_pdf_does_not_return_success(service):
     assert "extraer texto" in case["error"]
 
 
-def test_application_restart_marks_pending_review_interrupted(tmp_path):
+def test_application_restart_preserves_durable_queued_review(tmp_path):
     store = ReviewStore(tmp_path / "test.sqlite3")
     store.create_case("case-1", "request-1", "Test", [])
-    store.interrupt_unfinished()
-    assert store.get_case("case-1")["status"] == "interrupted"
+    store.close()
+    reopened = ReviewStore(tmp_path / "test.sqlite3")
+    assert reopened.get_case("case-1")["status"] == "queued"
+    assert reopened.claim_job("new-worker").case_id == "case-1"
+    reopened.close()
 
 
 def test_prompts_use_only_relevant_taxonomy_and_bounded_document_text():

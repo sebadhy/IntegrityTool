@@ -135,7 +135,10 @@ export default function App() {
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ state, comment, reviewer: "Revisor local" }),
+          body: JSON.stringify({
+            state, comment, reviewer: "Revisor local",
+            expected_revision: activeCase.reviews[selected.id]?.revision ?? 0,
+          }),
         },
       );
       setActiveCase((value) =>
