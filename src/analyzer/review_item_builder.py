@@ -83,6 +83,9 @@ def _build_item(finding: ConsolidatedFinding) -> ReviewItem:
             "consolidated_from_finding_ids": [finding.finding_id],
             "consolidated_from_signal_ids": [signal.signal_id for signal in finding.signals],
             "aggregated_sources": _aggregated_sources(finding),
+            "analysis_methods": unique_strings([
+                str(signal.metadata.get("analysis_source", "deterministic_rules")) for signal in finding.signals
+            ]),
         },
     )
 
@@ -266,6 +269,8 @@ def _additional_excerpts(finding: ConsolidatedFinding, representative: dict) -> 
 
 def _aggregated_sources(finding: ConsolidatedFinding) -> list[str]:
     sources = ["Taxonomía documental"]
+    if any(s.metadata.get("analysis_source") == "semantic_assisted" for s in finding.signals):
+        sources.append("análisis semántico asistido")
     historical = finding.historical_context or {}
     if historical.get("frequency_label") not in {None, "", "No disponible", "0 de 0 procesos"}:
         sources.append("comparación con corpus")

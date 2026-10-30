@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 
 import yaml
+import httpx
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,10 +27,18 @@ def _requirements(filename):
 
 
 def test_runtime_dependencies_are_separate_from_development_and_legacy_ui():
-    runtime = _requirements("requirements-workbench.txt")
+    runtime = _requirements("requirements.txt")
     assert {"fastapi", "uvicorn", "pymupdf", "openai"} <= runtime
     assert not {"streamlit", "pytest", "groq", "pyodbc"} & runtime
-    assert {"pytest", "streamlit", "fastapi", "httpx"} <= _requirements("requirements-dev.txt")
+    development = _requirements("requirements-dev.txt")
+    assert runtime | {"pytest", "httpx"} == development
+
+
+def test_unit_tests_cannot_open_external_http_connections():
+    transport = httpx.HTTPTransport()
+    with pytest.raises(AssertionError, match="External HTTP is disabled"):
+        transport.handle_request(httpx.Request("GET", "https://example.invalid/"))
+    transport.close()
 
 
 def test_workbench_imports_without_streamlit_or_groq_sdk():
@@ -48,27 +58,25 @@ from src.workbench_api import create_app
     assert result.returncode == 0, result.stderr
 
 
-def test_streamlit_helpers_are_reachable_from_its_entrypoint():
-    tree = ast.parse((ROOT / "app.py").read_text(encoding="utf-8"))
-    functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
-
-    def references(node):
-        return {child.id for child in ast.walk(node)
-                if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Load)}
-
-    roots = set().union(*(references(node) for node in tree.body if not isinstance(node, ast.FunctionDef)))
-    pending = list(roots & functions.keys())
-    reachable = set(pending)
-    while pending:
-        for name in references(functions[pending.pop()]) & functions.keys() - reachable:
-            reachable.add(name)
-            pending.append(name)
-    assert not functions.keys() - reachable
+def test_repository_has_one_supported_application_and_installation():
+    for relative in [
+        "app.py", "pages/Ayuda.py", "assets/styles.css", "notifier.py",
+        "src/analyzer/review_synthesis.py", "src/analyzer/exporter.py",
+        "requirements-core.txt", "requirements-workbench.txt",
+    ]:
+        assert not (ROOT / relative).exists(), relative
+    assert (ROOT / "run_workbench.py").is_file()
+    assert (ROOT / "frontend/src/App.tsx").is_file()
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "python run_workbench.py" in readme
+    assert "pip install -r requirements.txt" in readme
+    for obsolete in ["streamlit run", "requirements-workbench.txt", "requirements-core.txt"]:
+        assert obsolete not in readme
 
 
 def test_runtime_modules_do_not_import_removed_experiments():
-    forbidden = {"agent", "agent_runner", "db", "tools", "groq"}
-    paths = [ROOT / "app.py", ROOT / "notifier.py", *sorted((ROOT / "src").rglob("*.py"))]
+    forbidden = {"agent", "agent_runner", "db", "tools", "groq", "streamlit", "notifier"}
+    paths = [ROOT / "run_workbench.py", *sorted((ROOT / "src").rglob("*.py"))]
     for path in paths:
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):

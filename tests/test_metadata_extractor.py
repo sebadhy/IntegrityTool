@@ -4,6 +4,7 @@ from src.analyzer.metadata_extractor import (
     normalize_budget,
     normalize_procedure,
     validate_metadata,
+    extract_pliego_metadata,
 )
 
 
@@ -17,6 +18,22 @@ def test_invalid_entity_clause_is_rejected():
     })
     assert metadata["entidad"] == "No identificado automáticamente"
     assert is_invalid_entity("será responsable de la validación de la firma electrónica")
+
+
+def test_plural_entity_word_in_requirement_is_not_a_metadata_heading(tmp_path):
+    text = "Para recibir la oferta es indispensable una constancia; no se admitirán documentos de otras entidades."
+    metadata = extract_pliego_metadata("prueba.pdf", text, tmp_path)
+    assert metadata["entidad"] == "No identificado automáticamente"
+    assert is_invalid_entity("es")
+    assert not is_invalid_entity("SRI")
+    assert not is_invalid_entity("CNE")
+
+
+def test_numbered_and_multiline_entity_headings_still_work(tmp_path):
+    for text in ["1. Entidad contratante: Hospital de prueba",
+                 "Entidad contratante\nHospital de prueba"]:
+        metadata = extract_pliego_metadata("prueba.pdf", text, tmp_path)
+        assert metadata["entidad"] == "Hospital de prueba"
 
 
 def test_procedure_and_budget_are_normalized():

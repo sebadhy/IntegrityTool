@@ -4,6 +4,12 @@
 
 Versión preliminar de trabajo
 
+## Estado de implementación: 30 de octubre de 2026
+
+La mesa React incorpora una primera etapa experimental de propuestas semánticas, además de la redacción asistida. El modelo puede identificar candidatos dentro de la taxonomía sobre una selección registrada de cláusulas activas. Se comprueban citas y origen documental; los candidatos pasan por la consolidación y prioridad existentes. Comprobar una cita no valida la interpretación ni reemplaza el juicio técnico o jurídico.
+
+La selección es acotada, no una lectura semántica completa del expediente. Esta entrega no implementa contraste semántico integral entre documentos ni búsqueda de mercado. La referencia operativa actual es [Arquitectura del pipeline](architecture.md); el [Protocolo de evaluación de la PoC](poc_evaluation.md) distingue funcionamiento técnico de precisión institucional aún no demostrada. Las capacidades futuras descritas en este documento no deben presentarse como implementadas.
+
 # 1. Resumen Ejecutivo
 
 El presente documento describe una propuesta preliminar para explorar el uso de capacidades avanzadas de análisis documental e inteligencia artificial generativa aplicadas a procesos de contratación pública en Ecuador. La iniciativa se concibe como una línea de trabajo exploratoria y prudente orientada a fortalecer capacidades institucionales de revisión documental, particularmente en contextos caracterizados por alto volumen de información, complejidad técnica y necesidad de priorización analítica.
@@ -1174,7 +1180,7 @@ Posibles líneas futuras:
 
 ## 16.1 Rol de la IA dentro de la arquitectura
 
-La arquitectura propuesta contempla el uso de inteligencia artificial generativa exclusivamente como una capa de asistencia analítica y contextualización. La IA no constituye el núcleo principal del sistema ni reemplaza los mecanismos trazables de extracción documental, comparación histórica y reglas analíticas.
+La arquitectura propuesta contempla el uso de modelos como asistencia analítica, con propuestas semánticas sustentadas en citas y contextualización narrativa. No actúan como autoridad autónoma ni reemplazan los mecanismos trazables de extracción, verificación de evidencias, consolidación y priorización. Su aporte adicional debe evaluarse frente a la base sin modelo.
 
 Conceptualmente, la herramienta se apoya sobre una arquitectura híbrida compuesta por:
 
@@ -1610,25 +1616,31 @@ En consecuencia, la propuesta prioriza:
 
 ## Stack actual exploratorio
 
-- Python;
+- Python y FastAPI para el motor y la API;
 
-- Streamlit;
+- React, TypeScript y PDF.js para la revisión documental;
 
-- OpenAI API;
+- PyMuPDF para extracción de texto;
 
-- PyMuPDF;
+- SQLite local para originales, revisiones y trazabilidad;
 
-- análisis comparativo.
+- taxonomía YAML y comparación documental determinística;
 
-## Posibles evoluciones futuras
+- procesamiento asistido opcional mediante proveedores compatibles.
 
-- Reflex/FastAPI;
+La aplicación se ejecuta como una única mesa documental. No se mantiene una segunda interfaz de ejecución. El catálogo de señales, las reglas de prioridad y la validación de evidencia permanecen independientes del proveedor asistido.
 
-- APIs desacopladas;
+## Evolución condicionada a la PoC
 
-- almacenamiento vectorial;
+- acceso institucional y permisos antes del despliegue compartido;
 
-- pipelines automatizados.
+- persistencia, respaldo y restauración verificables;
+
+- evaluación con un conjunto documental validado por especialistas;
+
+- mejoras de cobertura y contraste entre documentos según los resultados de esa evaluación.
+
+No se presupone la necesidad de agentes, bases vectoriales ni infraestructura adicional. Las incorporaciones deben responder a una limitación comprobada y mantener trazabilidad y revisión humana.
 
 ## Principios tecnológicos
 

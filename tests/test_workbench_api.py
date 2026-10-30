@@ -1,9 +1,10 @@
+import csv
 import hashlib
+import io
 import time
 
 import pytest
 
-pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 from src.workbench_api import create_app
 from test_workbench import pdf
@@ -44,6 +45,62 @@ def test_api_upload_review_pdf_and_export(client):
         assert export.status_code == 200
         assert "Verificar soporte" in export.text
     assert len(client.get(f'/api/cases/{case["id"]}/history').json()) == 1
+
+
+def test_csv_exports_unique_columns_evidence_and_analysis_provenance(client):
+    case = create_case(client)
+    response = client.get(f'/api/cases/{case["id"]}/export?format=csv')
+    reader = csv.DictReader(io.StringIO(response.text.lstrip("\ufeff")))
+    assert len(reader.fieldnames) == len(set(reader.fieldnames))
+    rows = list(reader)
+    assert len(rows) == sum(len(item["evidence"]) for item in case["result"]["items"])
+    for row in rows:
+        for field in ["observacion_id", "patron", "documento", "pagina", "fragmento", "engine_version"]:
+            assert row[field]
+        assert len(row["taxonomy_sha256"]) == 64
+    exported = client.get(f'/api/cases/{case["id"]}/export?format=json').json()
+    assert exported["result"]["provenance"] == case["result"]["provenance"]
+    assert all(len(doc["sha256"]) == 64 for doc in exported["documents"])
+
+
+def test_navigation_and_exports_do_not_repeat_analysis_or_call_llm(client, monkeypatch):
+    case = create_case(client)
+    def unexpected(*args, **kwargs):
+        raise AssertionError("Navigation must use the persisted review.")
+    monkeypatch.setattr("src.analyzer.workbench_service.analyze_document_bytes", unexpected)
+    monkeypatch.setattr("src.analyzer.llm_reviewer._request_json", unexpected)
+    document_id = case["documents"][0]["id"]
+    for endpoint in [
+        "/api/cases", f'/api/cases/{case["id"]}',
+        f'/api/cases/{case["id"]}/documents/{document_id}',
+        f'/api/cases/{case["id"]}/taxonomy',
+        f'/api/cases/{case["id"]}/export?format=html',
+        f'/api/cases/{case["id"]}/export?format=csv',
+        f'/api/cases/{case["id"]}/export?format=json',
+    ]:
+        assert client.get(endpoint).status_code == 200
+
+
+def test_api_reports_missing_taxonomy_without_success_or_export(client, monkeypatch):
+    from src.analyzer.taxonomy_loader import TaxonomyLoadResult
+    monkeypatch.setattr("src.analyzer.workbench_service.load_taxonomy",
+                        lambda: TaxonomyLoadResult([], ["No disponible"], False))
+    case = create_case(client)
+    assert case["status"] == "failed"
+    assert "reglas" in case["error"]
+    assert not case["result"]
+    assert client.get(f'/api/cases/{case["id"]}/export').status_code == 409
+
+
+def test_api_does_not_blame_the_document_for_an_engine_error(client, monkeypatch):
+    def fail(*args, **kwargs):
+        raise RuntimeError("Synthetic rule engine failure")
+    monkeypatch.setattr("src.analyzer.workbench_service.analyze_document_bytes", fail)
+    case = create_case(client)
+    assert case["status"] == "failed"
+    assert "No se pudo completar la revisión" in case["error"]
+    assert "PDF" not in case["error"]
+    assert client.get(f'/api/cases/{case["id"]}/export').status_code == 409
 
 
 def test_api_rejects_cross_origin_mutation_and_unknown_host(client):

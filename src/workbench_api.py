@@ -1,4 +1,4 @@
-"""Loopback-first API for the review workbench; Streamlit remains optional."""
+"""Loopback-first API serving the React/PDF.js document review workbench."""
 from __future__ import annotations
 
 import csv
@@ -160,11 +160,11 @@ def create_app(storage: Path | None = None, assisted: bool | None = None, corpus
         elif format == "csv":
             out = io.StringIO()
             writer = csv.writer(out)
-            writer.writerow(["observacion_id", "patron", "titulo", "prioridad_revision", "documento", "pagina", "fragmento", "mitigantes", "preguntas", "estado_humano", "comentario", "engine_version", "taxonomy_sha256"])
+            writer.writerow(["observacion_id", "patron", "titulo", "prioridad_revision", "documento", "pagina", "fragmento", "mitigantes", "preguntas", "estado_humano", "comentario", "engine_version", "taxonomy_sha256", "fuentes", "metodos_identificacion"])
             for item in case["result"]["items"]:
                 for ev in item["evidence"]:
                     review = case["reviews"].get(item["id"], {})
-                    cells = [item["id"], item["pattern_id"], item["title"], item["priority"], ev["document_name"], ev["page"], ev["text"], "; ".join(item["mitigants"]), "; ".join(item["questions"]), review.get("state", "pending"), review.get("comment", ""), case["result"]["provenance"]["engine_version"], case["result"]["provenance"]["taxonomy_sha256"]]
+                    cells = [item["id"], item["pattern_id"], item["title"], item["priority"], ev["document_name"], ev["page"], ev["text"], "; ".join(item["mitigants"]), "; ".join(item["questions"]), review.get("state", "pending"), review.get("comment", ""), case["result"]["provenance"]["engine_version"], case["result"]["provenance"]["taxonomy_sha256"], "; ".join(item.get("sources", [])), "; ".join(item.get("analysis_methods", ["deterministic_rules"]))]
                     writer.writerow([_csv_cell(cell) for cell in cells])
             body, media = "\ufeff" + out.getvalue(), "text/csv"
         else:
@@ -194,13 +194,18 @@ def _html_report(case):
     parts = [f'<!doctype html><html lang="es"><meta charset="utf-8"><title>{esc(case["title"])}</title><style>body{{font:15px/1.6 system-ui;max-width:900px;margin:40px auto;padding:20px;color:#223438}}article{{border-top:1px solid #ccd5d6;margin-top:28px}}blockquote{{border-left:3px solid #297a70;padding-left:16px}}small{{color:#526466}}</style><h1>{esc(case["title"])}</h1><p>Lectura preliminar para revisión humana.</p><p>{esc(result.get("assisted_summary") or result["summary"])}</p>']
     for doc in result["documents"]:
         parts.append(f'<p><strong>{esc(doc["name"])}</strong> · {esc(doc["role"])} · versión {esc(doc["version"])}<br><small>SHA256: {esc(doc["sha256"])}</small></p>')
+    semantic = result.get("semantic_review", {})
+    coverage = semantic.get("coverage") or {}
+    if semantic.get("status") == "completed":
+        parts.append(f'<p>Lectura contextual adicional: {esc(coverage.get("selected_clause_count", 0))} de {esc(coverage.get("active_clause_count", 0))} cláusulas activas. Las citas se comprueban; las interpretaciones requieren validación humana. No es una revisión semántica completa.</p>')
     for item in result["items"]:
         review = case["reviews"].get(item["id"], {})
         parts.append(f'<article><h2>{esc(item["title"])}</h2><p>Prioridad de revisión: {esc(item["priority"])} · Estado humano: {esc(review.get("state", "pending"))}</p><p>{esc(item["explanation"])}</p>')
+        parts.append(f'<small>Origen: {esc(" + ".join(item.get("sources", ["Taxonomía documental"])))}</small>')
         for ev in item["evidence"]:
             parts.append(f'<small>{esc(ev["document_name"])} · página {ev["page"]}</small><blockquote>{esc(ev["text"])}</blockquote>')
         parts.append(f'<p>Mitigantes: {esc("; ".join(item["mitigants"]) or "No identificados en los fragmentos revisados.")}</p><p>Qué validar: {esc(" ".join(item["questions"]))}</p><p>Comentario: {esc(review.get("comment", ""))}</p></article>')
-    parts.append(f'<hr><p>La lectura es preliminar y no reemplaza el análisis técnico o jurídico. Las frecuencias históricas no acreditan validez de requisitos. El procesamiento asistido, cuando interviene, solo apoya la redacción.</p><small>{esc(json.dumps(result["provenance"], ensure_ascii=False))}</small></html>')
+    parts.append(f'<hr><p>La lectura es preliminar y no reemplaza el análisis técnico o jurídico. Las frecuencias históricas no acreditan validez de requisitos. El procesamiento asistido puede proponer candidatos y redactar contexto; no asigna prioridad final ni valida la interpretación por sí solo.</p><small>{esc(json.dumps(result["provenance"], ensure_ascii=False))}</small></html>')
     return "".join(parts)
 
 

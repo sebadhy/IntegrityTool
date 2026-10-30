@@ -1,11 +1,6 @@
-"""Canonical field names for the review row dictionary.
+"""Shared constants for tabular review adapters and priority labels.
 
-The review pipeline produces a dict with these keys. Using constants avoids
-silent typos and enables IDE autocomplete in pipeline modules.
-
-The UI (app.py) still accesses them as raw strings — this file bridges the gap.
-When a field name needs to change, update the constant here and the pipeline
-modules will follow; the UI can be updated separately.
+The React interface receives case JSON from the API, not these legacy row keys.
 """
 
 from __future__ import annotations

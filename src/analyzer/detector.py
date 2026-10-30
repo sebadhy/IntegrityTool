@@ -666,7 +666,7 @@ def detect_patterns(
     When a RULES term overlaps with a taxonomy textual_signal, the RULE is
     skipped to avoid double-counting (L654).
 
-    For the clause-centric pipeline (Streamlit UI, agent), prefer
+    For the active clause-centric pipeline, prefer
     :func:`detect_signals` which operates on pre-classified Clause objects.
     Mitigant detection is handled downstream by :mod:`mitigants` in that path.
     """

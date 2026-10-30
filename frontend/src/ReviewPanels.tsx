@@ -121,6 +121,7 @@ export function ObservationDetail({
   const generated = assistance.calls.find(
     (call) => call.item_id === item.id && call.status === "completed",
   );
+  const semantic = item.analysis_methods?.includes("semantic_assisted");
   return (
     <aside className="review-detail">
       <div className="detail-heading">
@@ -265,7 +266,10 @@ export function ObservationDetail({
         </summary>
         <dl>
           <dt>Identificación</dt>
-          <dd>Taxonomía documental · {item.pattern_id}</dd>
+          <dd>
+            {semantic ? "Reglas y propuestas semánticas verificadas por cita" : "Reglas documentales"}
+            {" · "}{item.pattern_id}
+          </dd>
           <dt>Dimensión</dt>
           <dd>
             {item.dimension_label}. Organización analítica inicial, sujeta a
@@ -286,9 +290,10 @@ export function ObservationDetail({
           </dd>
           <dt>Uso de modelo de lenguaje</dt>
           <dd>
-            {generated
-              ? `Intervino ${generated.provider} (${generated.model}) solo para redactar contexto. La detección y prioridad son determinísticas.`
-              : "No se utilizó una explicación de modelo de lenguaje para esta observación."}
+            {semantic
+              ? "Un modelo propuso una lectura de la cláusula. Se comprobaron la cita y el patrón, no la corrección de la interpretación. Consolidación y prioridad aplican criterios explícitos; requiere validación humana."
+              : "La identificación de esta observación se realizó mediante reglas."}
+            {generated && ` Además, ${generated.provider} (${generated.model}) apoyó la redacción de la explicación.`}
           </dd>
           <dt>Límites</dt>
           <dd>

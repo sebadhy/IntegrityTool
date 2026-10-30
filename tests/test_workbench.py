@@ -321,6 +321,7 @@ def test_review_state_and_comment_have_transactional_history(service):
 
 
 def test_failed_narration_does_not_remove_deterministic_review(service, monkeypatch):
+    monkeypatch.setenv("INTEGRITY_SEMANTIC_ENABLED", "false")
     service.assisted = True
     monkeypatch.setattr(service, "_narrate", lambda *args: (_ for _ in ()).throw(RuntimeError("provider unavailable")))
     case = create(service)
@@ -330,6 +331,8 @@ def test_failed_narration_does_not_remove_deterministic_review(service, monkeypa
 
 
 def test_llm_is_bounded_cached_and_does_not_change_priority(service, monkeypatch):
+    # Preserve the regression contract of the narration-only compatibility mode.
+    monkeypatch.setenv("INTEGRITY_SEMANTIC_ENABLED", "false")
     calls = []
     monkeypatch.setattr("src.analyzer.llm_reviewer._llm_available", lambda: True)
     monkeypatch.setattr("src.analyzer.llm_reviewer.generate_document_brief", lambda *args: calls.append("summary") or {"llm_available": True, "document_summary": "Conviene validar las equivalencias."})
