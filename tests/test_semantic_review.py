@@ -113,6 +113,13 @@ def test_same_pattern_clause_is_not_counted_twice():
     assert all(d["status"] == "rejected" for d in audit)
 
 
+def test_language_guard_does_not_reject_an_institutional_department():
+    signals, audit = validate_semantic_proposals({"candidates": [proposal(
+        review_note="Convendría solicitar a la Dirección Técnica que valide las alternativas documentales admitidas.")]}, selection(), [])
+    assert signals
+    assert audit[0]["status"] == "accepted"
+
+
 def test_negation_outside_selected_quote_is_preserved_and_rejected():
     quoted = "una constancia emitida por la casa que produjo el equipo"
     source = clause("No se requiere " + quoted + " para presentar la oferta.")

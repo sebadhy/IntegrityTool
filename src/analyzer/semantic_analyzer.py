@@ -132,7 +132,7 @@ def validate_semantic_proposals(payload: dict, selection: SemanticSelection,
             reason = "Fragmento sin contenido sustantivo suficiente."
         elif not isinstance(note, str) or not 20 <= len(note.strip()) <= 700:
             reason = "Explicación vacía o fuera de los límites permitidos."
-        elif re.search(r"corrupcion|fraude|ilegal|direccion|colusion|culpable|responsabil|irregularidad|red flag|alto riesgo", normalize_text_es(note)):
+        elif re.search(r"corrupcion|fraude|ilegal|direccionamiento|direccionad[oa]|colusion|culpable|responsabil|irregularidad|red flag|alto riesgo", normalize_text_es(note)):
             reason = "La explicación no cumple el lenguaje institucional."
         elif not isinstance(confidence, str) or confidence not in {"medium", "high"}:
             reason = "La propuesta no tiene confianza suficiente para integrarse."
