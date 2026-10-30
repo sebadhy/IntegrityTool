@@ -25,6 +25,8 @@ def test_plural_entity_word_in_requirement_is_not_a_metadata_heading(tmp_path):
     metadata = extract_pliego_metadata("prueba.pdf", text, tmp_path)
     assert metadata["entidad"] == "No identificado automáticamente"
     assert is_invalid_entity("es")
+    assert not is_invalid_entity("SRI")
+    assert not is_invalid_entity("CNE")
 
 
 def test_numbered_and_multiline_entity_headings_still_work(tmp_path):

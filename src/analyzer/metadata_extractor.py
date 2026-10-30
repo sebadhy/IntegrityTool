@@ -210,7 +210,7 @@ def clean_metadata_value(value: object, fallback: str = "No identificado") -> st
 def is_invalid_entity(value: object) -> bool:
     text = clean_metadata_value(value, "")
     lower = f" {text.lower()} "
-    if len(text) < 4 or len(text) > 120:
+    if len(text) < 3 or len(text) > 120:
         return True
     if any(verb in lower for verb in ENTITY_BAD_VERBS):
         return True
