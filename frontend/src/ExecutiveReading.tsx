@@ -25,11 +25,11 @@ export function ExecutiveReading({
             : "Síntesis estructurada a partir de los aspectos y la evidencia documental."}
         </span>
         {result.semantic_review?.coverage && result.semantic_review.status === "completed" && (
-          <p className="reading-provenance">
+          <span className="reading-provenance">
             Lectura contextual adicional sobre {result.semantic_review.coverage.selected_clause_count}
             {" de "}{result.semantic_review.coverage.active_clause_count} cláusulas activas.
             {" "}Las propuestas requieren validación humana; no es una revisión semántica completa.
-          </p>
+          </span>
         )}
       </section>
       <section className="priorities-section">
