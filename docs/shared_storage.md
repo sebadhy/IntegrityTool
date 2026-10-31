@@ -6,6 +6,8 @@ Implementado: una capa de datos SQLite/PostgreSQL, originales en archivos o Azur
 
 Esto no publica la aplicación ni completa su seguridad institucional. Siguen pendientes autenticación y permisos por expediente, catálogo operativo del corpus, límites de proveedor compartidos y dimensionamiento de carga. La API mantiene la restricción de acceso local.
 
+La entrega al desarrollador se organiza en [la guía de responsabilidades](developer_handoff.md) y [el procedimiento Azure](azure_deployment.md); no se debe interpretar el soporte de persistencia como autorización para publicar HTTP.
+
 ## Responsabilidades
 
 | Componente | Responsabilidad |

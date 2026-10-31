@@ -2,6 +2,8 @@
 
 La aplicación se inicia con `python run_workbench.py`. Estas opciones no agregan interfaces ni servicios de ejecución alternativos.
 
+Para la entrega al equipo Azure, consultar primero [las responsabilidades y el orden de trabajo](developer_handoff.md) y [la guía operativa](azure_deployment.md). Los ejemplos de API/trabajador no configuran un tenant ni habilitan acceso público.
+
 ## Variables y secretos
 
 Copie `.env.example` a `.env` solo si no existe una configuración propia. Las variables del proceso tienen precedencia sobre el archivo. No publique `.env`, claves, bases de revisión ni documentos locales en Git.

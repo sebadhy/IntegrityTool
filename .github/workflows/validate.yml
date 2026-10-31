@@ -73,3 +73,11 @@ jobs:
       - run: python -m pip install -r requirements-dev.txt -r requirements-azure.txt
       - run: python -m pip check
       - run: python -m pytest -q tests/test_storage_backends.py tests/test_storage_migration.py tests/test_document_storage.py tests/test_cloud_persistence.py
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: docker build --build-arg REVISION=${{ github.sha }} -t integrity:ci .
+      - run: python3 deploy/verify_container.py integrity:ci

@@ -1,0 +1,20 @@
+# Allowlist: never send .env, PDFs, databases, Git or local caches to the builder.
+**
+!Dockerfile
+!requirements.txt
+!requirements-azure.txt
+!src/
+!src/**
+!frontend/
+!frontend/package.json
+!frontend/pnpm-lock.yaml
+!frontend/pnpm-workspace.yaml
+!frontend/tsconfig.json
+!frontend/vite.config.ts
+!frontend/index.html
+!frontend/src/
+!frontend/src/**
+!frontend/scripts/
+!frontend/scripts/**
+**/__pycache__/
+**/*.pyc

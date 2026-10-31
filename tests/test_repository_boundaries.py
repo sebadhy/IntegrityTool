@@ -97,6 +97,21 @@ def test_readme_relative_document_links_exist():
     assert all((ROOT / target).is_file() for target in local)
 
 
+def test_azure_handoff_links_and_example_configuration_are_consistent():
+    for name in ("developer_handoff.md", "azure_deployment.md"):
+        source = ROOT / "docs" / name
+        targets = re.findall(r"\]\(([^)]+)\)", source.read_text(encoding="utf-8"))
+        local = [target.split("#", 1)[0] for target in targets if "://" not in target and not target.startswith("#")]
+        assert all((source.parent / target).is_file() for target in local)
+    for role in ("api", "worker"):
+        example = ROOT / "deploy/azure" / f"{role}.env.example"
+        content = example.read_text(encoding="utf-8")
+        assert "INTEGRITY_DATABASE_URL=" in content
+        assert "INTEGRITY_DOCUMENT_STORAGE=azure" in content
+        assert "INTEGRITY_ASSISTED_ENABLED=false" in content
+        assert "INTEGRITY_ENTRA_TENANT_ID" not in content
+
+
 def test_ci_actions_use_explicit_commit_references():
     workflow = yaml.safe_load((ROOT / ".github/workflows/validate.yml").read_text(encoding="utf-8"))
     references = [step["uses"] for job in workflow["jobs"].values()

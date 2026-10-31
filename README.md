@@ -6,6 +6,8 @@ Herramienta exploratoria de revisión documental de pliegos, especificaciones y 
 
 La aplicación tiene una sola interfaz: **React + TypeScript + PDF.js**, servida por una **API Python/FastAPI**. El motor combina reglas y una taxonomía editable con procesamiento asistido opcional. No detecta corrupción, no determina ilegalidad ni reemplaza revisión técnica, jurídica o institucional.
 
+**Entrega para Azure:** comenzar por [la guía para el desarrollador](docs/developer_handoff.md). Incluye imagen, variables, datos y aceptación. La autenticación institucional y el acceso HTTP compartido siguen pendientes; el contenedor no los configura.
+
 ## Inicio rápido
 
 Requisitos: Python 3.11 o superior, Node.js 22.13 o superior (recomendado: 24) y pnpm 11.25. Node solo es necesario para construir la interfaz. Si falta pnpm: `npm install --global pnpm@11.25.0`.
@@ -95,6 +97,8 @@ run_workbench.py                 Inicio local
 requirements.txt                Dependencias de ejecución
 requirements-dev.txt            Ejecución + herramientas de pruebas
 requirements-azure.txt          La misma aplicación + adaptadores PostgreSQL/Blob
+Dockerfile                      Imagen de API/trabajador, sin datos ni secretos
+deploy/azure/                   Contratos de variables del ambiente
 frontend/                       Interfaz React/TypeScript y PDF.js
 src/workbench_api.py             API, originales y exportaciones
 src/config.py                   Configuración del motor y corpus
@@ -110,11 +114,12 @@ src/analyzer/
 tests/                          Pruebas de motor, API y contratos
 src/manage_storage.py           Inicialización y migración explícitas
 src/review_worker.py            Inicio del trabajador independiente
+src/deployment_check.py          Comprobaciones sin análisis ni modelos
 docs/                           Arquitectura, metodología y evaluación
 data/                           Datos locales, no versionados
 ```
 
-Las interfaces y notificaciones anteriores se retiraron; su código es recuperable en el historial Git. No hay un segundo comando de ejecución ni un segundo frontend soportado.
+Las interfaces y notificaciones anteriores se retiraron; su código es recuperable en el historial Git. El inicio local y los comandos del contenedor ejecutan la misma aplicación, no frontends alternativos.
 
 ## Validación
 
@@ -135,8 +140,12 @@ El inicio local utiliza un trabajador integrado. Para separar API y análisis ex
 
 Antes de publicarla en Azure se deben resolver acceso autenticado, permisos, dominio autorizado, operación de la persistencia, respaldos y retención. Las pruebas locales de concurrencia no son una certificación de carga institucional. No es suficiente cambiar la dirección de escucha. La configuración de proveedores y almacenamiento no equivale a un despliegue seguro.
 
+La [guía de Azure](docs/azure_deployment.md) distingue lo implementado de los pasos que debe completar el desarrollador. El Dockerfile construye el frontend, incorpora OCR y ejecuta sin root. No contiene PDFs, bases ni claves; mantiene el acceso HTTP local hasta integrar los controles pendientes. No ejecutar los ejemplos de variables sin reemplazar sus marcadores y suministrar secretos mediante el ambiente.
+
 ## Documentación
 
+- [Entrega al desarrollador](docs/developer_handoff.md)
+- [Preparación, datos y aceptación en Azure](docs/azure_deployment.md)
 - [Configuración: proveedores, corpus y almacenamiento](docs/configuration.md)
 - [Persistencia compartida, trabajos y migración](docs/shared_storage.md)
 - [Arquitectura del pipeline documental](docs/architecture.md)

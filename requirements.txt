@@ -1,4 +1,5 @@
-PyMuPDF>=1.24.5
+# Keep the validated extraction API; major 2 adds a different dependency stack.
+PyMuPDF>=1.24.5,<2
 pandas>=2.2.2
 openai>=1.109.0
 python-dotenv>=1.0.1
