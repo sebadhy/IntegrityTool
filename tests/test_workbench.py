@@ -117,6 +117,14 @@ def test_service_persists_result_and_reuses_versioned_analysis(service, monkeypa
     assert reopened["result"]["items"] == case["result"]["items"]
 
 
+def test_engine_change_invalidates_new_analysis_but_preserves_existing_review(service, monkeypatch):
+    first = create(service, [{"name": "test.pdf", "content": pdf()}])
+    monkeypatch.setattr("src.analyzer.workbench_service.ENGINE_VERSION", "test-next-engine")
+    second = create(service, [{"name": "test.pdf", "content": pdf()}], key="new-version-request")
+    assert second["result"]["documents"][0]["cache_hit"] is False
+    assert service.store.get_case(first["id"])["result"] == first["result"]
+
+
 def test_taxonomy_change_invalidates_analysis_cache(service, monkeypatch, tmp_path):
     content = pdf()
     first = create(service, [{"name": "test.pdf", "content": content}])

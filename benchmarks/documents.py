@@ -20,6 +20,7 @@ import pymupdf as fitz
 
 from src.analyzer.corpus_validator import validate_corpus
 from src.analyzer.metadata_reader import read_process_metadata
+from src.analyzer import ENGINE_VERSION, pdf_extractor
 
 from . import extractors
 from .extractors import BenchmarkError
@@ -188,6 +189,8 @@ def provenance(root: Path) -> dict:
     return {"application_commit": _git(root, "rev-parse", "HEAD"),
             "working_tree_status": _git(root, "status", "--porcelain"),
             "benchmark_source_sha256": digest(b"".join(p.name.encode() + p.read_bytes() for p in files)),
+            "engine_version": ENGINE_VERSION,
+            "pdf_extractor_sha256": digest(Path(pdf_extractor.__file__).read_bytes()),
             "python": sys.version, "platform": platform.platform(),
             "tesseract_available": shutil.which("tesseract") is not None,
             "packages": {name: extractors.package_version(name) for name in
@@ -297,32 +300,41 @@ def run_benchmark(manifest_path: Path, root: Path, output: Path, backends: list[
     return report
 
 
-def evaluate_run(run: Path, annotations: Path) -> dict:
+def load_run(run: Path) -> tuple[dict, dict]:
     report = read_json(run / "report.json")
     manifest = read_json(run / "manifest.json")
     if digest((run / "manifest.json").read_bytes()) != report["manifest_sha256"]:
         raise BenchmarkError("El manifiesto guardado fue modificado.")
-    references = validate_annotations(read_json(annotations), manifest, report["manifest_sha256"])
-    by_id = {doc["document_id"]: doc for doc in references}
     documents = {doc["document_id"]: doc for doc in manifest["documents"]}
     expected = {(identity, backend) for identity in documents for backend in report["backends"]}
     actual = [(record["document_id"], record["backend"]) for record in report["records"]]
     if len(actual) != len(set(actual)) or set(actual) != expected:
         raise BenchmarkError("El reporte contiene mediciones repetidas o faltantes.")
-    totals = {}
-    details = []
     for record in report["records"]:
         if record.get("document_sha256") != documents[record["document_id"]]["sha256"]:
             raise BenchmarkError("La medicion no corresponde al hash documental del manifiesto.")
+    return report, manifest
+
+
+def read_artifact(run: Path, record: dict) -> dict:
+    if not record.get("artifact"):
+        return {"pages": []}
+    path = (run / record["artifact"]).resolve(strict=True)
+    if not path.is_relative_to(run.resolve()) or digest(path.read_bytes()) != record["artifact_sha256"]:
+        raise BenchmarkError("El artefacto de extraccion fue modificado o esta fuera de la ejecucion.")
+    return read_json(path)
+
+
+def evaluate_run(run: Path, annotations: Path) -> dict:
+    report, manifest = load_run(run)
+    references = validate_annotations(read_json(annotations), manifest, report["manifest_sha256"])
+    by_id = {doc["document_id"]: doc for doc in references}
+    totals, details = {}, []
+    for record in report["records"]:
         reference = by_id.get(record["document_id"])
         if reference is None:
             continue
-        result = {"pages": []}
-        if record.get("artifact"):
-            path = (run / record["artifact"]).resolve(strict=True)
-            if not path.is_relative_to(run.resolve()) or digest(path.read_bytes()) != record["artifact_sha256"]:
-                raise BenchmarkError("El artefacto de extraccion fue modificado o esta fuera de la ejecucion.")
-            result = read_json(path)
+        result = read_artifact(run, record)
         score = score_reference(result, reference)
         details.append({"document_id": record["document_id"], "backend": record["backend"], **score})
         total = totals.setdefault(record["backend"], {key: 0 for key in
@@ -361,6 +373,11 @@ def main():
     score.add_argument("--run", type=Path, required=True)
     score.add_argument("--annotations", type=Path, required=True)
     score.add_argument("--output", type=Path, required=True)
+    review = commands.add_parser("review-pack", help="Preparar originales y paginas para anotacion independiente.")
+    review.add_argument("--root", type=Path, default=Path.cwd())
+    review.add_argument("--run", type=Path, required=True)
+    review.add_argument("--output", type=Path, required=True)
+    review.add_argument("--pages-per-document", type=int, default=2)
     args = parser.parse_args()
     try:
         if args.command == "prepare":
@@ -376,10 +393,14 @@ def main():
             print(f'Benchmark terminado: {len(value["records"])} mediciones, {failures} parciales o fallidas.')
             if failures:
                 raise SystemExit(2)
-        else:
+        elif args.command == "score":
             value = evaluate_run(args.run, args.annotations)
             write_json(args.output, value)
             print(f'Evaluacion: {value["status"]}; documentos resueltos: {value["adjudicated_documents"]}.')
+        else:
+            from .review_pack import build_review_pack
+            value = build_review_pack(args.run, args.root.resolve(), args.output, args.pages_per_document)
+            print(f'Cuaderno preparado: {len(value["pages"])} paginas. Referencias expertas pendientes.')
     except (BenchmarkError, FileExistsError, FileNotFoundError, json.JSONDecodeError) as exc:
         message = str(exc) if isinstance(exc, BenchmarkError) else "Revise archivos de entrada y use una salida nueva."
         parser.exit(2, message + "\n")

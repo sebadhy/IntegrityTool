@@ -135,6 +135,8 @@ La suite cubre extracción, metadata, negaciones, mitigantes, consolidación, tr
 
 Para comparar fidelidad documental antes de cambiar el extractor, consulte el [benchmark de extracción](docs/document_benchmark.md). Congela una muestra por SHA-256 y conserva mediciones y evidencias; se ejecuta por separado de la aplicación. La comparación local no utiliza modelos ni servicios externos.
 
+El benchmark también prepara un cuaderno con originales y páginas seleccionadas, sin respuestas precargadas, para anotación independiente y resolución de referencias expertas.
+
 ## Despliegue
 
 El inicio local integra API y trabajador. El contenedor permite ejecutarlos por separado y conserva los trabajos en la base de datos. El Dockerfile construye el frontend e incorpora Python y OCR.

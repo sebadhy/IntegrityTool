@@ -111,6 +111,8 @@ El corpus utiliza el mismo motor determinístico que los documentos cargados y e
 
 Para PDFs escaneados, instale Tesseract con el idioma español en el sistema. Sin OCR disponible, las páginas sin texto se informan como lectura parcial.
 
+El texto seleccionable breve se conserva como lectura nativa. Una imagen pequeña que se repite en el mismo margen en varias páginas no activa OCR por sí sola cuando ya existe texto seleccionable. Las imágenes de contenido y los casos de ubicación incierta mantienen el control de OCR. Cada página registra una nota de extracción; esta clasificación no certifica exactitud ni cobertura completa.
+
 `APP_MAX_DOCUMENT_CHARS` y `APP_DEFAULT_CONTEXT_CHARS` mantienen los límites de texto del adaptador asistido y las ventanas del detector. No los cambie para simular lectura completa; las restricciones de selección semántica y los controles de evidencia siguen aplicando.
 
 ## Despliegue compartido

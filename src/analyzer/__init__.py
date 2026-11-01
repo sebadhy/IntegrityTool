@@ -1,6 +1,6 @@
 """Analyzer package for exploratory tender document review."""
 
-ENGINE_VERSION = "2026.10.4"
+ENGINE_VERSION = "2026.11.1"
 
 __all__ = [
     "corpus_loader",

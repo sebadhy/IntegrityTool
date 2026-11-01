@@ -3,11 +3,11 @@ pdf_extractor.py — Extracción de texto de PDFs con soporte OCR.
 
 Flujo:
 1. Intenta extraer texto con PyMuPDF (rápido, sin dependencias extra)
-2. Si una página tiene poco texto, intenta OCR con Tesseract
+2. Si una página tiene poco texto e imágenes por leer, intenta OCR con Tesseract
 3. Si Tesseract no está instalado, marca la página como requires_ocr
 
-Reemplaza el pdf_extractor.py original. API compatible — el resto
-del proyecto no necesita cambios.
+Los logotipos pequeños repetidos en márgenes no convierten por sí solos
+una página con texto seleccionable en una página escaneada.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import math
 import shutil
+from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 
@@ -22,8 +23,7 @@ import pymupdf as fitz
 
 LOGGER = logging.getLogger(__name__)
 
-# Mínimo de caracteres para considerar que una página tiene texto real.
-# Páginas con menos que esto se tratan como escaneadas.
+# Umbral para revisar posibles imágenes de contenido; texto breve no implica escaneo.
 MIN_TEXT_CHARS = 100
 
 
@@ -43,6 +43,7 @@ class PageText:
     # Campos adicionales para trazabilidad
     char_count: int = 0
     ocr_attempted: bool = False
+    extraction_note: str = ""
 
     def __post_init__(self) -> None:
         # frozen=True no permite setattr, usamos object.__setattr__
@@ -114,8 +115,9 @@ def extract_pdf(pdf_bytes: bytes) -> ExtractionResult:
     pages: list[PageText] = []
 
     with fitz.open(stream=pdf_bytes, filetype="pdf") as document:
+        decorative_images = _recurring_margin_images(document)
         for page_index, page in enumerate(document, start=1):
-            page_text = _extract_page(page, page_index, tesseract_ok)
+            page_text = _extract_page(page, page_index, tesseract_ok, decorative_images)
             pages.append(page_text)
 
     result = ExtractionResult.from_pages(pages, tesseract_ok)
@@ -140,7 +142,8 @@ def extract_pdf(pdf_bytes: bytes) -> ExtractionResult:
 # Lógica por página
 # ---------------------------------------------------------------------------
 
-def _extract_page(page: fitz.Page, page_number: int, tesseract_ok: bool) -> PageText:
+def _extract_page(page: fitz.Page, page_number: int, tesseract_ok: bool,
+                  decorative_images: set | None = None) -> PageText:
     """Extrae texto de una página, con fallback a OCR si es necesario."""
 
     # Intento 1: extracción directa con PyMuPDF
@@ -151,18 +154,20 @@ def _extract_page(page: fitz.Page, page_number: int, tesseract_ok: bool) -> Page
             page_number=page_number,
             text=raw_text,
             status=PageStatus.OK,
+            extraction_note="Texto seleccionable extraído directamente del PDF.",
         )
 
     # Página con poco texto — puede ser escaneada o genuinamente vacía
     # Verificar si hay contenido visual (imágenes) que sugiera que es escaneada
-    is_likely_scanned = _page_has_images(page) and len(raw_text) < MIN_TEXT_CHARS
+    is_likely_scanned = _page_has_images(page, decorative_images if raw_text else None)
 
     if not is_likely_scanned:
-        # Página vacía real (portada sin texto, separador, etc.)
         return PageText(
             page_number=page_number,
             text=raw_text,
-            status=PageStatus.EMPTY,
+            status=PageStatus.OK if raw_text else PageStatus.EMPTY,
+            extraction_note=("Texto breve conservado; sin imágenes pendientes salvo elementos repetidos en márgenes."
+                             if raw_text else "No se detectó texto ni imagen de contenido en la página."),
         )
 
     # Es escaneada — intentar OCR
@@ -173,6 +178,7 @@ def _extract_page(page: fitz.Page, page_number: int, tesseract_ok: bool) -> Page
             text=raw_text,  # lo poco que haya
             status=PageStatus.REQUIRES_OCR,
             ocr_attempted=False,
+            extraction_note="La página contiene imágenes por leer y no hay OCR disponible.",
         )
 
     # Intentar OCR con Tesseract
@@ -183,6 +189,7 @@ def _extract_page(page: fitz.Page, page_number: int, tesseract_ok: bool) -> Page
             text=ocr_text,
             status=PageStatus.OCR_OK,
             ocr_attempted=True,
+            extraction_note="Texto recuperado mediante OCR; requiere comprobación contra el original.",
         )
 
     # OCR intentado pero sin resultado útil
@@ -192,15 +199,43 @@ def _extract_page(page: fitz.Page, page_number: int, tesseract_ok: bool) -> Page
         text=raw_text,
         status=PageStatus.OCR_FAILED,
         ocr_attempted=True,
+        extraction_note="El OCR no recuperó texto suficiente; se conserva el texto seleccionable disponible.",
     )
 
 
-def _page_has_images(page: fitz.Page) -> bool:
-    """Retorna True si la página tiene imágenes (señal de que puede ser escaneada)."""
+def _margin_image_signature(page: fitz.Page, image: dict) -> tuple | None:
+    bounds = page.rect * page.derotation_matrix
+    box = fitz.Rect(image["bbox"]) & bounds
+    if box.is_empty or box.is_infinite or not image.get("digest"):
+        return None
+    x0, y0, x1, y1 = ((box.x0 - bounds.x0) / bounds.width, (box.y0 - bounds.y0) / bounds.height,
+                       (box.x1 - bounds.x0) / bounds.width, (box.y1 - bounds.y0) / bounds.height)
+    if (x1 - x0 > 0.60 or y1 - y0 > 0.08 or not (y1 <= 0.12 or y0 >= 0.90)):
+        return None
+    return (image["digest"], *(round(value, 3) for value in (x0, y0, x1, y1)))
+
+
+def _recurring_margin_images(document: fitz.Document) -> set:
+    occurrences = defaultdict(set)
+    for number, page in enumerate(document):
+        try:
+            for image in page.get_image_info(hashes=True):
+                signature = _margin_image_signature(page, image)
+                if signature:
+                    occurrences[signature].add(number)
+        except Exception:
+            # Unknown image placement is never evidence that OCR can be skipped.
+            continue
+    return {signature for signature, pages in occurrences.items() if len(pages) >= 2}
+
+
+def _page_has_images(page: fitz.Page, decorative_images: set | None = None) -> bool:
+    """Consider displayed images, retaining uncertain or non-recurring content."""
     try:
-        return len(page.get_images()) > 0
+        return any(_margin_image_signature(page, image) not in (decorative_images or set())
+                   for image in page.get_image_info(hashes=True))
     except Exception:
-        return False
+        return True
 
 
 # ---------------------------------------------------------------------------

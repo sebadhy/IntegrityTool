@@ -27,7 +27,7 @@ from .taxonomy_loader import TaxonomyLoadResult, load_taxonomy
 from .metadata_reader import read_process_metadata
 from .pdf_extractor import PageStatus, PageText, extract_text_by_page
 
-EXTRACTION_CACHE_VERSION = 3
+EXTRACTION_CACHE_VERSION = 4
 
 
 RAW_METADATA_PATH = APP_CORPUS_METADATA_PATH
@@ -308,7 +308,8 @@ def _load_or_extract_document(
         if payload.get("sha256") == trace.sha256 and payload.get("extraction_cache_version") == EXTRACTION_CACHE_VERSION:
             pages = [
                 PageText(page_number=int(page["pagina"]), text=str(page["texto"]),
-                         status=PageStatus(page.get("status", "ok")), ocr_attempted=bool(page.get("ocr_attempted")))
+                         status=PageStatus(page.get("status", "ok")), ocr_attempted=bool(page.get("ocr_attempted")),
+                         extraction_note=str(page.get("extraction_note", "")))
                 for page in payload.get("paginas", [])
             ]
             return CorpusDocument(
@@ -344,7 +345,8 @@ def _load_or_extract_document(
                 "tamano_archivo": trace.tamano_archivo,
                 "texto": extracted_text,
                 "paginas": [
-                    {"pagina": page.page_number, "texto": page.text, "status": page.status.value, "ocr_attempted": page.ocr_attempted}
+                    {"pagina": page.page_number, "texto": page.text, "status": page.status.value,
+                     "ocr_attempted": page.ocr_attempted, "extraction_note": page.extraction_note}
                     for page in pages
                 ],
             },

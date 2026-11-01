@@ -47,7 +47,7 @@ def _native_box(values, page) -> list[float] | None:
 def extract_current(content: bytes) -> dict:
     pages = extract_text_by_page(content)
     return {"pages": [{"page": p.page_number, "text": p.text, "status": p.status.value,
-                       "blocks": [], "tables": []} for p in pages],
+                       "extraction_note": p.extraction_note, "blocks": [], "tables": []} for p in pages],
             "notes": ["Contrato actual: texto y estado OCR por pagina; sin geometria estructurada."]}
 
 
@@ -74,7 +74,8 @@ def extract_pymupdf_layout(content: bytes) -> dict:
                                    "cells": cells, "bbox": _native_box(table.bbox, page)})
             pages.append({"page": source.page_number,
                           "text": "\n".join(b["text"] for b in blocks) if blocks else source.text,
-                          "status": source.status.value, "blocks": blocks, "tables": tables})
+                          "status": source.status.value, "extraction_note": source.extraction_note,
+                          "blocks": blocks, "tables": tables})
     return {"pages": pages, "notes": [
         "Geometria normalizada sobre la pagina visible, con rotacion aplicada.",
         "El OCR conserva el texto del extractor actual; sus cajas no se reconstruyen.",

@@ -338,3 +338,106 @@ def test_report_escapes_markup_and_spreadsheet_formulas(sample, tmp_path):
     assert "<script>" not in (exported / "report.html").read_text(encoding="utf-8")
     with (exported / "metrics.csv").open(encoding="utf-8-sig", newline="") as stream:
         assert next(csv.DictReader(stream))["process_id"].startswith("'=")
+
+
+def test_review_pack_preserves_originals_and_does_not_prefill_reference_answers(sample, tmp_path):
+    from benchmarks.review_pack import build_review_pack
+    root, manifest_path, manifest = sample
+    run = tmp_path / "run"
+    documents.run_benchmark(manifest_path, root, run, ["current", "pymupdf-layout"])
+    output = tmp_path / "review"
+    selection = build_review_pack(run, root, output)
+    assert selection["answers_prefilled"] is False
+    assert selection["independent_evaluation"] is False
+    assert len(selection["pages"]) == 2
+    originals = {doc["document_id"]: doc for doc in manifest["documents"]}
+    for page in selection["pages"]:
+        doc = originals[page["document_id"]]
+        assert documents.digest((output / page["original"]).read_bytes()) == doc["sha256"]
+        assert documents.digest((output / page["image"]).read_bytes()) == page["image_sha256"]
+    for name in ("reviewer-01.json", "reviewer-02.json", "adjudication.template.json"):
+        labels = documents.read_json(output / name)
+        assert all(doc["fields"] == [] and doc["review_status"] == "pending" for doc in labels["documents"])
+        assert documents.evaluate_run(run, output / name)["status"] == "pending_human_reference"
+    content = (output / "index.html").read_text(encoding="utf-8")
+    assert 'loading="lazy"' in content and "16 GB" not in content
+    assert "<script" not in content and "https://" not in content
+
+
+def test_review_pack_rejects_modified_sources_before_creating_output(sample, tmp_path):
+    from benchmarks.review_pack import build_review_pack
+    root, path, manifest = sample
+    run = tmp_path / "run"
+    documents.run_benchmark(path, root, run, ["current"])
+    (root / manifest["documents"][0]["path"]).write_bytes(pdf_bytes("Changed"))
+    output = tmp_path / "review"
+    with pytest.raises(extractors.BenchmarkError, match="cambio"):
+        build_review_pack(run, root, output)
+    assert not output.exists()
+
+
+def test_review_pack_rejects_modified_artifacts_before_creating_output(sample, tmp_path):
+    from benchmarks.review_pack import build_review_pack
+    root, path, _ = sample
+    run = tmp_path / "run"
+    report = documents.run_benchmark(path, root, run, ["current"])
+    (run / report["records"][0]["artifact"]).write_text("{}", encoding="utf-8")
+    output = tmp_path / "review"
+    with pytest.raises(extractors.BenchmarkError, match="modificado"):
+        build_review_pack(run, root, output)
+    assert not output.exists()
+
+
+def test_review_pack_does_not_overwrite_an_existing_folder(sample, tmp_path):
+    from benchmarks.review_pack import build_review_pack
+    root, path, _ = sample
+    run = tmp_path / "run"
+    documents.run_benchmark(path, root, run, ["current"])
+    output = tmp_path / "review"
+    output.mkdir()
+    with pytest.raises(FileExistsError):
+        build_review_pack(run, root, output)
+
+
+def test_review_page_selection_prioritizes_incomplete_and_tabular_pages_without_duplicates():
+    from benchmarks.review_pack import select_pages
+    doc = {"page_count": 4, "sha256": "a" * 64}
+    result = {"pages": [{"page": 2, "status": "requires_ocr", "tables": []},
+                        {"page": 3, "status": "ok", "tables": [{"cells": [{}, {}, {}]}]}]}
+    selection = select_pages(doc, [result, result], 3)
+    assert selection[:2] == [(2, "pagina_con_lectura_pendiente"),
+                             (3, "pagina_con_estructura_tabular_candidata")]
+    assert len({page for page, _ in selection}) == 3
+    assert selection == select_pages(doc, [result, result], 3)
+
+
+def test_review_pack_limit_is_bounded(sample, tmp_path):
+    from benchmarks.review_pack import build_review_pack
+    root, _, _ = sample
+    for count in (0, 5):
+        with pytest.raises(extractors.BenchmarkError, match="cuatro"):
+            build_review_pack(tmp_path / "unneeded", root, tmp_path / "review", count)
+
+
+def test_corpus_cache_preserves_extraction_notes_and_invalidates_previous_format(sample, tmp_path, monkeypatch):
+    from src.analyzer import corpus_loader
+    root, _, manifest = sample
+    doc = manifest["documents"][0]
+    rows = corpus_loader.load_process_metadata(root / "data/raw/metadata/procesos.csv")
+    validation = documents.validate_corpus(rows, {"pliego": root / "data/raw/pliegos",
+                                                  "especificaciones": root / "data/raw/especificaciones"})
+    trace = validation["traces"][(doc["process_id"], doc["role"])]
+    metadata = next(row for row in rows if row["process_id"] == doc["process_id"])
+    monkeypatch.setattr(corpus_loader, "PROCESSED_TEXT_DIR", tmp_path / "cache")
+    def load():
+        return corpus_loader._load_or_extract_document(metadata, doc["role"], root / doc["path"], trace, False)
+    first, cached = load(), load()
+    assert first.paginas[0].extraction_note and cached.paginas == first.paginas
+    path = corpus_loader._cache_path(doc["process_id"], doc["role"])
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["extraction_cache_version"] = corpus_loader.EXTRACTION_CACHE_VERSION - 1
+    payload["paginas"][0]["texto"] = "Outdated cached text"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    renewed = load()
+    assert renewed.paginas[0].text == first.paginas[0].text
+    assert json.loads(path.read_text(encoding="utf-8"))["extraction_cache_version"] == corpus_loader.EXTRACTION_CACHE_VERSION

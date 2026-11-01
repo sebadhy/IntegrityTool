@@ -45,6 +45,16 @@ El comando devuelve código 2 si alguna extracción resulta parcial o fallida, a
 
 ## 3. Anotar referencias verificables
 
+Preparar un cuaderno portátil para los revisores, con un máximo de dos páginas por documento por defecto:
+
+```bash
+python -m benchmarks.documents review-pack --run data/benchmark/piloto-v1/local --output data/benchmark/piloto-v1/cuaderno
+```
+
+Abrir `cuaderno/index.html`. Incluye copias verificadas de los PDFs, imágenes de páginas legibles y tres plantillas: una por revisor y otra para resolver referencias. Se verifican hashes de originales y artefactos antes de generar la salida. `selection.json` registra páginas, criterio de selección y huellas de las imágenes. El cuaderno no muestra las respuestas de los extractores ni completa campos esperados.
+
+La selección prioriza páginas con lectura pendiente y estructura tabular candidata; completa las restantes mediante una selección determinística. Es una muestra diagnóstica dirigida, no una evaluación representativa. `--pages-per-document` admite de una a cuatro páginas. Aplicar permisos y retención al compartir la carpeta: contiene los PDFs completos. La generación no inicia servidores ni envía documentos.
+
 Dos especialistas revisan el PDF de forma independiente y resuelven las referencias antes de medir recuperación. Copiar la plantilla a un archivo de anotación y conservar los hashes. Por documento, cambiar `review_status` a `adjudicated`, registrar dos revisores distintos y quien resolvió la anotación. Ejemplo de campos; los valores son ilustrativos, no etiquetas del corpus:
 
 ```json
@@ -125,3 +135,9 @@ Elegir extractores solo después de comparar referencias expertas, errores, geom
 Se compararon los dos extractores locales en ocho procesos del corpus de desarrollo: 16 PDFs y 288 páginas. Ambos identificaron cuatro documentos con una página pendiente de OCR cada uno; el entorno de esta corrida no tenía Tesseract disponible. El adaptador estructurado detectó 474 regiones tabulares candidatas y 11.647 celdas: estos conteos requieren validación y no representan tablas correctas verificadas. El extractor actual no devuelve tablas estructuradas en su contrato.
 
 No se realizaron llamadas a modelos ni servicios externos. Las referencias expertas permanecen pendientes; no se declara un extractor ganador. El siguiente paso es anotar una selección de celdas y fragmentos, resolver los pendientes de OCR y comparar los adaptadores opcionales solo con configuración y autorización del equipo. Este piloto diagnostica limitaciones técnicas, no valida precisión institucional.
+
+### Revisión de los pendientes del piloto
+
+La inspección visual de las cuatro páginas señaladas mostró texto nativo breve y logotipos de encabezado. Se corrigió la clasificación que confundía cualquier imagen con una página escaneada. En una nueva corrida de los mismos 16 PDFs, ambos extractores completaron las 288 páginas según su contrato, conservando exactamente el texto nativo de la corrida anterior. Los estados de extracción cambiaron, no el contenido documental.
+
+Esto corrige avisos de lectura parcial, pero no valida la asociación de celdas ni demuestra cobertura perfecta. El OCR real sigue requiriendo Tesseract; sus rutas de éxito y fallo tienen pruebas simuladas y necesitan una muestra escaneada independiente para medir calidad. La versión del motor y el caché del corpus se actualizan para aplicar la corrección a análisis nuevos, conservando las revisiones anteriores. El informe registra versión de motor y SHA-256 del extractor además de la huella del benchmark.
