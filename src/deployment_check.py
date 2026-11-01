@@ -1,8 +1,4 @@
-"""Read-only preparation checks. No provisioning, migration or model requests.
-
-These checks do not authorize public HTTP access. The existing API intentionally
-retains its local-only guard until the deployer integrates authenticated access.
-"""
+"""Read-only validation of deployment configuration and existing services."""
 from __future__ import annotations
 
 import argparse

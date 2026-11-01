@@ -73,13 +73,13 @@ PDF
 
 `analyze_document_pages()` es la entrada común para corpus y documentos cargados. `analyze_document_bytes()` agrega únicamente lectura del PDF e identidad por SHA-256. El corpus calcula presencia por `pattern_id` a partir de las señales del mismo motor, no de un detector alternativo ni de la visibilidad final. La frecuencia cuenta procesos distintos, no matches. El workbench excluye del histórico el proceso cuyo documento ya está cargado, para evitar autocomparación.
 
-`consolidator.py` agrupa y conserva evidencia; no calcula prioridad. `prioritizer.py` es la etapa de ranking, con mitigantes locales por requisito y máximo contextual entre sus ocurrencias. Una aceptación de equivalentes en otra cláusula no neutraliza una exigencia exclusiva. El motor no vuelve a pasar por una segunda consolidación tabular. `observation_filter.py` y `detect_patterns()` conservan contratos tabulares con pruebas de regresión; no deciden la salida del pipeline activo. La síntesis y el exportador exclusivos de la interfaz retirada se eliminaron.
+`consolidator.py` agrupa y conserva evidencia; no calcula prioridad. `prioritizer.py` es la etapa de ranking, con mitigantes locales por requisito y máximo contextual entre sus ocurrencias. Una aceptación de equivalentes en otra cláusula no neutraliza una exigencia exclusiva. El motor ejecuta la consolidación una vez. `observation_filter.py` y `detect_patterns()` conservan contratos tabulares con pruebas de regresión; la salida del pipeline activo se construye desde `ReviewItem[]`.
 
 Los agrupamientos por patrón son temas de revisión, no prueba de que dos exigencias sean idénticas. Se conservan todos los fragmentos para distinguir requisitos dentro del tema. Los aliases de DataFrame quedan como adaptador interno de compatibilidad del motor y sus pruebas, no como una segunda interfaz. La API y sus exportaciones usan el resultado del expediente.
 
 ## Ejecución local y persistencia
 
-`workbench_service.py` coordina la misma secuencia fija. `review_store.py` utiliza SQLAlchemy Core con SQLite o PostgreSQL; `document_storage.py` conserva los originales nuevos fuera de la base, en archivos o Azure Blob Storage por SHA-256. Los originales binarios de la pre-PoC siguen siendo legibles. No se introducen agentes ni microservicios.
+`workbench_service.py` coordina la misma secuencia fija. `review_store.py` utiliza SQLAlchemy Core con SQLite o PostgreSQL; `document_storage.py` conserva los originales nuevos fuera de la base, en archivos o Azure Blob Storage por SHA-256. Los originales binarios de la pre-PoC siguen siendo legibles.
 
 `analysis_jobs` es la cola persistente. `review_worker.py` reserva un trabajo mediante transacción, propietario, token de reserva y vencimiento. PostgreSQL utiliza bloqueo de fila con SKIP LOCKED; SQLite serializa las transacciones locales. Un heartbeat renueva la reserva y un trabajador vencido no puede publicar resultados. El arranque de la API no interrumpe trabajos de otras instancias.
 
@@ -105,11 +105,11 @@ El cotejo compara el conjunto de textos de todas las evidencias por patrón y di
 
 ## Procesamiento asistido acotado
 
-El resultado determinístico se guarda antes del procesamiento asistido. En la mesa hay por defecto una solicitud semántica y una síntesis; el máximo configurable es tres solicitudes lógicas compartidas. El tercer cupo puede usarse para una explicación. Desactivar la semántica conserva la ruta de narración anterior. El encabezado no se reescribe mediante LLM. La salida se valida por estructura, completitud y lenguaje; no es un verificador factual independiente.
+El resultado determinístico se guarda antes del procesamiento asistido. En la mesa hay por defecto una solicitud semántica y una síntesis; el máximo configurable es tres solicitudes lógicas compartidas. El tercer cupo puede usarse para una explicación. La síntesis también puede ejecutarse con las propuestas semánticas desactivadas. El encabezado se construye de forma determinística. La salida asistida se valida por estructura, completitud y lenguaje; no es un verificador factual independiente.
 
 Cada solicitud tiene timeout y máximo de tokens de salida. El SDK no reintenta implícitamente. Éxitos y fallos se guardan por contenido, configuración de proveedor/modelo y versión de prompt/reglas. `assisted_requests` reserva la solicitud antes de contactar al proveedor: otra ejecución no repite una respuesta incierta. Se registra uso reportado por el proveedor; un error de transporte no permite asegurar que no haya facturación. No se realiza una llamada adicional para probar conexión. La interfaz distingue redacción efectivamente utilizada de configuración meramente disponible.
 
-### Propuestas semánticas: primera entrega
+### Propuestas semánticas
 
 `semantic_analyzer.py` selecciona cláusulas activas por documento/sección, excluye versiones sustituidas y limita texto a 12.000 caracteres, 24 cláusulas y 19.000 caracteres de contexto serializado. Las cláusulas mayores de 1.600 caracteres no se truncan: quedan fuera de esta selección y se contabilizan. El catálogo resumido también tiene límite; cualquier patrón no enviado queda registrado. Selección, IDs, cobertura y límites se conservan en `semantic_review.coverage`.
 
@@ -119,7 +119,7 @@ Cada solicitud tiene timeout y máximo de tokens de salida. El SDK no reintenta 
 
 Los Signals validados pasan a `build_finding_candidates()` y `finalize_candidates()`, compartidos con las reglas. Se reconstruye el resultado antes de reemplazar la base: un fallo no elimina la revisión determinística. La fuente se conserva en Signals, ReviewItems y agregación del expediente. Se registran tanto decisiones aceptadas/rechazadas como integración visible o filtrado posterior por las reglas del dominio.
 
-El análisis básico cacheado guarda `Clause[]` y `Signal[]`, incluidos estados de exclusión, dentro del JSON transaccional existente. No requiere migrar resultados anteriores. La versión del servicio cambia para no confundir cachés anteriores sin cláusulas. Los originales y revisiones previas no se reinterpretan al abrirlos.
+El análisis básico cacheado guarda `Clause[]` y `Signal[]`, incluidos estados de exclusión, dentro del JSON transaccional. La clave incorpora la versión del servicio para distinguir formatos de caché. Abrir una revisión recupera su resultado guardado y conserva la interpretación de esa ejecución.
 
 El corpus sigue evaluándose con reglas; una propuesta semántica nueva no recibe un aumento por rareza de un detector distinto. Esta entrega no implementa inferencia de contradicciones entre documentos, búsqueda comercial ni lectura exhaustiva. La identidad institucional y el despliegue compartido siguen pendientes.
 
@@ -133,14 +133,12 @@ El servidor se enlaza a loopback, rechaza hosts y mutaciones de origen ajeno y n
 
 Las pruebas sintéticas verifican contratos, no precisión de revisión institucional. Quedan pendientes benchmark etiquetado, prueba real en Windows, accesibilidad con tecnología asistiva, concurrencia, recuperación/respaldos, aislamiento de PDFs no confiables, licenciamiento de PyMuPDF y selección normativa vigente. La revisión comercial no consulta un mercado exhaustivo ni demuestra exclusividad.
 
-## Mantenimiento de la base pre-PoC
+## Dependencias y mantenimiento
 
-Se retiraron los experimentos de agentes, SQL Server y feedback JSONL sin conexión con la interfaz activa. También se retiró la interfaz anterior completa: entrada, ayuda, estilos, correo SMTP y síntesis/exportador exclusivos de esa ruta. El historial Git conserva su código; no se eliminaron corpus, originales, configuración privada ni revisiones locales.
+`requirements.txt` instala la ejecución local; `requirements-dev.txt` agrega pytest y httpx. `requirements-azure.txt` incluye la misma base y los adaptadores de PostgreSQL y almacenamiento Azure. SQLAlchemy Core comparte las consultas entre las bases compatibles. El cliente compatible con OpenAI conecta los proveedores configurados.
 
-Existe una sola aplicación. `requirements.txt` instala su ejecución local; `requirements-dev.txt` agrega pytest y httpx. `requirements-azure.txt` incluye la misma base y únicamente los adaptadores de PostgreSQL y almacenamiento Azure. SQLAlchemy Core permite compartir consultas sin mantener dos motores de persistencia. El motor analítico no depende de la base elegida ni del SDK de Groq, que continúa disponible mediante el cliente compatible con OpenAI.
-
-Las pruebas verifican estos límites, la ausencia de las entradas retiradas y que los recorridos documentados apunten a la aplicación activa. Las comprobaciones de exportación, navegación sin reprocesamiento y errores de motor/taxonomía cubren la API actual. TypeScript rechaza variables e imports sin uso.
+Las pruebas verifican las dependencias, los enlaces de documentación y los contratos de ejecución. La API tiene pruebas de exportación, navegación sin reprocesamiento y errores de motor/taxonomía. TypeScript rechaza variables e imports sin uso.
 
 Las acciones oficiales de CI se fijan por commit, con la versión de referencia anotada, y usan Node 24. La descarga del repositorio no conserva credenciales Git en el entorno de las pruebas. Las actualizaciones de estas acciones deben ser explícitas y volver a pasar validación.
 
-Las APIs tabulares del detector y del filtro anterior se conservan temporalmente porque todavía tienen pruebas de regresión específicas. Retirarlas exige migrar esos casos al contrato `ReviewItem` y comprobar equivalencia. Esta limpieza no cambia reglas, prioridades, claves de caché ni resultados existentes, no amplía el catálogo y no constituye calibración de precisión con SERCOP.
+Las APIs tabulares de `detect_patterns()` y `observation_filter.py` tienen pruebas de regresión específicas. Cualquier cambio en estos contratos debe migrar sus casos al contrato `ReviewItem` y comprobar equivalencia. Los cambios de reglas o catálogo requieren versionado y evaluación con ejemplos revisados por especialistas.

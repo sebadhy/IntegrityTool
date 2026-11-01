@@ -97,6 +97,19 @@ def test_readme_relative_document_links_exist():
     assert all((ROOT / target).is_file() for target in local)
 
 
+def test_operational_docs_describe_current_components():
+    paths = [ROOT / "README.md", *[
+        ROOT / "docs" / name for name in (
+            "developer_handoff.md", "azure_deployment.md", "configuration.md",
+            "shared_storage.md", "workbench_ux.md", "architecture.md",
+        )
+    ]]
+    for path in paths:
+        content = path.read_text(encoding="utf-8").casefold()
+        for obsolete in ("streamlit", "sql server", "interfaz retirada", "interfaz anterior"):
+            assert obsolete not in content, (path.name, obsolete)
+
+
 def test_azure_handoff_links_and_example_configuration_are_consistent():
     for name in ("developer_handoff.md", "azure_deployment.md"):
         source = ROOT / "docs" / name

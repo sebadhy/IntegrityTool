@@ -1,4 +1,4 @@
-"""Container roles for the same application, without provisioning or auth setup."""
+"""Start the API or background worker using shared storage configuration."""
 from __future__ import annotations
 
 import argparse

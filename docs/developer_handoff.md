@@ -2,35 +2,35 @@
 
 ## Punto de partida
 
-Repositorio: [sebadhy/IntegrityTool, rama fusion](https://github.com/sebadhy/IntegrityTool/tree/fusion). Utilizar un commit revisado, no una copia de la laptop ni una rama personal. No modificar `main` durante esta preparación.
+Repositorio: [sebadhy/IntegrityTool, rama fusion](https://github.com/sebadhy/IntegrityTool/tree/fusion). Utilizar un commit revisado de esta rama para construir la imagen. La integración a `main` se realiza después de la validación del equipo.
 
-La aplicación es **React/TypeScript + PDF.js y Python/FastAPI**, con un trabajador Python del mismo proyecto. No hay una aplicación Streamlit que desplegar.
+La aplicación consta de un frontend **React/TypeScript + PDF.js**, una API **Python/FastAPI** y un trabajador Python que procesa los documentos.
 
-**Estado real:** el motor, la persistencia PostgreSQL/Blob y los trabajos durables están implementados. El acceso HTTP continúa siendo local. La integración de autenticación, autorización, identidad del revisor y dominio compartido está pendiente y debe resolverse antes de publicar la URL. Tener un contenedor no elimina ese bloqueo.
+**Estado de entrega:** motor documental, persistencia PostgreSQL/Blob, trabajos durables e imagen disponibles. **Acceso HTTP actual: local.** Antes de publicar la URL se requiere integrar autenticación, autorización, identidad verificada del revisor y dominio HTTPS.
 
 ## Qué se entrega
 
-- `Dockerfile`: frontend construido y runtime Python con OCR, sin usuario root ni datos locales.
-- `src/container_start.py`: arranque de API o trabajador; rechaza almacenamiento compartido incompleto. No configura Azure ni autenticación.
-- `src/deployment_check.py`: comprobación de configuración y, opcionalmente, servicios existentes; no crea recursos ni solicita contenido a modelos.
+- `Dockerfile`: frontend compilado, runtime Python con OCR y ejecución como usuario de aplicación.
+- `src/container_start.py`: arranque de API o trabajador con validación del almacenamiento compartido.
+- `src/deployment_check.py`: validación de configuración y consulta de servicios existentes.
 - [Variables de API](../deploy/azure/api.env.example) y [variables del trabajador](../deploy/azure/worker.env.example), solo con ejemplos.
-- [Guía de despliegue y aceptación](azure_deployment.md), con el bloqueo HTTP explícito.
+- [Guía de despliegue y aceptación](azure_deployment.md).
 - [Migración de datos existentes](shared_storage.md), verificable y sin reanálisis.
 
 ## Qué corresponde al desarrollador y al equipo Azure
 
 1. Seleccionar región y recursos dentro de la suscripción autorizada; estimar y aprobar costos.
-2. Configurar tenant, acceso del equipo, autenticación y permisos. Integrar esos controles con la API antes de abrir acceso web; no quitar simplemente la restricción de host.
+2. Configurar tenant, acceso del equipo, autenticación y permisos. Integrar y probar esos controles con la API antes de abrir acceso web.
 3. Preparar PostgreSQL, contenedor Blob privado, identidades, secretos, red y registro de imágenes.
-4. Configurar el deployment existente de Azure OpenAI en el trabajador. Una licencia no equivale a un endpoint, deployment y permisos ya disponibles.
-5. Decidir si se trasladan revisiones anteriores y qué corpus versionado se utilizará. Los datos no viajan dentro de Git ni de la imagen.
+4. Configurar en el trabajador el endpoint, deployment, versión de API y credenciales de Azure OpenAI.
+5. Definir las revisiones que se importarán y la versión del corpus. Transferir los datos por un canal protegido, separado del código.
 6. Ejecutar la lista de aceptación, probar respaldo/restauración y entregar URL, versión de imagen, responsables y limitaciones conocidas.
 
 ## Orden recomendado
 
 **Acceso seguro → imagen y servicios privados → esquema y datos → trabajador → validación funcional → URL para el equipo.**
 
-Puede validarse primero el trabajador con el ambiente privado mientras se integra el acceso web. No compartir una URL sin autenticación ni utilizar una carpeta de red como sustituto de PostgreSQL.
+Puede validarse primero el trabajador con los servicios privados mientras se integra el acceso web. PostgreSQL conserva el estado compartido y Blob almacena los originales.
 
 ## Entregables de vuelta
 
@@ -38,4 +38,4 @@ Puede validarse primero el trabajador con el ambiente privado mientras se integr
 - URL autenticada y cuentas de prueba autorizadas, sin enviar contraseñas por correo.
 - Confirmación de PostgreSQL, Blob, corpus y proveedor configurados; evidencia de las pruebas de aceptación.
 - Procedimiento de actualización, recuperación y contacto de soporte.
-- Pendientes explícitos. Esta base no acredita precisión institucional ni operación multiinstitucional.
+- Pendientes explícitos y resultados de la evaluación analítica con el equipo institucional.

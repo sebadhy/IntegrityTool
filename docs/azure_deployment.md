@@ -1,21 +1,21 @@
 # Preparación y despliegue en Azure
 
-Guía operativa para el desarrollador. No crea recursos ni establece un tenant. La configuración efectiva de Azure pertenece al equipo que administra la suscripción.
+Procedimiento para construir la imagen, configurar los procesos y validar el despliegue. El equipo que administra la suscripción prepara los recursos y el acceso institucional.
 
-## 1. Bloqueo de publicación HTTP
+## 1. Requisitos de acceso compartido
 
-**Esta versión no debe exponerse públicamente todavía.** La API comprueba hosts locales y no autentica identidades institucionales. El contenedor conserva el enlace a `127.0.0.1:8000`: publicar un puerto Docker no convierte esa API en un servicio compartido.
+**Acceso actual: local, en `127.0.0.1:8000`.** Antes de publicar la URL se requiere integrar y validar el acceso institucional.
 
 Antes de compartir la URL, el desarrollador debe integrar y probar:
 
 - Autenticación institucional, acceso del equipo autorizado y cierre de sesión.
-- Autorización de lectura/escritura y política de acceso a cada expediente. La aplicación actual no implementa aislamiento entre usuarios o instituciones.
-- Identidad del revisor derivada de la sesión validada, no del campo `reviewer` enviado por el navegador. El historial actual es operativo, no un registro de auditoría autenticado o inmutable.
+- Autorización de lectura/escritura y política de acceso a cada expediente, incluido el aislamiento requerido entre usuarios o instituciones.
+- Identidad del revisor derivada de la sesión validada. Actualmente, `reviewer` es un campo enviado por el navegador y el historial registra operaciones con una etiqueta local.
 - Dominios y origen HTTPS permitidos, protección de operaciones de escritura y rechazo de acceso directo que evada la autenticación.
 
-Esta integración requiere cambios en la aplicación y pruebas; no se resuelve solo configurando variables o eliminando el guard de host de `src/workbench_api.py`. No hay variables de tenant o roles ficticiamente soportadas en los ejemplos.
+Implementar la integración en `src/workbench_api.py` y comprobar autenticación, permisos y origen de las solicitudes antes de habilitar el dominio compartido.
 
-Como ruta de referencia, Azure Container Apps permite delegar el inicio de sesión en la plataforma y recibir información de identidad validada. Debe configurarse expresamente; no basta con desplegar un contenedor. El equipo puede elegir otra arquitectura autorizada. [Documentación oficial de autenticación](https://learn.microsoft.com/en-us/azure/container-apps/authentication).
+Como ruta de referencia, Azure Container Apps permite delegar el inicio de sesión en la plataforma y recibir información de identidad validada. Configurar el proveedor y vincular la identidad con los permisos de la aplicación. [Documentación oficial de autenticación](https://learn.microsoft.com/en-us/azure/container-apps/authentication).
 
 ## 2. Arquitectura mínima de referencia
 
@@ -31,7 +31,7 @@ Usuario autorizado
       → Azure OpenAI, si está habilitado
 ```
 
-API y trabajador utilizan la misma imagen y código, con comandos distintos. No se añaden agentes, Redis, Service Bus ni un segundo motor analítico. Para la primera prueba, comenzar con un trabajador; aumentar concurrencia solo después de medir memoria, tiempos, conexiones y cuotas del proveedor.
+API y trabajador utilizan la misma imagen y código, con comandos distintos. PostgreSQL conserva la cola de trabajos. Para la primera prueba, comenzar con un trabajador; aumentar concurrencia después de medir memoria, tiempos, conexiones y cuotas del proveedor.
 
 Si se utiliza Container Apps para el trabajador continuo, deshabilitar ingreso y mantener al menos una réplica; sin ingreso ni una regla de activación, reducirlo a cero impediría procesar la cola. Los recursos son un costo a aprobar por el equipo. [Escalamiento oficial](https://learn.microsoft.com/en-us/azure/container-apps/scale-app).
 
@@ -44,11 +44,11 @@ git rev-parse HEAD
 docker buildx build --platform linux/amd64 --build-arg REVISION=COMMIT_SHA -t REGISTRY/integrity:COMMIT_SHA --load .
 ```
 
-Reemplazar `COMMIT_SHA` y `REGISTRY`; no ejecutar literalmente los marcadores. Publicar esa imagen en el registro autorizado y conservar su digest. Para Container Apps, construir `linux/amd64`, también desde una computadora ARM. [Requisitos de contenedores](https://learn.microsoft.com/en-us/azure/container-apps/containers).
+Sustituir `COMMIT_SHA` y `REGISTRY` por los valores del ambiente. Publicar la imagen en el registro autorizado y conservar su digest. Para Container Apps, construir `linux/amd64`, también desde una computadora ARM. [Requisitos de contenedores](https://learn.microsoft.com/en-us/azure/container-apps/containers).
 
-El build usa imágenes base fijadas por digest, lockfile del frontend y dependencias Python declaradas. Los rangos Python y paquetes del sistema aún pueden cambiar al reconstruir: conserve la imagen aprobada, no prometa reconstrucción idéntica desde cero. `/app/installed-packages.txt` registra los paquetes efectivos; la etiqueta OCI `org.opencontainers.image.revision` registra el commit suministrado. Revisar licencias y vulnerabilidades antes de liberar la imagen.
+El build usa imágenes base fijadas por digest, lockfile del frontend y dependencias Python declaradas. Los rangos Python y paquetes del sistema pueden resolverse a versiones distintas al reconstruir: conservar la imagen aprobada. `/app/installed-packages.txt` registra los paquetes efectivos y la etiqueta OCI `org.opencontainers.image.revision` identifica el commit. Revisar licencias y vulnerabilidades antes de liberar la imagen.
 
-La imagen incluye OCR español/inglés y se ejecuta como UID/GID `10001`. No contiene `.env`, Git, PDFs, bases de revisión, corpus ni `node_modules` del equipo. Node se utiliza solo en la fase de construcción.
+La imagen incluye OCR español/inglés y se ejecuta como UID/GID `10001`. Los secretos, PDFs, bases y corpus se suministran por separado. Node se utiliza en la fase de construcción del frontend.
 
 Para repetir la prueba aislada de la imagen, sin Azure ni red externa:
 
@@ -56,7 +56,7 @@ Para repetir la prueba aislada de la imagen, sin Azure ni red externa:
 python deploy/verify_container.py REGISTRY/integrity:COMMIT_SHA
 ```
 
-Comprueba usuario, OCR, configuración y una revisión ficticia con trabajador separado, comentario y exportaciones. No utiliza datos de la demo ni prueba autenticación institucional.
+Comprueba usuario, OCR, configuración y una revisión ficticia con trabajador separado, comentario y exportaciones. Utiliza datos temporales; el acceso institucional se valida en el ambiente de destino.
 
 ## 4. Contratos de ejecución
 
@@ -64,33 +64,31 @@ El entrypoint es `python -m src.container_start`. Comandos dentro de la imagen:
 
 | Proceso | Argumentos del entrypoint | Comportamiento |
 |---|---|---|
-| API | `api` | Sirve frontend y API solo en loopback; no habilita acceso institucional |
-| Trabajador | `worker` | Procesa trabajos persistentes; no abre un puerto HTTP |
+| API | `api` | Sirve frontend y API en `127.0.0.1:8000` |
+| Trabajador | `worker` | Procesa trabajos persistentes de PostgreSQL |
 
-Para herramientas administrativas, sustituir el entrypoint por `python` y usar el módulo correspondiente. Ejemplo **sin conexión ni recursos**:
+Para herramientas administrativas, sustituir el entrypoint por `python` y usar el módulo correspondiente. Para consultar sus opciones:
 
 ```bash
 docker run --rm --entrypoint python REGISTRY/integrity:COMMIT_SHA -m src.deployment_check --help
 ```
 
-No ejecutar `run_workbench.py` como comando de despliegue Azure ni construir una aplicación Streamlit. Ese script sigue siendo el inicio de la demo local.
-
-El trabajador maneja SIGTERM y termina después del trabajo actual. Una terminación forzada se recupera mediante la reserva persistente; no garantiza conservar una respuesta asistida aún no guardada. No configurar un probe HTTP para un proceso que no escucha HTTP. La estrategia de probes de la API debe definirse al integrar el acceso compartido, sin excluir endpoints de datos de la autenticación.
+El trabajador maneja SIGTERM y termina después del trabajo actual. Una terminación forzada se recupera mediante la reserva persistente; una respuesta asistida pendiente de guardar puede perderse. Monitorizar el trabajador mediante el estado del proceso y de la cola. Definir los probes de la API al integrar el acceso compartido, manteniendo protegidos los endpoints de datos.
 
 ## 5. Variables y secretos
 
-Consultar los contratos, no duplicarlos en el correo de entrega:
+Configurar cada proceso según su contrato:
 
 - [API](../deploy/azure/api.env.example).
 - [Trabajador](../deploy/azure/worker.env.example).
 
 La API usa `INTEGRITY_WORKER_MODE=external`; el procesamiento se configura en el trabajador. API y trabajador deben apuntar a la misma base y contenedor, con credenciales apropiadas para cada proceso.
 
-PostgreSQL remoto exige `sslmode=verify-full`. La imagen proporciona `/etc/ssl/certs/ca-certificates.crt`; si se exige otra CA, montarla y cambiar `sslrootcert`. No reemplazar verificación por `require` o `disable`. Codificar correctamente caracteres especiales de la contraseña en la URL. Mantener migraciones con permisos separados de los de ejecución.
+PostgreSQL remoto exige `sslmode=verify-full`. La imagen proporciona `/etc/ssl/certs/ca-certificates.crt`; si se exige otra CA, montarla y cambiar `sslrootcert`, conservando la verificación TLS. Codificar los caracteres especiales de la contraseña en la URL. Mantener migraciones con permisos separados de los de ejecución.
 
-Blob se conecta con identidad administrada por defecto; una identidad asignada por usuario requiere `AZURE_CLIENT_ID`. El desarrollador crea el contenedor privado y asigna permisos de datos: la API carga/lee originales y el trabajador los lee. No habilitar acceso anónimo a PDFs ni entregar URLs públicas como sustituto de autorización. La comprobación previa de propiedades de contenedor puede necesitar permisos de lectura de contenedor además del acceso a objetos.
+Blob se conecta con identidad administrada por defecto; una identidad asignada por usuario requiere `AZURE_CLIENT_ID`. Crear un contenedor privado y asignar permisos de datos: la API carga/lee originales y el trabajador los lee. Servir los PDFs mediante la API autorizada. La comprobación de propiedades del contenedor puede necesitar permisos de lectura de contenedor además del acceso a objetos.
 
-Suministrar secretos mediante la plataforma o su integración con Key Vault. No pasarlos como argumentos de build, no enviarlos al frontend ni guardarlos en archivos versionados. Los ejemplos no configuran Key Vault ni identidades.
+Suministrar secretos en tiempo de ejecución mediante la plataforma o su integración con Key Vault. Mantenerlos excluidos del build, del frontend y de Git.
 
 ### Azure OpenAI
 
@@ -107,9 +105,9 @@ OPENAI_API_VERSION=COMPATIBLE_API_VERSION
 OPENAI_MODEL=DEPLOYMENT_NAME
 ```
 
-Usar el nombre del deployment, no asumir que coincide con el nombre comercial del modelo. La integración actual de Azure OpenAI utiliza clave; identidad administrada para el modelo no está implementada. No confundirla con la identidad administrada ya soportada por Blob.
+`OPENAI_MODEL` identifica el deployment configurado en Azure. Azure OpenAI se autentica mediante `OPENAI_API_KEY`; Blob utiliza la identidad administrada indicada en la sección anterior.
 
-Probar compatibilidad real con los esquemas estructurados y límites del deployment elegido. La aplicación admite hasta tres solicitudes lógicas por expediente y no repite automáticamente una solicitud incierta; esto no constituye un límite de gasto global. Aprobar cuotas y presupuestos del recurso. No cambiar de proveedor silenciosamente si Azure falla: se conserva la lectura determinística.
+Probar compatibilidad con los esquemas estructurados y límites del deployment elegido. La aplicación admite hasta tres solicitudes lógicas por expediente y conserva las solicitudes inciertas para evitar repeticiones automáticas. Configurar cuotas y presupuesto global en el recurso. Ante un fallo del proveedor se conserva la lectura determinística.
 
 ## 6. Esquema y datos existentes
 
@@ -119,7 +117,7 @@ Crear base y contenedor privados antes del arranque. Con variables y permisos de
 python -m src.manage_storage init
 ```
 
-En un contenedor administrativo, utilizar `--entrypoint python` y `-m src.manage_storage init`, con acceso privado a los mismos servicios. Ni la API ni el trabajador PostgreSQL crean el esquema automáticamente.
+En un contenedor administrativo, utilizar `--entrypoint python` y `-m src.manage_storage init`, con acceso privado a los mismos servicios. La inicialización del esquema es un paso administrativo previo al arranque de API y trabajador.
 
 Decidir si el ambiente comienza vacío o conserva revisiones anteriores. Para importar, detener escrituras en el origen, respaldar y utilizar [la migración verificada](shared_storage.md#migración-desde-la-pre-poc). No copiar una SQLite en uso ni adjuntar una base de laptop al repositorio. Conservar el comprobante de migración en almacenamiento protegido.
 
@@ -127,7 +125,7 @@ La migración conserva IDs, resultados, eventos, comentarios, originales y copia
 
 ## 7. Corpus histórico: entrega separada
 
-El corpus no es la base de revisiones ni se completa automáticamente con las cargas de usuarios. Actualmente sigue siendo CSV + PDFs, con validación determinística de correspondencia:
+El corpus histórico se administra como un conjunto versionado de CSV y PDFs. Las cargas de usuarios se almacenan en expedientes; el equipo publica las versiones del corpus por separado, con validación determinística de correspondencia:
 
 ```text
 /mnt/corpus/
@@ -136,7 +134,7 @@ El corpus no es la base de revisiones ni se completa automáticamente con las ca
   especificaciones/*.pdf
 ```
 
-Utilizar los nombres y columnas de [configuración del corpus](configuration.md#corpus-documental-opcional). Entregar una versión identificable, conservar CSV y hashes de originales, comprobar faltantes/duplicados y no renombrar por similitud. Montar una versión aprobada en el trabajador, preferentemente de solo lectura. Azure Files es una opción de montaje, no un requisito creado por este repo. [Montajes de almacenamiento](https://learn.microsoft.com/en-us/azure/container-apps/storage-mounts).
+Utilizar los nombres y columnas de [configuración del corpus](configuration.md#corpus-documental-opcional). Entregar una versión identificable, conservar CSV y hashes, comprobar faltantes/duplicados y respetar la correspondencia exacta normalizada. Montar la versión aprobada en el trabajador, preferentemente de solo lectura. Azure Files permite suministrarla mediante un volumen. [Montajes de almacenamiento](https://learn.microsoft.com/en-us/azure/container-apps/storage-mounts).
 
 La caché de extracción puede ir en `/tmp/integrity/extracted_text`: es regenerable, no el original. Para reproducir un análisis debe conservarse el corpus de referencia, además de la base y los originales de cada expediente. Si no se suministra corpus, la revisión funciona sin comparación y debe indicarlo; no simular procesos comparables.
 
@@ -170,6 +168,6 @@ Sin `--check-services` solo valida variables. Con él consulta el esquema, propi
 
 Actualizar imagen y esquema como un cambio controlado, con respaldo y plan de reversión. Esta versión solo tiene la migración de esquema actual; una imagen anterior no necesariamente puede abrir una base futura. No hacer downgrade contra la base activa sin verificar compatibilidad.
 
-## 10. Qué sigue pendiente
+## 10. Operación y evaluación
 
-Acceso institucional y autorización; identidad de auditoría; catálogo operativo y permisos del corpus; cuota global; reconciliación/retención de objetos; consultas de detalle por demanda; ensayos de carga y recuperación en la suscripción real; evaluación analítica con SERCOP. Las pruebas locales y de CI no acreditan estas condiciones.
+Acordar responsables para la gestión del corpus, cuotas, reconciliación y retención de objetos. Validar carga y recuperación en la suscripción real, y evaluar la calidad analítica con especialistas de SERCOP. Registrar resultados y pendientes como parte de la aceptación del ambiente.

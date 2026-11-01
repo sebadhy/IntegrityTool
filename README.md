@@ -4,9 +4,9 @@ Herramienta exploratoria de revisión documental de pliegos, especificaciones y 
 
 > ¿Qué aspectos de este pliego convendría revisar primero y por qué?
 
-La aplicación tiene una sola interfaz: **React + TypeScript + PDF.js**, servida por una **API Python/FastAPI**. El motor combina reglas y una taxonomía editable con procesamiento asistido opcional. No detecta corrupción, no determina ilegalidad ni reemplaza revisión técnica, jurídica o institucional.
+La aplicación utiliza **React + TypeScript + PDF.js**, servida por una **API Python/FastAPI**. El motor combina reglas y una taxonomía editable con procesamiento asistido opcional. No detecta corrupción, no determina ilegalidad ni reemplaza revisión técnica, jurídica o institucional.
 
-**Entrega para Azure:** comenzar por [la guía para el desarrollador](docs/developer_handoff.md). Incluye imagen, variables, datos y aceptación. La autenticación institucional y el acceso HTTP compartido siguen pendientes; el contenedor no los configura.
+**Entrega para Azure:** comenzar por [la guía para el desarrollador](docs/developer_handoff.md): componentes, configuración, datos y criterios de aceptación.
 
 ## Inicio rápido
 
@@ -57,7 +57,7 @@ Se admiten hasta ocho PDFs, de hasta 25 MB cada uno y 100 MB por expediente. Los
 
 En local, los resultados, comentarios y copias de taxonomía se guardan en `data/workbench/reviews.sqlite3`; los originales nuevos, en `data/workbench/documents/`. Los originales de revisiones anteriores siguen disponibles desde su almacenamiento previo. Todo queda fuera de Git. Navegar, cambiar zoom, revisar y exportar no repite el análisis ni vuelve a solicitar contenido al proveedor.
 
-La misma aplicación admite PostgreSQL y Azure Blob Storage, con trabajos persistentes y un proceso de análisis separado. Es una base de persistencia, no un despliegue institucional terminado: consulte [almacenamiento compartido y migración](docs/shared_storage.md).
+Para almacenamiento compartido, la aplicación admite PostgreSQL y Azure Blob Storage, con trabajos persistentes y un proceso de análisis separado. Consulte [almacenamiento compartido y migración](docs/shared_storage.md).
 
 ## Cómo funciona
 
@@ -96,7 +96,7 @@ Los resultados y los fallos se conservan para evitar reintentos al navegar. Una 
 run_workbench.py                 Inicio local
 requirements.txt                Dependencias de ejecución
 requirements-dev.txt            Ejecución + herramientas de pruebas
-requirements-azure.txt          La misma aplicación + adaptadores PostgreSQL/Blob
+requirements-azure.txt          Dependencias con adaptadores PostgreSQL/Blob
 Dockerfile                      Imagen de API/trabajador, sin datos ni secretos
 deploy/azure/                   Contratos de variables del ambiente
 frontend/                       Interfaz React/TypeScript y PDF.js
@@ -119,8 +119,6 @@ docs/                           Arquitectura, metodología y evaluación
 data/                           Datos locales, no versionados
 ```
 
-Las interfaces y notificaciones anteriores se retiraron; su código es recuperable en el historial Git. El inicio local y los comandos del contenedor ejecutan la misma aplicación, no frontends alternativos.
-
 ## Validación
 
 ```bash
@@ -136,11 +134,11 @@ La suite cubre extracción, metadata, negaciones, mitigantes, consolidación, tr
 
 ## Despliegue
 
-El inicio local utiliza un trabajador integrado. Para separar API y análisis existe un trabajador independiente con reservas persistentes. Sigue sin haber autenticación institucional: no exponga el puerto en Internet ni en una red compartida. `Revisor local` es una etiqueta, no una identidad verificada.
+El inicio local integra API y trabajador. El contenedor permite ejecutarlos por separado y conserva los trabajos en la base de datos. El Dockerfile construye el frontend e incorpora Python y OCR.
 
-Antes de publicarla en Azure se deben resolver acceso autenticado, permisos, dominio autorizado, operación de la persistencia, respaldos y retención. Las pruebas locales de concurrencia no son una certificación de carga institucional. No es suficiente cambiar la dirección de escucha. La configuración de proveedores y almacenamiento no equivale a un despliegue seguro.
+**Acceso actual: local.** Antes de compartir una URL, integrar autenticación institucional, permisos, identidad verificada del revisor y dominio HTTPS. El equipo de despliegue también debe validar respaldos, retención y capacidad de carga.
 
-La [guía de Azure](docs/azure_deployment.md) distingue lo implementado de los pasos que debe completar el desarrollador. El Dockerfile construye el frontend, incorpora OCR y ejecuta sin root. No contiene PDFs, bases ni claves; mantiene el acceso HTTP local hasta integrar los controles pendientes. No ejecutar los ejemplos de variables sin reemplazar sus marcadores y suministrar secretos mediante el ambiente.
+La [guía de Azure](docs/azure_deployment.md) detalla construcción, arranque, servicios y aceptación. Sustituya los marcadores de los ejemplos por los valores del ambiente y suministre secretos mediante la plataforma. Los documentos y las bases se administran fuera de la imagen.
 
 ## Documentación
 

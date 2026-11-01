@@ -1,8 +1,8 @@
 # Configuración de Integrity Tool
 
-La aplicación se inicia con `python run_workbench.py`. Estas opciones no agregan interfaces ni servicios de ejecución alternativos.
+El inicio local es `python run_workbench.py`. Las variables del ambiente configuran proveedor, almacenamiento y corpus.
 
-Para la entrega al equipo Azure, consultar primero [las responsabilidades y el orden de trabajo](developer_handoff.md) y [la guía operativa](azure_deployment.md). Los ejemplos de API/trabajador no configuran un tenant ni habilitan acceso público.
+Para el equipo Azure, consultar [las responsabilidades y el orden de trabajo](developer_handoff.md) y [la guía operativa](azure_deployment.md), con los requisitos para habilitar el acceso compartido.
 
 ## Variables y secretos
 
@@ -24,7 +24,7 @@ OPENAI_API_VERSION=<version de API compatible con el deployment>
 OPENAI_MODEL=<nombre del deployment>
 ```
 
-`OPENAI_MODEL` es el nombre del despliegue Azure. La configuración por clave está implementada; identidad administrada no está integrada todavía. Antes de publicar, valide los contratos de salida estructurada con la versión y modelo elegidos. No se debe asumir compatibilidad solo por obtener una respuesta a una llamada simple.
+`OPENAI_MODEL` es el nombre del despliegue Azure. Este proveedor se autentica mediante `OPENAI_API_KEY`. Antes de publicar, valide los contratos de salida estructurada con la versión y modelo elegidos.
 
 ### OpenAI
 
@@ -42,7 +42,7 @@ GROQ_API_KEY=<clave>
 GROQ_MODEL=llama-3.3-70b-versatile
 ```
 
-Utiliza el cliente compatible con OpenAI; no requiere otro SDK.
+Utiliza el cliente compatible con OpenAI incluido en las dependencias.
 
 ### Ollama local
 
@@ -79,7 +79,7 @@ INTEGRITY_STORE_PATH=data/workbench/reviews.sqlite3
 
 La base conserva resultados, cláusulas, copias de taxonomía, caché, revisiones humanas y trabajos persistentes. Los originales nuevos se guardan en archivos por SHA-256 junto a la base; los PDFs internos de revisiones anteriores se siguen leyendo sin reanalizarlos. Base y originales están excluidos de Git: respalde ambos.
 
-Para PostgreSQL y Azure Blob Storage, consulte [persistencia compartida y migración](shared_storage.md). No es suficiente apuntar una ruta SQLite a una carpeta de red.
+Para almacenamiento compartido, configure PostgreSQL y Azure Blob Storage según [la guía de persistencia y migración](shared_storage.md).
 
 ## Corpus documental opcional
 
@@ -115,4 +115,4 @@ Para PDFs escaneados, instale Tesseract con el idioma español en el sistema. Si
 
 ## Despliegue compartido
 
-El inicio local escucha en `127.0.0.1:8000`. La API rechaza hosts externos y no tiene identidad institucional integrada. Configurar Azure OpenAI no publica la aplicación. La autenticación, autorización, almacenamiento persistente y operación segura deben resolverse antes de exponerla.
+El inicio local escucha en `127.0.0.1:8000` y la API rechaza hosts externos. Antes de habilitar acceso compartido, integrar identidad institucional, autenticación, autorización y operación segura según [la guía de Azure](azure_deployment.md).

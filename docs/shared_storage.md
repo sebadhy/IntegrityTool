@@ -1,12 +1,10 @@
 # Persistencia compartida y trabajos durables
 
-## Estado de esta entrega
+## Componentes y acceso
 
-Implementado: una capa de datos SQLite/PostgreSQL, originales en archivos o Azure Blob Storage, proyección consultable de observaciones/evidencias, trabajos persistentes, trabajador separado y migración verificable desde SQLite.
+La persistencia incluye SQLite/PostgreSQL, originales en archivos o Azure Blob Storage, proyección consultable de observaciones/evidencias, trabajos persistentes, trabajador separado y migración verificable desde SQLite.
 
-Esto no publica la aplicación ni completa su seguridad institucional. Siguen pendientes autenticación y permisos por expediente, catálogo operativo del corpus, límites de proveedor compartidos y dimensionamiento de carga. La API mantiene la restricción de acceso local.
-
-La entrega al desarrollador se organiza en [la guía de responsabilidades](developer_handoff.md) y [el procedimiento Azure](azure_deployment.md); no se debe interpretar el soporte de persistencia como autorización para publicar HTTP.
+La API mantiene el acceso local. Para habilitar acceso compartido, seguir [la guía de responsabilidades](developer_handoff.md) y [el procedimiento Azure](azure_deployment.md), que incluyen autenticación, permisos y validación operativa.
 
 ## Responsabilidades
 
@@ -19,7 +17,7 @@ La entrega al desarrollador se organiza en [la guía de responsabilidades](devel
 | `src/review_worker.py` | Inicio del proceso de análisis independiente |
 | `src/manage_storage.py` | Inicialización e importación explícitas, sin motor ni modelos |
 
-SQLAlchemy Core comparte consultas entre los dos motores. No se incorporan ORM de entidades, agentes, colas externas ni otro frontend.
+SQLAlchemy Core comparte consultas entre SQLite y PostgreSQL. La tabla `analysis_jobs` conserva los trabajos que procesa el trabajador Python.
 
 ## Datos conservados
 
@@ -65,7 +63,7 @@ INTEGRITY_WORKER_MODE=external
 
 PostgreSQL remoto exige TLS con verificación de servidor. Configure una CA de confianza; no elimine la verificación para evitar un error de conexión. La prueba local en loopback no requiere TLS.
 
-Blob utiliza identidad administrada por defecto. Para una identidad asignada por usuario, configure `AZURE_CLIENT_ID`. El equipo de infraestructura debe crear el contenedor privado y asignar permisos de datos. La aplicación no crea cuentas, contenedores ni permisos de Azure. Se admite una cadena de conexión como secreto mediante `INTEGRITY_BLOB_CONNECTION_STRING`.
+Blob utiliza identidad administrada por defecto. Para una identidad asignada por usuario, configure `AZURE_CLIENT_ID`. El equipo de infraestructura crea el contenedor privado y asigna permisos de datos antes del arranque. Se admite una cadena de conexión como secreto mediante `INTEGRITY_BLOB_CONNECTION_STRING`.
 
 Inicialice el esquema con una identidad autorizada para migraciones:
 
@@ -91,7 +89,7 @@ Tras un vencimiento se admiten como máximo tres intentos. Si ya hay una lectura
 
 La solicitud al proveedor se reserva antes de contactar con él. Si el proceso termina sin confirmar respuesta, no se vuelve a llamar automáticamente con la misma clave. Esto puede dejar contextualización sin completar: la interfaz debe indicarlo, no fingir éxito. Una respuesta tardía puede quedar registrada para reutilización sin permitir que un trabajador vencido sobrescriba la revisión.
 
-El presupuesto actual sigue siendo por expediente. Esta entrega no implementa un limitador de cuota global de Azure OpenAI ni una estimación monetaria.
+El presupuesto de solicitudes se configura por expediente. Las cuotas y el presupuesto global de Azure OpenAI se administran en el recurso del proveedor; el registro local conserva el consumo reportado.
 
 ## Migración desde la pre-PoC
 
@@ -115,7 +113,7 @@ Los trabajos importados incompletos quedan interrumpidos, no se ponen en ejecuci
 
 Base y Blob no comparten una transacción distribuida. Un fallo puede dejar objetos sin referencia, pero revierte las filas de la importación. No se borran objetos en línea, porque otro expediente podría usarlos. La reconciliación y limpieza con retención quedan pendientes.
 
-La utilidad admite SQLite con originales internos o archivos locales. No es un exportador universal entre cuentas Blob. El corpus histórico CSV/PDF se traslada y valida por separado; no se incorpora automáticamente a las tablas de revisión.
+La utilidad importa desde SQLite con originales internos o archivos locales. El corpus histórico CSV/PDF se traslada y valida por separado de las tablas de revisión.
 
 ## Pruebas reproducibles
 
@@ -146,4 +144,4 @@ CI repite los contratos con PostgreSQL y Azurite. Esto verifica integración loc
 
 ## Siguiente etapa
 
-Antes de compartir el ambiente: identidad verificada y permisos, catálogo y versiones del corpus, consultas de detalle por demanda, políticas de retención, límites de procesamiento globales y pruebas de recuperación/carga. No se debe interpretar esta base técnica como aprobación para exponer la API actual.
+Para la operación compartida, validar identidad y permisos, catálogo y versiones del corpus, consultas de detalle por demanda, políticas de retención, límites de procesamiento globales y recuperación/carga. Los criterios de aceptación se detallan en [la guía de Azure](azure_deployment.md#9-aceptación-antes-de-entregar-la-url).
