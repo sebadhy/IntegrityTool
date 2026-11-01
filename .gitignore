@@ -8,6 +8,7 @@ __pycache__/
 data/raw/
 data/processed/
 data/feedback/
+data/benchmark/
 .streamlit/
 .pytest_cache/
 *.log

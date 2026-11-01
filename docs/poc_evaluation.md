@@ -24,6 +24,8 @@ Dos especialistas revisan independientemente qué aspectos merecen validación, 
 
 ## Medición
 
+Antes de atribuir errores al motor analítico, ejecutar el [benchmark de extracción documental](document_benchmark.md): texto, asociación de celdas, página y geometría. Sus referencias se anotan por separado de la utilidad de las observaciones. La recuperación de un dato no demuestra que una observación sea pertinente ni que la revisión sea completa.
+
 - Utilidad de cada observación, sustentación documental y pertinencia del patrón.
 - Falsos positivos, aspectos relevantes omitidos y duplicados.
 - Aporte incremental de candidatos semánticos frente al motor sin modelo.

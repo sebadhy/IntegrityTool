@@ -116,6 +116,7 @@ src/manage_storage.py           Inicialización y migración explícitas
 src/review_worker.py            Inicio del trabajador independiente
 src/deployment_check.py          Comprobaciones sin análisis ni modelos
 docs/                           Arquitectura, metodología y evaluación
+benchmarks/                     Evaluación aislada de extracción documental
 data/                           Datos locales, no versionados
 ```
 
@@ -124,13 +125,15 @@ data/                           Datos locales, no versionados
 ```bash
 python -m pip install -r requirements-dev.txt
 python -m pip check
-python -m compileall -q src tests run_workbench.py
+python -m compileall -q src tests benchmarks run_workbench.py
 python -m pytest -q
 cd frontend
 pnpm build
 ```
 
 La suite cubre extracción, metadata, negaciones, mitigantes, consolidación, trazabilidad, versiones, caché, persistencia, API y exportaciones. Los casos asistidos utilizan respuestas simuladas; las pruebas bloquean HTTP externo para no consumir claves locales. CI verifica Python 3.11/3.13 en Linux y Windows, el frontend y la integración con PostgreSQL y Blob emulado. Las pruebas externas requieren [servicios de prueba explícitos](docs/shared_storage.md); nunca utilizan cuentas de Azure reales.
+
+Para comparar fidelidad documental antes de cambiar el extractor, consulte el [benchmark de extracción](docs/document_benchmark.md). Congela una muestra por SHA-256 y conserva mediciones y evidencias; se ejecuta por separado de la aplicación. La comparación local no utiliza modelos ni servicios externos.
 
 ## Despliegue
 
@@ -149,6 +152,7 @@ La [guía de Azure](docs/azure_deployment.md) detalla construcción, arranque, s
 - [Arquitectura del pipeline documental](docs/architecture.md)
 - [Marco técnico y conceptual](docs/technical_and_conceptual_framework.md)
 - [Protocolo inicial de evaluación de la PoC](docs/poc_evaluation.md)
+- [Benchmark reproducible de extracción documental](docs/document_benchmark.md)
 - [Decisiones de UX de la mesa documental](docs/workbench_ux.md)
 
 ## Alcance

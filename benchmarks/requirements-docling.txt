@@ -1,0 +1,2 @@
+# Evaluation environment only; install with requirements-dev.txt to keep its constraints.
+docling==2.145.0
