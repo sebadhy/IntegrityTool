@@ -57,7 +57,14 @@ class FileDocumentStorage:
                 output.write(content)
                 output.flush()
                 os.fsync(output.fileno())
-            os.replace(temporary, path)
+            try:
+                os.replace(temporary, path)
+            except (FileExistsError, PermissionError):
+                # Windows may block replacement while a concurrent upload reads
+                # the same original. Accept it only after verifying its identity.
+                if not path.exists():
+                    raise
+                self.read(reference.key, digest, len(content))
         finally:
             if os.path.exists(temporary):
                 os.unlink(temporary)

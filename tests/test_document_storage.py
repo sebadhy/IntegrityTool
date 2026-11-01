@@ -1,11 +1,13 @@
 import hashlib
 import os
 import uuid
+from pathlib import Path
 from urllib.parse import urlparse
 
 import pytest
 
 from src.analyzer.document_storage import AzureDocumentStorage, FileDocumentStorage, document_key
+from src.analyzer import document_storage
 
 
 def test_file_original_has_deterministic_key_and_detects_corruption(tmp_path):
@@ -19,6 +21,46 @@ def test_file_original_has_deterministic_key_and_detects_corruption(tmp_path):
     (storage.root / first.key).write_bytes(b"changed")
     with pytest.raises(ValueError, match="huella"):
         storage.read(first.key, first.sha256, first.size)
+
+
+def test_concurrent_original_is_verified_when_windows_blocks_replacement(tmp_path, monkeypatch):
+    storage = FileDocumentStorage(tmp_path / "objects")
+    content = b"%PDF-concurrent-original"
+
+    def concurrent_replace(source, destination):
+        Path(destination).write_bytes(content)
+        raise PermissionError("Concurrent reader blocks replacement")
+
+    monkeypatch.setattr(document_storage.os, "replace", concurrent_replace)
+    reference = storage.put(content)
+    assert storage.read(reference.key, reference.sha256, reference.size) == content
+    assert not list(storage.root.rglob(".upload-*"))
+
+
+def test_concurrent_original_with_wrong_hash_is_not_accepted(tmp_path, monkeypatch):
+    storage = FileDocumentStorage(tmp_path / "objects")
+    content = b"%PDF-concurrent-original"
+
+    def concurrent_replace(source, destination):
+        Path(destination).write_bytes(b"X" * len(content))
+        raise PermissionError("Concurrent reader blocks replacement")
+
+    monkeypatch.setattr(document_storage.os, "replace", concurrent_replace)
+    with pytest.raises(ValueError, match="huella"):
+        storage.put(content)
+    assert not list(storage.root.rglob(".upload-*"))
+
+
+def test_storage_permission_error_without_an_existing_original_is_preserved(tmp_path, monkeypatch):
+    storage = FileDocumentStorage(tmp_path / "objects")
+
+    def denied(source, destination):
+        raise PermissionError("Access denied")
+
+    monkeypatch.setattr(document_storage.os, "replace", denied)
+    with pytest.raises(PermissionError, match="Access denied"):
+        storage.put(b"%PDF-local-original")
+    assert not list(storage.root.rglob(".upload-*"))
 
 
 @pytest.mark.parametrize("key", ["../outside.pdf", "/tmp/outside.pdf", "originals/wrong.pdf"])
