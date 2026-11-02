@@ -1,5 +1,15 @@
 import { ArrowRight, ChevronDown, FileText } from "lucide-react";
-import { PRIORITIES, ROLES, type ReviewCase, type ReviewItem } from "./types";
+import { lazy, Suspense, useState } from "react";
+import {
+  PRIORITIES,
+  ROLES,
+  type Evidence,
+  type ReviewCase,
+  type ReviewItem,
+} from "./types";
+const ComparisonPdfReader = lazy(() =>
+  import("./PdfReader").then((module) => ({ default: module.PdfReader })),
+);
 export function ExecutiveReading({
   reviewCase,
   onSelect,
@@ -24,13 +34,17 @@ export function ExecutiveReading({
             ? "Síntesis redactada con apoyo de un modelo de lenguaje, sobre aspectos sustentados en evidencia."
             : "Síntesis estructurada a partir de los aspectos y la evidencia documental."}
         </span>
-        {result.semantic_review?.coverage && result.semantic_review.status === "completed" && (
-          <span className="reading-provenance">
-            Lectura contextual adicional sobre {result.semantic_review.coverage.selected_clause_count}
-            {" de "}{result.semantic_review.coverage.active_clause_count} cláusulas activas.
-            {" "}Las propuestas requieren validación humana; no es una revisión semántica completa.
-          </span>
-        )}
+        {result.semantic_review?.coverage &&
+          result.semantic_review.status === "completed" && (
+            <span className="reading-provenance">
+              Lectura contextual adicional sobre{" "}
+              {result.semantic_review.coverage.selected_clause_count}
+              {" de "}
+              {result.semantic_review.coverage.active_clause_count} cláusulas
+              activas. Las propuestas requieren validación humana; no es una
+              revisión semántica completa.
+            </span>
+          )}
       </section>
       <section className="priorities-section">
         <div className="section-heading">
@@ -120,9 +134,9 @@ export function ExecutiveReading({
           expediente. La ausencia de observaciones no acredita cumplimiento.
         </p>
         <p>
-          La priorización aplica criterios explícitos sobre contenido sustantivo, obligatoriedad,
-          mitigantes y contexto histórico disponible; la repetición no aumenta
-          la prioridad.
+          La priorización aplica criterios explícitos sobre contenido
+          sustantivo, obligatoriedad, mitigantes y contexto histórico
+          disponible; la repetición no aumenta la prioridad.
         </p>
         <p>
           {result.corpus.total_processes
@@ -151,8 +165,9 @@ export function ExecutiveReading({
                 (call) => call.status === "completed",
               ).length
             }{" "}
-            solicitudes completadas. Puede proponer candidatos con citas verificadas;
-            no asigna la prioridad final ni reemplaza la revisión humana.
+            solicitudes completadas. Puede proponer candidatos con citas
+            verificadas; no asigna la prioridad final ni reemplaza la revisión
+            humana.
           </dd>
         </dl>
       </details>
@@ -160,15 +175,163 @@ export function ExecutiveReading({
   );
 }
 export function VersionComparison({ reviewCase }: { reviewCase: ReviewCase }) {
+  const [evidence, setEvidence] = useState<Evidence | undefined>();
+  const [showAll, setShowAll] = useState(false);
+  const comparison = reviewCase.result?.requirement_comparison;
+  const groups = [...(comparison?.comparisons || [])].sort(
+    (a, b) =>
+      Number(b.status === "different_conditions") -
+      Number(a.status === "different_conditions"),
+  );
+  const units: Record<string, string> = {
+    gb: "GB",
+    mb: "MB",
+    kg: "kg",
+    g: "g",
+    business_days: "días hábiles",
+    calendar_days: "días calendario",
+  };
+  const operators: Record<string, string> = {
+    min: "Mínimo",
+    max: "Máximo",
+    eq: "Exactamente",
+  };
   return (
     <section className="version-comparison">
       <div className="section-index">COTEJO DOCUMENTAL</div>
-      <h2>Cambios entre versiones relacionadas</h2>
-      <p>
-        Se comparan únicamente documentos que usted marcó como versiones
-        sustituidas. Las diferencias de texto no confirman una contradicción ni
-        su alcance jurídico.
-      </p>
+      {comparison && (
+        <>
+          <h2>Condiciones entre documentos</h2>
+          <p>
+            Se contrastan valores explícitos del mismo ítem, atributo, unidad y,
+            en plazos, hito de inicio. No se determina qué documento prevalece.
+          </p>
+          <small>
+            {comparison.extracted_count} condiciones extraídas ·{" "}
+            {comparison.comparisons.length}{" "}
+            {comparison.comparisons.length === 1
+              ? "grupo comparable"
+              : "grupos comparables"}
+            . El cotejo es parcial; la ausencia de diferencias no acredita
+            consistencia del expediente.
+          </small>
+          {comparison.comparisons.length === 0 && (
+            <p>
+              No se identificaron condiciones con contexto suficiente para un
+              cotejo entre documentos.
+            </p>
+          )}
+          {(showAll ? groups : groups.slice(0, 8)).map((group) => (
+            <article key={group.comparison_id}>
+              <div className="version-change-heading">
+                <h3>
+                  {group.title} ·{" "}
+                  {group.item_ref
+                    .replace("item:", "ítem ")
+                    .replace("lote:", "lote ")}
+                </h3>
+                <span>
+                  {group.status === "different_conditions"
+                    ? "Diferencia a validar"
+                    : "Mismo valor y condición numérica"}
+                </span>
+              </div>
+              <div className="version-columns">
+                {[
+                  ...new Set(
+                    group.sources.map((source) => source.source_document_id),
+                  ),
+                ].map((id) => {
+                  const sources = group.sources.filter(
+                    (source) => source.source_document_id === id,
+                  );
+                  return (
+                    <div key={id}>
+                      <h4>{sources![0].document_name}</h4>
+                      <p>
+                        {operators[sources![0].comparator]} {sources![0].value}{" "}
+                        {units[group.unit] || group.unit}
+                      </p>
+                      {sources!.map((source) => (
+                        <blockquote key={source.requirement_id}>
+                          <span>
+                            Pág. {source.page} · {source.section_title}
+                          </span>
+                          <p>{source.matched_text}</p>
+                          <button
+                            className="text-button"
+                            onClick={() =>
+                              setEvidence({
+                                document_id: source.source_document_id,
+                                document_name: source.document_name,
+                                role: source.document_role,
+                                version: "",
+                                page: source.page,
+                                section: source.section_title,
+                                text: source.evidence_text,
+                                matched_text: source.matched_text,
+                                rects: source.rects,
+                                location_precision: source.location_precision,
+                              })
+                            }
+                          >
+                            Consultar fuente
+                          </button>
+                        </blockquote>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+              {group.status === "different_conditions" && (
+                <p>{group.question}</p>
+              )}
+            </article>
+          ))}
+          {groups.length > 8 && (
+            <button
+              className="text-button"
+              onClick={() => setShowAll(!showAll)}
+            >
+              {showAll
+                ? "Mostrar menos"
+                : `Ver ${groups.length - 8} condiciones adicionales`}
+            </button>
+          )}
+          {evidence && (
+            <Suspense fallback={<p>Abriendo documento…</p>}>
+              <ComparisonPdfReader
+                caseId={reviewCase.id}
+                documents={reviewCase.result!.documents}
+                evidence={evidence}
+                documentId={evidence.document_id}
+                onDocumentChange={(id) =>
+                  setEvidence({
+                    ...evidence,
+                    document_id: id,
+                    page: 1,
+                    matched_text: "",
+                    rects: [],
+                  })
+                }
+              />
+            </Suspense>
+          )}
+          <p>
+            <small>{comparison.limitation}</small>
+          </p>
+        </>
+      )}
+      {reviewCase.result!.version_changes.length > 0 && (
+        <>
+          <h2>Cambios entre versiones relacionadas</h2>
+          <p>
+            Se comparan únicamente documentos que usted marcó como versiones
+            sustituidas. Las diferencias de texto no confirman una contradicción
+            ni su alcance jurídico.
+          </p>
+        </>
+      )}
       {reviewCase.result!.version_changes.map((change, i) => (
         <article key={`${change.pattern_id}-${i}`}>
           <div className="version-change-heading">

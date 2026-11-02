@@ -171,11 +171,18 @@ def create_app(storage: Path | None = None, assisted: bool | None = None, corpus
         elif format == "csv":
             out = io.StringIO()
             writer = csv.writer(out)
-            writer.writerow(["observacion_id", "patron", "titulo", "prioridad_revision", "documento", "pagina", "fragmento", "mitigantes", "preguntas", "estado_humano", "comentario", "engine_version", "taxonomy_sha256", "fuentes", "metodos_identificacion"])
+            writer.writerow(["observacion_id", "patron", "titulo", "prioridad_revision", "documento", "pagina", "fragmento", "mitigantes", "preguntas", "estado_humano", "comentario", "engine_version", "taxonomy_sha256", "fuentes", "metodos_identificacion", "tipo_registro", "requisito_id", "item", "atributo", "valor", "unidad", "condicion", "hito", "cotejo_id"])
             for item in case["result"]["items"]:
                 for ev in item["evidence"]:
                     review = case["reviews"].get(item["id"], {})
                     cells = [item["id"], item["pattern_id"], item["title"], item["priority"], ev["document_name"], ev["page"], ev["text"], "; ".join(item["mitigants"]), "; ".join(item["questions"]), review.get("state", "pending"), review.get("comment", ""), case["result"]["provenance"]["engine_version"], case["result"]["provenance"]["taxonomy_sha256"], "; ".join(item.get("sources", [])), "; ".join(item.get("analysis_methods", ["deterministic_rules"]))]
+                    writer.writerow([_csv_cell(cell) for cell in cells + ["observacion"] + [""] * 8])
+            comparison_ids = {source["requirement_id"]: group["comparison_id"]
+                              for group in case["result"].get("requirement_comparison", {}).get("comparisons", [])
+                              for source in group["sources"]}
+            for doc in case["result"]["documents"]:
+                for req in doc.get("analysis", {}).get("requirements", []):
+                    cells = ["", "", "Condición documental explícita", "", doc["name"], req["page"], req["evidence_text"], "", "", "", "", case["result"]["provenance"]["engine_version"], case["result"]["provenance"]["taxonomy_sha256"], "Documento original", req["extraction_method"], "requisito", req["requirement_id"], req["item_ref"], req["attribute"], req["value"], req["unit"], req["comparator"], req.get("milestone", ""), comparison_ids.get(req["requirement_id"], "")]
                     writer.writerow([_csv_cell(cell) for cell in cells])
             body, media = "\ufeff" + out.getvalue(), "text/csv"
         else:
@@ -204,7 +211,7 @@ def _public_case(case):
         analysis = document.get("analysis", {})
         result["documents"].append({**document, "analysis": {
             key: value for key, value in analysis.items()
-            if key not in {"clauses", "signals", "semantic_signals", "items"}}})
+            if key not in {"clauses", "signals", "semantic_signals", "items", "requirements"}}})
     if "semantic_review" in result:
         result["semantic_review"] = {key: value for key, value in result["semantic_review"].items() if key != "decisions"}
     return {**case, "result": result}
@@ -232,6 +239,15 @@ def _html_report(case):
         for ev in item["evidence"]:
             parts.append(f'<small>{esc(ev["document_name"])} · página {ev["page"]}</small><blockquote>{esc(ev["text"])}</blockquote>')
         parts.append(f'<p>Mitigantes: {esc("; ".join(item["mitigants"]) or "No identificados en los fragmentos revisados.")}</p><p>Qué validar: {esc(" ".join(item["questions"]))}</p><p>Comentario: {esc(review.get("comment", ""))}</p></article>')
+    comparison = result.get("requirement_comparison")
+    if comparison:
+        parts.append(f'<h2>Cotejo de condiciones documentales</h2><p>{esc(comparison["limitation"])}</p>')
+        for group in comparison["comparisons"]:
+            status = "Diferencia a validar" if group["status"] == "different_conditions" else "Misma condición explícita"
+            parts.append(f'<article><h3>{esc(group["title"])} · {esc(group["item_ref"])}</h3><p>{status}</p>')
+            for source in group["sources"]:
+                parts.append(f'<small>{esc(source["document_name"])} · página {esc(source["page"])}</small><blockquote>{esc(source["evidence_text"])}</blockquote>')
+            parts.append(f'<p>{esc(group["question"])}</p></article>')
     parts.append(f'<hr><p>La lectura es preliminar y no reemplaza el análisis técnico o jurídico. Las frecuencias históricas no acreditan validez de requisitos. El procesamiento asistido puede proponer candidatos y redactar contexto; no asigna prioridad final ni valida la interpretación por sí solo.</p><small>{esc(json.dumps(result["provenance"], ensure_ascii=False))}</small></html>')
     return "".join(parts)
 

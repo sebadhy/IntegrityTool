@@ -13,7 +13,8 @@ from .consolidator import consolidate_candidates
 from .contextualizer import build_finding_candidates
 from .detector import detect_signals
 from .document_segmenter import DocumentSection, segment_document
-from .domain_models import Clause, ConsolidatedFinding, FindingCandidate, ReviewItem, Signal
+from .domain_models import Clause, ConsolidatedFinding, FindingCandidate, Requirement, ReviewItem, Signal
+from .requirements import extract_requirements
 from .parser import parse_pdf_bytes
 from .pdf_extractor import PageText
 from .prioritizer import prioritize_consolidated_findings
@@ -45,6 +46,7 @@ class DocumentReviewResult:
     enriched_df: pd.DataFrame = field(default_factory=pd.DataFrame)
     validation_messages: list[str] = field(default_factory=list)
     provenance: dict = field(default_factory=dict)
+    requirements: list[Requirement] = field(default_factory=list)
 
     @property
     def detections(self) -> list[Signal]:
@@ -121,6 +123,7 @@ def analyze_document_pages(
         enriched_df=visible_df,
         validation_messages=taxonomy.messages,
         provenance=analysis_context,
+        requirements=extract_requirements(active),
     )
 
 

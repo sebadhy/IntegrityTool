@@ -64,6 +64,31 @@ def test_csv_exports_unique_columns_evidence_and_analysis_provenance(client):
     assert all(len(doc["sha256"]) == 64 for doc in exported["documents"])
 
 
+def test_requirement_comparison_navigation_and_exports(client):
+    response = client.post("/api/cases", data={"manifest": '[{"role":"pliego"},{"role":"especificaciones"}]', "request_key": "requirements"}, files=[
+        ("files", ("pliego.pdf", pdf("Item 1 Memoria RAM minima 16 GB. Condiciones del equipo ofertado."), "application/pdf")),
+        ("files", ("especificaciones.pdf", pdf("Item 1 Memoria RAM minima 32 GB. Condiciones del equipo ofertado."), "application/pdf")),
+    ])
+    assert response.status_code == 202
+    case_id = response.json()["id"]
+    for _ in range(200):
+        case = client.get(f"/api/cases/{case_id}").json()
+        if case["status"] in {"ready", "failed"}:
+            break
+        time.sleep(.03)
+    assert case["status"] == "ready"
+    assert len(case["result"]["requirement_comparison"]["comparisons"]) == 1
+    assert "requirements" not in case["result"]["documents"][0]["analysis"]
+    exported = client.get(f"/api/cases/{case_id}/export?format=json").json()
+    assert exported["result"]["documents"][0]["analysis"]["requirements"]
+    html = client.get(f"/api/cases/{case_id}/export?format=html").text
+    assert "Diferencia a validar" in html and "16 GB" in html and "32 GB" in html
+    rows = list(csv.DictReader(io.StringIO(client.get(f"/api/cases/{case_id}/export?format=csv").text.lstrip("\ufeff"))))
+    requirements = [row for row in rows if row["tipo_registro"] == "requisito"]
+    assert len(requirements) == 2
+    assert all(row["cotejo_id"] and not row["prioridad_revision"] for row in requirements)
+
+
 def test_navigation_and_exports_do_not_repeat_analysis_or_call_llm(client, monkeypatch):
     case = create_case(client)
     def unexpected(*args, **kwargs):

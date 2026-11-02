@@ -136,7 +136,9 @@ export default function App() {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            state, comment, reviewer: "Revisor local",
+            state,
+            comment,
+            reviewer: "Revisor local",
             expected_revision: activeCase.reviews[selected.id]?.revision ?? 0,
           }),
         },
@@ -286,13 +288,13 @@ export default function App() {
                   >
                     Revisar documentos
                   </button>
-                  {result.version_changes.length > 0 && (
+                  {(result.version_changes.length > 0 ||
+                    !!result.requirement_comparison) && (
                     <button
                       aria-current={view === "versions" ? "page" : undefined}
                       onClick={() => setView("versions")}
                     >
-                      Contrastar versiones{" "}
-                      <span>{result.version_changes.length}</span>
+                      Contrastar condiciones
                     </button>
                   )}
                 </nav>
@@ -374,7 +376,8 @@ export default function App() {
                       <h2>Lectura manual</h2>
                       <p>
                         No se identificaron aspectos priorizados con el alcance
-                        de esta revisión. Puede consultar los documentos completos.
+                        de esta revisión. Puede consultar los documentos
+                        completos.
                       </p>
                     </aside>
                   )}

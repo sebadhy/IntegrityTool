@@ -53,6 +53,13 @@ No se necesita una clave de modelos para iniciar la aplicación ni ejecutar el m
 4. Abra la evidencia en el PDF; registre revisión, descarte, seguimiento o comentario.
 5. Exporte el resultado existente en HTML, CSV o JSON.
 
+En **Contrastar condiciones**, consulte valores explícitos comparables entre
+documentos: RAM, almacenamiento, peso y determinados plazos. Cada comparación
+conserva sus citas y páginas. El cotejo se abstiene cuando no puede vincular el
+mismo ítem, unidad o hito; una diferencia no constituye una contradicción ni
+genera automáticamente una observación priorizada. Consulte su
+[alcance inicial y limitaciones](docs/requirements_comparison.md).
+
 Se admiten hasta ocho PDFs, de hasta 25 MB cada uno y 100 MB por expediente. Los PDFs con texto seleccionable no necesitan OCR. Para documentos escaneados se requiere Tesseract con el idioma correspondiente, instalado por separado; una extracción incompleta se informa como lectura parcial.
 
 En local, los resultados, comentarios y copias de taxonomía se guardan en `data/workbench/reviews.sqlite3`; los originales nuevos, en `data/workbench/documents/`. Los originales de revisiones anteriores siguen disponibles desde su almacenamiento previo. Todo queda fuera de Git. Navegar, cambiar zoom, revisar y exportar no repite el análisis ni vuelve a solicitar contenido al proveedor.
@@ -152,6 +159,7 @@ La [guía de Azure](docs/azure_deployment.md) detalla construcción, arranque, s
 - [Configuración: proveedores, corpus y almacenamiento](docs/configuration.md)
 - [Persistencia compartida, trabajos y migración](docs/shared_storage.md)
 - [Arquitectura del pipeline documental](docs/architecture.md)
+- [Requisitos verificables y cotejo de condiciones entre documentos](docs/requirements_comparison.md)
 - [Marco técnico y conceptual](docs/technical_and_conceptual_framework.md)
 - [Protocolo inicial de evaluación de la PoC](docs/poc_evaluation.md)
 - [Benchmark reproducible de extracción documental](docs/document_benchmark.md)

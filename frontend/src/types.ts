@@ -107,6 +107,34 @@ export type ReviewCase = CaseSummary & {
         cached: boolean;
       }[];
     };
+    requirement_comparison?: {
+      version: string;
+      extracted_count: number;
+      abstentions: Record<string, number>;
+      limitation: string;
+      comparisons: {
+        comparison_id: string;
+        item_ref: string;
+        title: string;
+        unit: string;
+        status: "different_conditions" | "same_explicit_condition";
+        question: string;
+        sources: {
+          requirement_id: string;
+          source_document_id: string;
+          document_name: string;
+          document_role: string;
+          value: string;
+          comparator: string;
+          evidence_text: string;
+          matched_text: string;
+          page: number;
+          section_title: string;
+          rects?: number[][];
+          location_precision?: string;
+        }[];
+      }[];
+    };
     version_changes: {
       pattern_id: string;
       title: string;

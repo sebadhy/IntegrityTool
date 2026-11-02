@@ -19,6 +19,28 @@ ReviewPriority = Literal["alta", "media", "baja"]
 
 
 @dataclass(frozen=True)
+class Requirement:
+    """A literal measurable condition, not a finding or a legal conclusion."""
+
+    requirement_id: str
+    document_id: str
+    clause_id: str
+    page: int
+    section_title: str
+    item_ref: str
+    attribute: str
+    value: str
+    unit: str
+    comparator: str
+    evidence_text: str
+    matched_text: str
+    milestone: str = ""
+    mandatory: bool = False
+    equivalence: bool = False
+    extraction_method: str = "explicit_requirement_v1"
+
+
+@dataclass(frozen=True)
 class Clause:
     clause_id: str
     document_id: str

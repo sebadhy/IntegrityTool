@@ -16,6 +16,7 @@ import pymupdf as fitz
 
 from . import ENGINE_VERSION
 from .case_review import consolidate_case
+from .requirements import compare_requirements
 from .contextualizer import build_finding_candidates
 from .domain_models import Clause, Signal
 from .metadata_extractor import extract_pliego_metadata
@@ -27,7 +28,7 @@ from .taxonomy_loader import TaxonomyLoadResult, load_taxonomy
 from .semantic_analyzer import SEMANTIC_VERSION, select_semantic_context, validate_semantic_proposals
 
 LOGGER = logging.getLogger(__name__)
-SERVICE_VERSION = "2026.10.workbench-v3"
+SERVICE_VERSION = "2026.11.workbench-v4"
 ROLES = {"pliego", "especificaciones", "adenda", "anexo"}
 MAX_DOCUMENTS, MAX_FILE_BYTES, MAX_TOTAL_BYTES, MAX_PAGES = 8, 25 * 1024**2, 100 * 1024**2, 400
 
@@ -136,6 +137,7 @@ class WorkbenchService:
                         "items": [asdict(item) for item in result.review_items],
                         "clauses": [asdict(clause) for clause in result.clauses],
                         "signals": [asdict(signal) for signal in result.signals],
+                        "requirements": [asdict(requirement) for requirement in result.requirements],
                         "document_text": result.document_text,
                         "page_count": len(result.pages),
                         "page_statuses": [{"page": p.page_number, "status": p.status.value,
@@ -156,6 +158,7 @@ class WorkbenchService:
             items, changes = consolidate_case(documents)
             result = {
                 "documents": documents, "items": items, "version_changes": changes,
+                "requirement_comparison": compare_requirements(documents),
                 "summary": _deterministic_summary(items, documents),
                 "messages": messages + corpus_info.get("messages", []),
                 "corpus": corpus_info,
@@ -356,20 +359,21 @@ def _assistance_status(result: dict) -> str:
 
 def _attach_evidence_coordinates(analysis: dict, content: bytes):
     with fitz.open(stream=content, filetype="pdf") as pdf:
-        for item in analysis["items"]:
-            for ev in item["evidence_items"]:
-                page = pdf[int(ev["page"]) - 1]
-                exact = " ".join(ev["text"].replace("...", " ").split())
-                rects = page.search_for(exact) if exact else []
-                precision = "excerpt" if rects else "matched_term"
-                if not rects and len(exact) > 240:
-                    rects = page.search_for(exact[:240])
-                    if rects:
-                        precision = "excerpt_prefix"
-                if not rects and ev.get("matched_text"):
-                    rects = page.search_for(ev["matched_text"])
-                ev["rects"] = [[r.x0 / page.rect.width, r.y0 / page.rect.height, r.x1 / page.rect.width, r.y1 / page.rect.height] for r in rects[:12]]
-                ev["location_precision"] = precision if rects else "unlocated"
+        evidence = [ev for item in analysis["items"] for ev in item["evidence_items"]]
+        evidence.extend(analysis.get("requirements", []))
+        for ev in evidence:
+            page = pdf[int(ev["page"]) - 1]
+            exact = " ".join((ev.get("text") or ev.get("evidence_text", "")).replace("...", " ").split())
+            rects = page.search_for(exact) if exact else []
+            precision = "excerpt" if rects else "matched_term"
+            if not rects and len(exact) > 240:
+                rects = page.search_for(exact[:240])
+                if rects:
+                    precision = "excerpt_prefix"
+            if not rects and ev.get("matched_text"):
+                rects = page.search_for(ev["matched_text"])
+            ev["rects"] = [[r.x0 / page.rect.width, r.y0 / page.rect.height, r.x1 / page.rect.width, r.y1 / page.rect.height] for r in rects[:12]]
+            ev["location_precision"] = precision if rects else "unlocated"
 
 
 def _llm_row(item: dict, taxonomy_context: dict | None = None) -> dict:

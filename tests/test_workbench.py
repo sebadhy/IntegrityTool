@@ -66,6 +66,19 @@ def test_shared_engine_returns_identical_signal_ids_for_upload_and_corpus_pages(
     assert [i.title for i in first.review_items] == [i.title for i in second.review_items]
 
 
+def test_quantified_requirements_persist_without_becoming_duplicate_findings(service):
+    files = [{"name": "pliego.pdf", "content": pdf("Item 1 Memoria RAM minima 16 GB. Condiciones tecnicas del equipo ofertado."), "role": "pliego"},
+             {"name": "especificaciones.pdf", "content": pdf("Item 1 Memoria RAM minima 32 GB. Condiciones tecnicas del equipo ofertado."), "role": "especificaciones"}]
+    case = create(service, files=files)
+    assert case["status"] == "ready"
+    group, = case["result"]["requirement_comparison"]["comparisons"]
+    assert group["status"] == "different_conditions"
+    assert all(r["rects"] for r in group["sources"])
+    saved = service.store.get_case(case["id"])
+    assert saved["result"]["requirement_comparison"] == case["result"]["requirement_comparison"]
+    assert all(doc["analysis"]["requirements"] for doc in saved["result"]["documents"])
+
+
 def test_structured_metadata_requires_matching_content_when_hash_is_supplied(tmp_path):
     from src.analyzer.metadata_extractor import document_metadata_from_name
     metadata = tmp_path / "data/raw/metadata/procesos.csv"
