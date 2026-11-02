@@ -7,24 +7,23 @@ desde el backend, sin modelos de lenguaje ni nuevas dependencias.
 
 1. Seleccione «Buscar proceso en SERCOP».
 2. Indique año y código o palabras clave (mínimo tres caracteres).
-3. Puede agregar comprador, entidad contratante y procedimiento; son búsquedas
-   por texto, no selectores exhaustivos. Proveedor queda en «Más filtros».
+3. Puede agregar comprador y proveedor mediante desplegables con búsqueda por
+   texto y términos recientes de la sesión.
 4. Revise los resultados paginados y seleccione el proceso correcto.
 5. Como alternativa, consulte directamente su OCID.
 6. Agregue los originales y confirme que corresponden al proceso antes de iniciar
    la revisión. La vinculación es humana, no un matching documental automático.
 
-Comprador (`buyer`) y proveedor (`supplier`) se envían a la API. Entidad contratante
-(`tender.procuringEntity.name`) y procedimiento son filtros locales de la página
-recuperada: el primero consulta hasta 10 fichas, con dos consultas simultáneas y
-18 segundos de espera por lote; consultas ya iniciadas pueden finalizar después.
-El segundo compara `internal_type`, sin inferir una modalidad desde el código.
-No se utiliza el comprador como sustituto de la entidad contratante.
+Todos los filtros se envían a la API: año (`year`), palabras clave (`search`),
+comprador (`buyer`) y proveedor (`supplier`). `page` controla la paginación.
+No se filtran localmente las páginas recibidas ni se consultan fichas adicionales
+durante la búsqueda. El total y las páginas son los informados por SERCOP.
 
-El total y las páginas de SERCOP se conservan sin presentarlos como un conteo
-filtrado global. Se indican coincidencias de la página y fichas sin verificar,
-incluyendo fallos, datos ausentes o el límite de consulta. Cero coincidencias no
-significa ausencia en todo el portal; se mantiene disponible la página siguiente.
+La API documenta comprador y proveedor como texto libre, no como catálogos.
+Los desplegables muestran términos ya utilizados en esta sesión, sin extraer
+opciones de la página recuperada ni impedir nuevos términos. La entidad
+contratante y el procedimiento permanecen como datos de la ficha, no como filtros.
+Los parámetros de búsqueda no admitidos se rechazan explícitamente.
 
 No se ofrecen CPC, estado o montos como filtros remotos porque el
 endpoint utilizado no los documenta. Buscar proveedor puede excluir procesos

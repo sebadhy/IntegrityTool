@@ -328,12 +328,59 @@ details[open] > summary > svg:last-child {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin: 16px 0;
 }
-.sercop-search-fields.filters {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.sercop-search .searchable-filter {
+  position: relative;
+  display: block;
+  min-width: 0;
 }
-.sercop-filter-scope {
-  color: #63766a;
-  line-height: 1.7;
+.searchable-filter-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-top: 8px;
+  width: 100%;
+}
+.searchable-filter-input input {
+  width: 100%;
+  min-width: 0;
+  padding-right: 36px;
+}
+.searchable-filter-input button {
+  position: absolute;
+  right: 6px;
+}
+.searchable-filter-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: white;
+  border: 1px solid #cdd5d2;
+  border-radius: 4px;
+  padding: 12px;
+  box-shadow: 0 4px 12px #00000012;
+}
+.searchable-filter-menu ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.searchable-filter-menu li {
+  padding: 8px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.searchable-filter-menu li:hover,
+.searchable-filter-menu li[aria-selected="true"] {
+  background: #eef3f0;
+}
+.searchable-filter-menu p {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: normal;
 }
 .sercop-search > [aria-live="polite"] {
   margin-top: 20px;
@@ -421,7 +468,6 @@ details[open] > summary > svg:last-child {
 @media (max-width: 760px) {
   .sercop-search-fields,
   .sercop-search-fields.equal,
-  .sercop-search-fields.filters,
   .sercop-facts {
     grid-template-columns: minmax(0, 1fr);
   }
