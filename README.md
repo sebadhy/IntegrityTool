@@ -47,7 +47,7 @@ No se necesita una clave de modelos para iniciar la aplicación ni ejecutar el m
 
 ## Uso
 
-1. Cargue el pliego o busque el proceso en SERCOP por año y palabras clave, con filtros opcionales de entidad/proveedor o consulta directa por OCID. La ficha oficial permite vincular los PDF mediante confirmación humana; no los descarga automáticamente.
+1. Cargue el pliego o busque el proceso en SERCOP por año y palabras clave, con comprador/proveedor o consulta directa por OCID. Entidad contratante y procedimiento filtran la página recuperada, no todo el portal. La ficha oficial permite vincular los PDF mediante confirmación humana; no los descarga automáticamente.
 2. Indique los tipos documentales y las sustituciones de versiones de forma explícita.
 3. Inicie la revisión y consulte el resumen y las observaciones consolidadas.
 4. Abra la evidencia en el PDF; registre revisión, descarte, seguimiento o comentario.

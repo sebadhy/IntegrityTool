@@ -109,8 +109,10 @@ def create_app(storage: Path | None = None, assisted: bool | None = None, corpus
         return app.state.service.store.list_cases()
 
     @app.get("/api/sources/sercop/search")
-    def search_sercop(year: int, search: str, buyer: str = "", supplier: str = "", page: int = 1):
-        return sercop_ocds.search_processes(year, search, buyer, supplier, page)
+    def search_sercop(year: int, search: str, buyer: str = "", supplier: str = "", page: int = 1,
+                      procuring_entity: str = "", procedure: str = ""):
+        return sercop_ocds.search_processes(year, search, buyer, supplier, page,
+                                           procuring_entity=procuring_entity, procedure=procedure)
 
     @app.post("/api/sources/sercop/record")
     def import_sercop(request: SercopRecordRequest):

@@ -328,6 +328,16 @@ details[open] > summary > svg:last-child {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin: 16px 0;
 }
+.sercop-search-fields.filters {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.sercop-filter-scope {
+  color: #63766a;
+  line-height: 1.7;
+}
+.sercop-search > [aria-live="polite"] {
+  margin-top: 20px;
+}
 .sercop-search .primary-button {
   justify-self: start;
 }
@@ -411,6 +421,7 @@ details[open] > summary > svg:last-child {
 @media (max-width: 760px) {
   .sercop-search-fields,
   .sercop-search-fields.equal,
+  .sercop-search-fields.filters,
   .sercop-facts {
     grid-template-columns: minmax(0, 1fr);
   }

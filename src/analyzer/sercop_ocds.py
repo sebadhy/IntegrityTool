@@ -5,6 +5,8 @@ import hashlib
 import json
 import re
 import threading
+import unicodedata
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeout
 import uuid
 import urllib.parse
 import urllib.request
@@ -81,11 +83,52 @@ def _read_json(route: str, params: dict) -> tuple[dict, bytes, str]:
         _SLOTS.release()
 
 
-def search_processes(year: int, search: str, buyer: str = "", supplier: str = "", page: int = 1) -> dict:
+def _matches(value: str, term: str) -> bool:
+    def normalized(text):
+        return " ".join("".join(char for char in unicodedata.normalize("NFD", text.casefold())
+                                 if not unicodedata.combining(char)).split())
+    return normalized(term) in normalized(value)
+
+
+def _filter_page(results: list[dict], entity: str, procedure: str) -> tuple[list[dict], int, int]:
+    missing_procedure = sum(not row["procedure"] for row in results) if procedure else 0
+    candidates = [row for row in results if not procedure or _matches(row["procedure"], procedure)]
+    if not entity or not candidates:
+        return candidates, 0, missing_procedure
+    # Explicit page-only lookup, not a crawl. Never infer the procuring entity
+    # from the buyer; missing/unreadable records remain unverified.
+    pool = ThreadPoolExecutor(max_workers=2)
+    futures = {pool.submit(fetch_process, row["ocid"]): index for index, row in enumerate(candidates[:10])}
+    verified = {}
+    try:
+        for future in as_completed(futures, timeout=18):
+            try:
+                snapshot = future.result()
+                name = snapshot["metadata"].get("entidad", "")
+                if name:
+                    verified[futures[future]] = name
+            except SercopUnavailable:
+                continue
+    except FutureTimeout:
+        pass
+    finally:
+        for future in futures:
+            future.cancel()
+        pool.shutdown(wait=False, cancel_futures=True)
+    matched = [{**row, "procuring_entity": verified[index]} for index, row in enumerate(candidates)
+               if index in verified and _matches(verified[index], entity)]
+    return matched, len(candidates) - len(verified), missing_procedure
+
+
+def search_processes(year: int, search: str, buyer: str = "", supplier: str = "", page: int = 1,
+                     *, procuring_entity: str = "", procedure: str = "") -> dict:
     if not 2015 <= year <= datetime.now(timezone.utc).year or not 1 <= page <= 10000:
         raise ValueError("Verifique el año y la página de la búsqueda.")
     params = {"year": year, "search": search.strip(), "page": page}
-    for field, value, label in [("search", search, "La búsqueda"), ("buyer", buyer, "La entidad"), ("supplier", supplier, "El proveedor")]:
+    for value, label in [(procuring_entity, "La entidad contratante"), (procedure, "El procedimiento")]:
+        if value.strip() and not 3 <= len(value.strip()) <= 200:
+            raise ValueError(f"{label} debe contener entre 3 y 200 caracteres.")
+    for field, value, label in [("search", search, "La búsqueda"), ("buyer", buyer, "El comprador"), ("supplier", supplier, "El proveedor")]:
         value = value.strip()
         if (field == "search" or value) and not 3 <= len(value) <= 200:
             raise ValueError(f"{label} debe contener entre 3 y 200 caracteres.")
@@ -110,8 +153,14 @@ def search_processes(year: int, search: str, buyer: str = "", supplier: str = ""
                         "procedure": _text(row.get("internal_type")), "date": _text(row.get("date"), 60)})
     if data["data"] and not results:
         raise SercopUnavailable("La fuente devolvió procesos sin identificadores verificables.")
-    return {"total": total, "page": page, "pages": pages, "results": results,
-            "omitted_count": len(data["data"]) - len(results)}
+    omitted = len(data["data"]) - len(results)
+    page_count = len(results)
+    local_filters = [name for name, value in [("procuring_entity", procuring_entity), ("procedure", procedure)] if value.strip()]
+    filtered, unverified, missing_procedure = _filter_page(results, procuring_entity.strip(), procedure.strip())
+    return {"total": total, "page": page, "pages": pages, "results": filtered,
+            "omitted_count": omitted, "page_count_before_filters": page_count,
+            "local_filters": local_filters, "unverified_entity_count": unverified,
+            "missing_procedure_count": missing_procedure}
 
 
 def _release(package: dict, ocid: str) -> tuple[dict, str]:

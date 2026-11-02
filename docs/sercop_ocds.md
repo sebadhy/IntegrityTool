@@ -7,14 +7,26 @@ desde el backend, sin modelos de lenguaje ni nuevas dependencias.
 
 1. Seleccione «Buscar proceso en SERCOP».
 2. Indique año y código o palabras clave (mínimo tres caracteres).
-3. En «Más filtros», puede agregar entidad contratante y proveedor; son búsquedas
-   por texto, no selectores exhaustivos de entidades o proveedores.
+3. Puede agregar comprador, entidad contratante y procedimiento; son búsquedas
+   por texto, no selectores exhaustivos. Proveedor queda en «Más filtros».
 4. Revise los resultados paginados y seleccione el proceso correcto.
 5. Como alternativa, consulte directamente su OCID.
 6. Agregue los originales y confirme que corresponden al proceso antes de iniciar
    la revisión. La vinculación es humana, no un matching documental automático.
 
-No se ofrecen CPC, modalidad, estado o montos como filtros remotos porque el
+Comprador (`buyer`) y proveedor (`supplier`) se envían a la API. Entidad contratante
+(`tender.procuringEntity.name`) y procedimiento son filtros locales de la página
+recuperada: el primero consulta hasta 10 fichas, con dos consultas simultáneas y
+18 segundos de espera por lote; consultas ya iniciadas pueden finalizar después.
+El segundo compara `internal_type`, sin inferir una modalidad desde el código.
+No se utiliza el comprador como sustituto de la entidad contratante.
+
+El total y las páginas de SERCOP se conservan sin presentarlos como un conteo
+filtrado global. Se indican coincidencias de la página y fichas sin verificar,
+incluyendo fallos, datos ausentes o el límite de consulta. Cero coincidencias no
+significa ausencia en todo el portal; se mantiene disponible la página siguiente.
+
+No se ofrecen CPC, estado o montos como filtros remotos porque el
 endpoint utilizado no los documenta. Buscar proveedor puede excluir procesos
 que todavía no publican esa información. Cambiar filtros limpia resultados
 anteriores; consultar una ficha no inicia un análisis.

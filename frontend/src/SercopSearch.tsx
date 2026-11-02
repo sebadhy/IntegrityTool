@@ -9,6 +9,7 @@ type Process = {
   buyer: string;
   description: string;
   procedure: string;
+  procuring_entity?: string;
 };
 type Results = {
   total: number;
@@ -16,6 +17,10 @@ type Results = {
   pages: number;
   results: Process[];
   omitted_count: number;
+  local_filters?: string[];
+  page_count_before_filters?: number;
+  unverified_entity_count?: number;
+  missing_procedure_count?: number;
 };
 
 export function SercopSearch({
@@ -29,6 +34,8 @@ export function SercopSearch({
   const [year, setYear] = useState(new Date().getFullYear());
   const [search, setSearch] = useState("");
   const [buyer, setBuyer] = useState("");
+  const [entity, setEntity] = useState("");
+  const [procedure, setProcedure] = useState("");
   const [supplier, setSupplier] = useState("");
   const [ocid, setOcid] = useState("");
   const [results, setResults] = useState<Results | null>(null);
@@ -75,6 +82,8 @@ export function SercopSearch({
       page: String(page),
     });
     if (buyer.trim()) query.set("buyer", buyer.trim());
+    if (entity.trim()) query.set("procuring_entity", entity.trim());
+    if (procedure.trim()) query.set("procedure", procedure.trim());
     if (supplier.trim()) query.set("supplier", supplier.trim());
     return run(`/sources/sercop/search?${query}`);
   }
@@ -166,7 +175,7 @@ export function SercopSearch({
                 <label className="field-label">
                   Año
                   <select
-                  aria-label="Año"
+                    aria-label="Año"
                     value={year}
                     onChange={(e) => {
                       setYear(Number(e.target.value));
@@ -196,22 +205,57 @@ export function SercopSearch({
                   />
                 </label>
               </div>
+              <div className="sercop-search-fields filters">
+                <label className="field-label">
+                  Entidad contratante
+                  <input
+                    minLength={3}
+                    maxLength={200}
+                    value={entity}
+                    placeholder="Entidad que tramita la contratación"
+                    onChange={(e) => {
+                      setEntity(e.target.value);
+                      setResults(null);
+                    }}
+                  />
+                </label>
+                <label className="field-label">
+                  Comprador
+                  <input
+                    minLength={3}
+                    maxLength={200}
+                    value={buyer}
+                    placeholder="Institución compradora"
+                    onChange={(e) => {
+                      setBuyer(e.target.value);
+                      setResults(null);
+                    }}
+                  />
+                </label>
+                <label className="field-label">
+                  Procedimiento
+                  <input
+                    minLength={3}
+                    maxLength={200}
+                    value={procedure}
+                    placeholder="Ej.: Subasta Inversa Electrónica"
+                    onChange={(e) => {
+                      setProcedure(e.target.value);
+                      setResults(null);
+                    }}
+                  />
+                </label>
+              </div>
+              <small className="sercop-filter-scope">
+                Comprador filtra en SERCOP. Entidad contratante y procedimiento
+                se aplican únicamente a la página recuperada; no filtran todo el
+                portal.
+                {entity.trim() &&
+                  " Verificar la entidad puede consultar hasta 10 fichas por página y tomar unos segundos."}
+              </small>
               <details className="sercop-more">
                 <summary>Más filtros</summary>
                 <div className="sercop-search-fields equal">
-                  <label className="field-label">
-                    Entidad contratante
-                    <input
-                      minLength={3}
-                      maxLength={200}
-                      value={buyer}
-                      placeholder="Nombre o parte del nombre"
-                      onChange={(e) => {
-                        setBuyer(e.target.value);
-                        setResults(null);
-                      }}
-                    />
-                  </label>
                   <label className="field-label">
                     Proveedor
                     <input
@@ -256,13 +300,44 @@ export function SercopSearch({
         {results && (
           <>
             <p>
-              {results.total} resultados informados por SERCOP · Página{" "}
-              {results.page} de {Math.max(1, results.pages)}
+              {results.total}{" "}
+              {results.total === 1
+                ? "resultado informado"
+                : "resultados informados"}{" "}
+              por SERCOP · Página {results.page} de {Math.max(1, results.pages)}
             </p>
+            {!!results.local_filters?.length && (
+              <p>
+                {results.results.length}{" "}
+                {results.results.length === 1
+                  ? "coincidencia verificada"
+                  : "coincidencias verificadas"}{" "}
+                entre {results.page_count_before_filters}{" "}
+                {results.page_count_before_filters === 1
+                  ? "proceso"
+                  : "procesos"}{" "}
+                de esta página. El total de SERCOP es anterior a estos filtros.
+              </p>
+            )}
+            {!!results.unverified_entity_count && (
+              <p>
+                No se pudo verificar la entidad de{" "}
+                {results.unverified_entity_count} procesos. No se incluyen como
+                coincidencias; la búsqueda es parcial.
+              </p>
+            )}
+            {!!results.missing_procedure_count && (
+              <p>
+                {results.missing_procedure_count} procesos no informan
+                procedimiento en el resultado y no pudieron comprobarse con ese
+                filtro.
+              </p>
+            )}
             {!results.results.length && (
               <p>
-                No se encontraron procesos con estos criterios. Cambie las
-                palabras o retire algún filtro.
+                {results.local_filters?.length
+                  ? "No hay coincidencias verificadas en esta página. Consulte la siguiente o cambie los filtros."
+                  : "No se encontraron procesos con estos criterios. Cambie las palabras o retire algún filtro."}
               </p>
             )}
             {!!results.omitted_count && (
@@ -276,7 +351,10 @@ export function SercopSearch({
                 <li key={`${process.ocid}-${index}`}>
                   <div>
                     <strong>{process.code}</strong>
-                    <p>{process.buyer || "Entidad no informada"}</p>
+                    <p>Comprador: {process.buyer || "No informado"}</p>
+                    {process.procuring_entity && (
+                      <p>Entidad contratante: {process.procuring_entity}</p>
+                    )}
                     <p>
                       {process.description ||
                         "Objeto no informado en el resultado; consulte la ficha."}

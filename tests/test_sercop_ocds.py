@@ -47,6 +47,94 @@ def test_filters_and_pagination_forwarded(monkeypatch):
     assert result["results"][0]["buyer"] == "Hospital"
 
 
+def page_data(rows, page=1, total=30):
+    return {"total": total, "page": page, "pages": 3, "data": [
+        {"ocid": f"ocds-5wno2w-test-{i}", "buyer": buyer, "internal_type": procedure}
+        for i, (buyer, procedure) in enumerate(rows)]}
+
+
+def test_procedure_is_page_local_and_normalized_without_record_calls(monkeypatch):
+    calls = mock_package(monkeypatch, page_data([("Comprador A", "Subasta Inversa Electrónica"), ("Comprador B", "Licitación"), ("Comprador C", None)]))
+    result = source.search_processes(2026, "equipos", buyer="Comprador", procedure="electronica")
+    assert len(calls) == 1 and "procedure" not in calls[0][1]
+    assert len(result["results"]) == 1
+    assert result["total"] == 30 and result["pages"] == 3
+    assert result["page_count_before_filters"] == 3
+    assert result["missing_procedure_count"] == 1
+    assert result["local_filters"] == ["procedure"]
+
+
+def test_entity_filter_uses_procuring_entity_not_buyer(monkeypatch):
+    calls = mock_package(monkeypatch, page_data([("Ministerio", "Licitación"), ("Hospital Norte", "Licitación")]))
+    def detail(ocid):
+        return {"metadata": {"entidad": "Hospital Norte" if ocid.endswith("-0") else "Municipio"}}
+    monkeypatch.setattr(source, "fetch_process", detail)
+    result = source.search_processes(2026, "equipos", procuring_entity="hospital norte", procedure="licitacion")
+    row, = result["results"]
+    assert row["buyer"] == "Ministerio" and row["procuring_entity"] == "Hospital Norte"
+    assert "procuring_entity" not in calls[0][1] and "procedure" not in calls[0][1]
+    assert result["unverified_entity_count"] == 0
+
+
+def test_missing_or_unreadable_entity_not_reported_as_verified_nonmatch(monkeypatch):
+    mock_package(monkeypatch, page_data([("Hospital", "Licitación"), ("Hospital", "Licitación")]))
+    def detail(ocid):
+        if ocid.endswith("-0"):
+            return {"metadata": {}}
+        raise source.SercopUnavailable("Fuente no disponible")
+    monkeypatch.setattr(source, "fetch_process", detail)
+    result = source.search_processes(2026, "equipos", procuring_entity="hospital")
+    assert result["results"] == [] and result["unverified_entity_count"] == 2
+    assert result["total"] == 30 and result["pages"] == 3
+
+
+def test_entity_lookup_is_bounded_to_ten_records(monkeypatch):
+    mock_package(monkeypatch, page_data([("Comprador", "Licitación")] * 14))
+    calls = []
+    def detail(ocid):
+        calls.append(ocid)
+        return {"metadata": {"entidad": "Hospital"}}
+    monkeypatch.setattr(source, "fetch_process", detail)
+    result = source.search_processes(2026, "equipos", procuring_entity="hospital")
+    assert len(calls) == 10 and len(result["results"]) == 10
+    assert result["unverified_entity_count"] == 4
+
+
+def test_no_local_filter_does_not_request_records(monkeypatch):
+    mock_package(monkeypatch, page_data([("Comprador", "Licitación")]))
+    def unexpected(*args): raise AssertionError("No implicit record lookups")
+    monkeypatch.setattr(source, "fetch_process", unexpected)
+    result = source.search_processes(2026, "equipos")
+    assert len(result["results"]) == 1 and not result["local_filters"]
+
+
+def test_verification_deadline_reports_unknown_instead_of_absence(monkeypatch):
+    mock_package(monkeypatch, page_data([("Comprador", "Licitación")]))
+    monkeypatch.setattr(source, "fetch_process", lambda ocid: {"metadata": {"entidad": "Hospital"}})
+    def elapsed(*args, **kwargs): raise source.FutureTimeout()
+    monkeypatch.setattr(source, "as_completed", elapsed)
+    result = source.search_processes(2026, "equipos", procuring_entity="hospital")
+    assert result["results"] == []
+    assert result["unverified_entity_count"] == 1
+    assert result["total"] == 30
+
+
+@pytest.mark.parametrize("kwargs", [{"procuring_entity": "ab"}, {"procedure": "ab"}])
+def test_invalid_local_filters_do_not_call_source(monkeypatch, kwargs):
+    def unexpected(*args): raise AssertionError("No network call")
+    monkeypatch.setattr(source, "_read_json", unexpected)
+    with pytest.raises(ValueError): source.search_processes(2026, "equipos", **kwargs)
+
+
+def test_local_filters_are_forwarded_by_api(client, monkeypatch):
+    mock_package(monkeypatch, page_data([("Comprador", "Subasta Inversa Electrónica")]))
+    monkeypatch.setattr(source, "fetch_process", lambda ocid: {"metadata": {"entidad": "Hospital"}})
+    response = client.get("/api/sources/sercop/search", params={"year": 2026, "search": "equipo", "procuring_entity": "hospital", "procedure": "inversa"})
+    assert response.status_code == 200
+    assert len(response.json()["results"]) == 1
+    assert response.json()["total"] == 30
+
+
 @pytest.mark.parametrize("kwargs", [{"year": 2014}, {"year": 9999}, {"search": "ab"}, {"buyer": "ab"}, {"supplier": "ab"}, {"page": 0}, {"page": 10001}])
 def test_invalid_filters_do_not_call_network(monkeypatch, kwargs):
     def unexpected(*args):
