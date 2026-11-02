@@ -166,7 +166,7 @@ Sin `--check-services` solo valida variables. Con él consulta el esquema, propi
 - [ ] Revisar memoria/latencia con documentos representativos, conexiones, cola pendiente, OCR y cuota del modelo antes de aumentar réplicas.
 - [ ] No publicar claves, texto completo de PDFs, respuestas completas ni comentarios en logs generales. Definir retención y acceso a registros.
 
-Actualizar imagen y esquema como un cambio controlado, con respaldo y plan de reversión. Esta versión solo tiene la migración de esquema actual; una imagen anterior no necesariamente puede abrir una base futura. No hacer downgrade contra la base activa sin verificar compatibilidad.
+Actualizar imagen y esquema como un cambio controlado, con respaldo y plan de reversión. El esquema 2 agrega instantáneas OCDS y vínculos documentales mediante `python -m src.manage_storage init`; detener API y trabajador durante la actualización. Una imagen anterior no debe abrir la base actualizada. Consulte [operación de la integración SERCOP](sercop_ocds.md).
 
 ## 10. Operación y evaluación
 

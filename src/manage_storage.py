@@ -19,6 +19,7 @@ from .analyzer.review_store import ReviewStore, utc_now
 COPY_ORDER = [
     s.cases, s.documents, s.analysis_cache, s.taxonomy_snapshots, s.reviews, s.events,
     s.analysis_runs, s.findings, s.evidence, s.jobs, s.assisted_requests,
+    s.source_snapshots, s.case_sources,
 ]
 
 
@@ -108,7 +109,8 @@ def migrate_sqlite(source: Path, target: ReviewStore | None = None, *, documents
             if target.is_postgres:
                 db.execute(text("SELECT setval(pg_get_serial_sequence('events','id'), "
                     "COALESCE((SELECT MAX(id) FROM events),1), EXISTS(SELECT 1 FROM events))"))
-            for table in (s.cases, s.documents, s.reviews, s.events, s.analysis_cache, s.taxonomy_snapshots):
+            for table in (s.cases, s.documents, s.reviews, s.events, s.analysis_cache,
+                          s.taxonomy_snapshots, s.source_snapshots, s.case_sources):
                 if db.scalar(select(func.count()).select_from(table)) != counts[table.name]:
                     raise ValueError("Los conteos de origen y destino no coinciden; la importación se revirtió.")
             # Verify every referenced destination object before committing rows.

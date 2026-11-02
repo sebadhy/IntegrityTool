@@ -82,7 +82,7 @@ def test_schema_version_mismatch_is_rejected_without_reinitialization(tmp_path):
     store = ReviewStore(path)
     store.close()
     with sqlite3.connect(path) as db:
-        db.execute("UPDATE schema_migrations SET version=99")
+        db.execute("UPDATE schema_migrations SET version=99 WHERE version=(SELECT max(version) FROM schema_migrations)")
     with pytest.raises(ValueError, match="versión"):
         ReviewStore(path)
 

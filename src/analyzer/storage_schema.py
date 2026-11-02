@@ -8,8 +8,12 @@ from sqlalchemy import (BigInteger, Column, Float, ForeignKey, ForeignKeyConstra
                         Text, inspect, select, text)
 from sqlalchemy.dialects.postgresql import JSONB
 
-SCHEMA_VERSION = 1
-SCHEMA_CHECKSUM = hashlib.sha256(b"integrity-storage-v1-2026-10").hexdigest()
+SCHEMA_VERSION = 2
+MIGRATIONS = {
+    1: hashlib.sha256(b"integrity-storage-v1-2026-10").hexdigest(),
+    2: hashlib.sha256(b"integrity-storage-v2-sercop-snapshots-2026-11").hexdigest(),
+}
+SCHEMA_CHECKSUM = MIGRATIONS[SCHEMA_VERSION]
 metadata = MetaData()
 json_type = JSON(none_as_null=True).with_variant(JSONB(none_as_null=True), "postgresql")
 
@@ -82,6 +86,12 @@ assisted_requests = Table("assisted_requests", metadata,
 schema_migrations = Table("schema_migrations", metadata,
     Column("version", Integer, primary_key=True), Column("checksum", String(64), nullable=False),
     Column("applied_at", Text, nullable=False))
+source_snapshots = Table("source_snapshots", metadata,
+    Column("id", String(64), primary_key=True), Column("payload", json_type, nullable=False),
+    Column("created_at", Text, nullable=False))
+case_sources = Table("case_sources", metadata,
+    Column("case_id", ForeignKey("cases.id"), primary_key=True),
+    Column("snapshot_id", ForeignKey("source_snapshots.id"), nullable=False))
 Index("ix_cases_updated", cases.c.updated_at, cases.c.id)
 Index("ix_documents_case", documents.c.case_id, documents.c.ordinal)
 Index("ix_jobs_claim", jobs.c.status, jobs.c.lease_until, jobs.c.created_at)
@@ -104,6 +114,12 @@ def initialize_schema(engine, timestamp: str) -> None:
             db.execute(text("SELECT pg_advisory_xact_lock(1852400171)"))
         existing = set(inspect(db).get_table_names())
         if "schema_migrations" in existing:
+            versions = list(db.execute(select(schema_migrations.c.version).order_by(schema_migrations.c.version)).scalars())
+            if versions == [1]:
+                validate_schema(db, version=1)
+                source_snapshots.create(db, checkfirst=True)
+                case_sources.create(db, checkfirst=True)
+                db.execute(schema_migrations.insert().values(version=2, checksum=MIGRATIONS[2], applied_at=timestamp))
             validate_schema(db)
             return
         old_documents = []
@@ -130,19 +146,22 @@ def initialize_schema(engine, timestamp: str) -> None:
             db.execute(cases.update().where(cases.c.status.in_(["queued", "running"])).values(
                 status="interrupted", updated_at=timestamp,
                 error="La versión anterior dejó una ejecución inconclusa. Revise antes de reintentar."))
-        db.execute(schema_migrations.insert().values(
-            version=SCHEMA_VERSION, checksum=SCHEMA_CHECKSUM, applied_at=timestamp))
+        for version, checksum in MIGRATIONS.items():
+            db.execute(schema_migrations.insert().values(version=version, checksum=checksum, applied_at=timestamp))
 
 
-def validate_schema(db) -> None:
+def validate_schema(db, version=SCHEMA_VERSION) -> None:
     if "schema_migrations" not in inspect(db).get_table_names():
         raise ValueError("La base no está inicializada. Ejecute python -m src.manage_storage init.")
     versions = list(db.execute(select(schema_migrations)).mappings())
-    if len(versions) != 1 or versions[0]["version"] != SCHEMA_VERSION or versions[0]["checksum"] != SCHEMA_CHECKSUM:
+    actual = {row["version"]: row["checksum"] for row in versions}
+    if actual != {key: value for key, value in MIGRATIONS.items() if key <= version}:
         raise ValueError("La versión de la base no corresponde a esta aplicación. No se modificó el esquema.")
     inspector = inspect(db)
     tables = set(inspector.get_table_names())
     for table in metadata.sorted_tables:
+        if version == 1 and table.name in {"source_snapshots", "case_sources"}:
+            continue
         if table.name not in tables or not set(table.c.keys()) <= {
                 column["name"] for column in inspector.get_columns(table.name)}:
             raise ValueError("El esquema de almacenamiento está incompleto. Se requiere revisión antes de iniciar.")

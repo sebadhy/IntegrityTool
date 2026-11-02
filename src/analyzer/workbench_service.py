@@ -57,7 +57,7 @@ class WorkbenchService:
             self.worker.close()
         self.store.close()
 
-    def create(self, title: str, request_key: str, files: list[dict]) -> dict:
+    def create(self, title: str, request_key: str, files: list[dict], source_snapshot_id: str | None = None) -> dict:
         if not request_key or len(request_key) > 100:
             raise ValueError("La solicitud de revisión no es válida.")
         if not 1 <= len(files) <= MAX_DOCUMENTS:
@@ -88,7 +88,7 @@ class WorkbenchService:
                               "supersedes": previous, "content": content})
         if len(self.pending) >= 100:
             raise ValueError("Hay varias revisiones pendientes. Espere antes de cargar otra.")
-        case_id = self.store.create_case(str(uuid.uuid4()), request_key, title.strip()[:200] or documents[0]["name"], documents)
+        case_id = self.store.create_case(str(uuid.uuid4()), request_key, title.strip()[:200] or documents[0]["name"], documents, source_snapshot_id=source_snapshot_id)
         return self.store.get_case(case_id)
 
     def retry(self, case_id: str):
@@ -151,8 +151,13 @@ class WorkbenchService:
                     _attach_evidence_coordinates(analysis, doc["content"])
                     self.store.cache_put(key, analysis)
                 metadata = extract_pliego_metadata(doc["name"], analysis["document_text"], self.root, doc["sha256"])
+                document_metadata = metadata.copy()
+                source = case.get("source")
+                if source:
+                    metadata.update(source.get("metadata", {}))
                 analysis = {k: v for k, v in analysis.items() if k != "document_text"}
-                documents.append({**info, "metadata": metadata, "analysis": analysis, "cache_hit": cache_hit})
+                documents.append({**info, "metadata": metadata, "analysis": analysis, "cache_hit": cache_hit,
+                                  **({"metadata_from_document": document_metadata, "metadata_source": source["snapshot_id"]} if source else {})})
                 if any(p["status"] in {"requires_ocr", "ocr_failed"} for p in analysis["page_statuses"]):
                     messages.append(f"{doc['name']}: algunas páginas no pudieron leerse por completo; la revisión es parcial.")
             items, changes = consolidate_case(documents)

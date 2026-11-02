@@ -47,7 +47,7 @@ No se necesita una clave de modelos para iniciar la aplicación ni ejecutar el m
 
 ## Uso
 
-1. Cargue el pliego y, si corresponde, especificaciones, anexos o adendas.
+1. Cargue el pliego o busque el proceso en SERCOP por año y palabras clave, con filtros opcionales de entidad/proveedor o consulta directa por OCID. La ficha oficial permite vincular los PDF mediante confirmación humana; no los descarga automáticamente.
 2. Indique los tipos documentales y las sustituciones de versiones de forma explícita.
 3. Inicie la revisión y consulte el resumen y las observaciones consolidadas.
 4. Abra la evidencia en el PDF; registre revisión, descarte, seguimiento o comentario.
@@ -160,6 +160,7 @@ La [guía de Azure](docs/azure_deployment.md) detalla construcción, arranque, s
 - [Persistencia compartida, trabajos y migración](docs/shared_storage.md)
 - [Arquitectura del pipeline documental](docs/architecture.md)
 - [Requisitos verificables y cotejo de condiciones entre documentos](docs/requirements_comparison.md)
+- [Búsqueda SERCOP, procedencia y alcance documental](docs/sercop_ocds.md)
 - [Marco técnico y conceptual](docs/technical_and_conceptual_framework.md)
 - [Protocolo inicial de evaluación de la PoC](docs/poc_evaluation.md)
 - [Benchmark reproducible de extracción documental](docs/document_benchmark.md)

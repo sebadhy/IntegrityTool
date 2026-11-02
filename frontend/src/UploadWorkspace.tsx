@@ -11,7 +11,13 @@ import {
   X,
 } from "lucide-react";
 import { api } from "./api";
-import { ROLES, type CaseSummary, type ReviewCase } from "./types";
+import { SercopSearch } from "./SercopSearch";
+import {
+  ROLES,
+  type CaseSummary,
+  type ReviewCase,
+  type SercopSnapshot,
+} from "./types";
 type UploadEntry = {
   file: File;
   role: string;
@@ -35,6 +41,9 @@ export function UploadWorkspace({
   onError: (message: string) => void;
 }) {
   const [files, setFiles] = useState<UploadEntry[]>([]);
+  const [entryMode, setEntryMode] = useState("upload");
+  const [source, setSource] = useState<SercopSnapshot | null>(null);
+  const [sourceConfirmed, setSourceConfirmed] = useState(false);
   const [title, setTitle] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -68,22 +77,28 @@ export function UploadWorkspace({
         supersedes_index: null,
       })),
     ]);
+    setSourceConfirmed(false);
     requestKey.current = crypto.randomUUID();
     if (input.current) input.current.value = "";
   }
   function changeEntry(index: number, values: Partial<UploadEntry>) {
+    setSourceConfirmed(false);
     setFiles((old) =>
       old.map((entry, i) => (i === index ? { ...entry, ...values } : entry)),
     );
     requestKey.current = crypto.randomUUID();
   }
   async function submit() {
-    if (!files.length || submitting) return;
+    if (!files.length || submitting || (source && !sourceConfirmed)) return;
     setSubmitting(true);
     const form = new FormData();
     files.forEach((entry) => form.append("files", entry.file));
     form.append("title", title);
     form.append("request_key", requestKey.current);
+    if (source) {
+      form.append("source_snapshot_id", source.snapshot_id);
+      form.append("source_confirmed", String(sourceConfirmed));
+    }
     form.append(
       "manifest",
       JSON.stringify(
@@ -114,147 +129,201 @@ export function UploadWorkspace({
         </div>
         <h1>¿Qué documento necesita revisar?</h1>
         <p className="intro">
-          Cargue el pliego y sus documentos relacionados. La revisión organiza
-          aspectos que conviene validar y los vincula con su evidencia.
+          Busque un proceso en SERCOP o cargue sus documentos. La revisión
+          organiza aspectos que conviene validar y los vincula con su evidencia.
         </p>
-        <div
-          className={`upload-drop ${dragging ? "is-dragging" : ""}`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragging(true);
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragging(false);
-            addFiles(e.dataTransfer.files);
-          }}
-        >
-          <div className="upload-icon">
-            <Upload size={23} strokeWidth={1.5} />
-          </div>
-          <div>
-            <strong>Arrastre sus documentos PDF</strong>
-            <p>Pliego, especificaciones, anexos o adendas.</p>
-          </div>
+        <nav className="source-modes" aria-label="Forma de iniciar la revisión">
           <button
-            className="secondary-button"
-            onClick={() => input.current?.click()}
+            aria-pressed={entryMode === "upload"}
+            onClick={() => {
+              setEntryMode("upload");
+              setSource(null);
+              setSourceConfirmed(false);
+              requestKey.current = crypto.randomUUID();
+            }}
           >
-            <Plus size={16} /> Seleccionar archivos
+            Cargar documentos
           </button>
-          <input
-            ref={input}
-            type="file"
-            accept="application/pdf,.pdf"
-            multiple
-            hidden
-            onChange={(e) => addFiles(e.target.files)}
+          <button
+            aria-pressed={entryMode === "sercop"}
+            onClick={() => setEntryMode("sercop")}
+          >
+            Buscar proceso en SERCOP
+          </button>
+        </nav>
+        {entryMode === "sercop" && (
+          <SercopSearch
+            selected={source}
+            onSelect={(value) => {
+              setSource(value);
+              setSourceConfirmed(false);
+              requestKey.current = crypto.randomUUID();
+            }}
           />
-        </div>
-        <p className="file-limits">
-          Hasta 8 archivos · 25 MB por documento · 100 MB por expediente
-        </p>
-        {files.length > 0 && (
-          <div className="selected-files">
-            <label className="field-label">
-              Nombre de la revisión <span>Opcional</span>
-              <input
-                value={title}
-                placeholder="Por ejemplo: adquisición de equipos de laboratorio"
-                onChange={(e) => {
-                  setTitle(e.target.value);
-                  requestKey.current = crypto.randomUUID();
-                }}
-                maxLength={200}
-              />
-            </label>
-            <div className="upload-row upload-labels">
-              <span>Documento</span>
-              <span>Tipo documental</span>
-              <span>Versión</span>
-              <span>Sustituye a</span>
-              <span />
-            </div>
-            {files.map((entry, index) => (
-              <div className="upload-row" key={`${entry.file.name}-${index}`}>
-                <span className="file-name">
-                  <FileText size={17} />
-                  <span>
-                    {entry.file.name}
-                    <small>
-                      {(entry.file.size / 1024 / 1024).toFixed(1)} MB
-                    </small>
-                  </span>
-                </span>
-                <select
-                  aria-label={`Tipo de ${entry.file.name}`}
-                  value={entry.role}
-                  onChange={(e) => changeEntry(index, { role: e.target.value })}
-                >
-                  {Object.entries(ROLES).map(([id, label]) => (
-                    <option value={id} key={id}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  aria-label={`Versión de ${entry.file.name}`}
-                  value={entry.version}
-                  onChange={(e) =>
-                    changeEntry(index, { version: e.target.value })
-                  }
-                  maxLength={40}
-                />
-                <select
-                  aria-label={`Documento sustituido por ${entry.file.name}`}
-                  value={entry.supersedes_index ?? ""}
-                  onChange={(e) =>
-                    changeEntry(index, {
-                      supersedes_index:
-                        e.target.value === "" ? null : Number(e.target.value),
-                    })
-                  }
-                >
-                  <option value="">No sustituye</option>
-                  {files.slice(0, index).map((file, i) => (
-                    <option key={i} value={i}>
-                      {file.file.name}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  className="icon-button"
-                  aria-label={`Retirar ${entry.file.name}`}
-                  title="Retirar documento"
-                  onClick={() => {
-                    setFiles((old) =>
-                      old
-                        .filter((_, i) => i !== index)
-                        .map((entry) => ({ ...entry, supersedes_index: null })),
-                    );
-                    requestKey.current = crypto.randomUUID();
-                  }}
-                >
-                  <X size={16} />
-                </button>
+        )}
+        {(entryMode === "upload" || source) && (
+          <>
+            <div
+              className={`upload-drop ${dragging ? "is-dragging" : ""}`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragging(false);
+                addFiles(e.dataTransfer.files);
+              }}
+            >
+              <div className="upload-icon">
+                <Upload size={23} strokeWidth={1.5} />
               </div>
-            ))}
-            <div className="start-review">
-              <span>
-                Las versiones sustituidas se conservan para cotejo, no como
-                requisitos vigentes.
-              </span>
+              <div>
+                <strong>Arrastre sus documentos PDF</strong>
+                <p>Pliego, especificaciones, anexos o adendas.</p>
+              </div>
               <button
-                className="primary-button"
-                disabled={submitting}
-                onClick={submit}
+                className="secondary-button"
+                onClick={() => input.current?.click()}
               >
-                {submitting ? "Guardando documentos…" : "Iniciar revisión"}
-                <ArrowRight size={17} />
+                <Plus size={16} /> Seleccionar archivos
               </button>
+              <input
+                ref={input}
+                type="file"
+                accept="application/pdf,.pdf"
+                multiple
+                hidden
+                onChange={(e) => addFiles(e.target.files)}
+              />
             </div>
-          </div>
+            <p className="file-limits">
+              Hasta 8 archivos · 25 MB por documento · 100 MB por expediente
+            </p>
+            {files.length > 0 && (
+              <div className="selected-files">
+                <label className="field-label">
+                  Nombre de la revisión <span>Opcional</span>
+                  <input
+                    value={title}
+                    placeholder="Por ejemplo: adquisición de equipos de laboratorio"
+                    onChange={(e) => {
+                      setTitle(e.target.value);
+                      requestKey.current = crypto.randomUUID();
+                    }}
+                    maxLength={200}
+                  />
+                </label>
+                <div className="upload-row upload-labels">
+                  <span>Documento</span>
+                  <span>Tipo documental</span>
+                  <span>Versión</span>
+                  <span>Sustituye a</span>
+                  <span />
+                </div>
+                {files.map((entry, index) => (
+                  <div
+                    className="upload-row"
+                    key={`${entry.file.name}-${index}`}
+                  >
+                    <span className="file-name">
+                      <FileText size={17} />
+                      <span>
+                        {entry.file.name}
+                        <small>
+                          {(entry.file.size / 1024 / 1024).toFixed(1)} MB
+                        </small>
+                      </span>
+                    </span>
+                    <select
+                      aria-label={`Tipo de ${entry.file.name}`}
+                      value={entry.role}
+                      onChange={(e) =>
+                        changeEntry(index, { role: e.target.value })
+                      }
+                    >
+                      {Object.entries(ROLES).map(([id, label]) => (
+                        <option value={id} key={id}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      aria-label={`Versión de ${entry.file.name}`}
+                      value={entry.version}
+                      onChange={(e) =>
+                        changeEntry(index, { version: e.target.value })
+                      }
+                      maxLength={40}
+                    />
+                    <select
+                      aria-label={`Documento sustituido por ${entry.file.name}`}
+                      value={entry.supersedes_index ?? ""}
+                      onChange={(e) =>
+                        changeEntry(index, {
+                          supersedes_index:
+                            e.target.value === ""
+                              ? null
+                              : Number(e.target.value),
+                        })
+                      }
+                    >
+                      <option value="">No sustituye</option>
+                      {files.slice(0, index).map((file, i) => (
+                        <option key={i} value={i}>
+                          {file.file.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      className="icon-button"
+                      aria-label={`Retirar ${entry.file.name}`}
+                      title="Retirar documento"
+                      onClick={() => {
+                        setFiles((old) =>
+                          old
+                            .filter((_, i) => i !== index)
+                            .map((entry) => ({
+                              ...entry,
+                              supersedes_index: null,
+                            })),
+                        );
+                        requestKey.current = crypto.randomUUID();
+                      }}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ))}
+                {source && (
+                  <label className="sercop-confirm">
+                    <input
+                      type="checkbox"
+                      checked={sourceConfirmed}
+                      onChange={(e) => setSourceConfirmed(e.target.checked)}
+                    />
+                    Confirmo que los PDF corresponden al proceso seleccionado.
+                    Esta vinculación no se verifica automáticamente.
+                  </label>
+                )}
+                <div className="start-review">
+                  <span>
+                    Las versiones sustituidas se conservan para cotejo, no como
+                    requisitos vigentes.
+                  </span>
+                  <button
+                    className="primary-button"
+                    disabled={submitting || (!!source && !sourceConfirmed)}
+                    onClick={submit}
+                  >
+                    {submitting ? "Guardando documentos…" : "Iniciar revisión"}
+                    <ArrowRight size={17} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
         <details className="how-it-works">
           <summary>
@@ -273,7 +342,8 @@ export function UploadWorkspace({
               lenguaje configurado, puede proponer aspectos adicionales sobre
               una selección de cláusulas y apoyar su explicación. Las citas se
               comprueban y las propuestas pasan por los mismos criterios de
-              consolidación y prioridad; su interpretación requiere revisión humana.
+              consolidación y prioridad; su interpretación requiere revisión
+              humana.
             </p>
             <p>
               Las dimensiones analíticas son una propuesta inicial sujeta a

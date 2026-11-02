@@ -139,12 +139,14 @@ class ReviewStore:
                 name: value for name, value in values.items() if name not in keys})
         return statement.on_conflict_do_nothing(index_elements=keys)
 
-    def create_case(self, case_id: str, request_key: str, title: str, documents: list[dict]) -> str:
+    def create_case(self, case_id: str, request_key: str, title: str, documents: list[dict], source_snapshot_id: str | None = None) -> str:
         indices = {doc["id"]: index for index, doc in enumerate(documents)}
         request_data = [title, [{key: doc.get(key) for key in
             ("name", "role", "version", "sha256")} | {
                 "supersedes_index": indices.get(doc.get("supersedes"))
             } for doc in documents]]
+        if source_snapshot_id:
+            request_data.append(source_snapshot_id)
         fingerprint = hashlib.sha256(json.dumps(request_data, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
         # Storage precedes the DB transaction. A crash may leave an unreferenced
         # object; never delete it inline because another request may reference it.
@@ -160,6 +162,8 @@ class ReviewStore:
         now = utc_now()
         job_id = str(uuid.uuid4())
         with self.connection() as db:
+            if source_snapshot_id and not db.scalar(select(s.source_snapshots.c.id).where(s.source_snapshots.c.id == source_snapshot_id)):
+                raise ValueError("La ficha de SERCOP ya no está disponible. Consulte nuevamente el proceso.")
             created = db.execute(self._insert(s.cases, {
                 "id": case_id, "request_key": request_key, "title": title, "status": "queued",
                 "created_at": now, "updated_at": now, "result": None, "error": None,
@@ -172,6 +176,8 @@ class ReviewStore:
                 return existing["id"]
             for doc in prepared:
                 db.execute(s.documents.insert().values(**doc))
+            if source_snapshot_id:
+                db.execute(s.case_sources.insert().values(case_id=case_id, snapshot_id=source_snapshot_id))
             db.execute(s.jobs.insert().values(id=job_id, case_id=case_id, status="queued", attempt=0,
                                              created_at=now, updated_at=now))
         return case_id
@@ -182,6 +188,10 @@ class ReviewStore:
             if row is None:
                 return None
             case = dict(row)
+            source = db.scalar(select(s.source_snapshots.c.payload).join(s.case_sources,
+                s.case_sources.c.snapshot_id == s.source_snapshots.c.id).where(s.case_sources.c.case_id == case_id))
+            if source:
+                case["source"] = source
             case.pop("request_key", None)
             case.pop("request_fingerprint", None)
             case["documents"] = [dict(doc) for doc in db.execute(select(
@@ -254,6 +264,18 @@ class ReviewStore:
     def cache_get(self, key: str) -> dict | None:
         with self.connection() as db:
             return db.scalar(select(s.analysis_cache.c.result).where(s.analysis_cache.c.cache_key == key))
+
+    def save_source_snapshot(self, snapshot: dict) -> None:
+        raw = snapshot["raw_json"].encode("utf-8")
+        if hashlib.sha256(raw).hexdigest() != snapshot["sha256"]:
+            raise ValueError("La huella de la respuesta oficial no coincide.")
+        with self.connection() as db:
+            db.execute(self._insert(s.source_snapshots, {"id": snapshot["snapshot_id"],
+                "payload": snapshot, "created_at": utc_now()}, ["id"]))
+
+    def get_source_snapshot(self, snapshot_id: str) -> dict | None:
+        with self.connection() as db:
+            return db.scalar(select(s.source_snapshots.c.payload).where(s.source_snapshots.c.id == snapshot_id))
 
     def cache_put(self, key: str, result: dict):
         with self.connection() as db:

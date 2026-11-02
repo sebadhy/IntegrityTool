@@ -7,6 +7,7 @@ import io
 import json
 import logging
 import os
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Literal
@@ -25,6 +26,7 @@ from pydantic import BaseModel, Field
 
 from .analyzer.workbench_service import MAX_FILE_BYTES, MAX_TOTAL_BYTES, WorkbenchService
 from .analyzer.review_store import StorageConflict
+from .analyzer import sercop_ocds
 
 LOGGER = logging.getLogger(__name__)
 
@@ -34,6 +36,10 @@ class ReviewUpdate(BaseModel):
     comment: str = Field(default="", max_length=4000)
     reviewer: str = Field(default="Revisor local", min_length=1, max_length=120)
     expected_revision: int = Field(ge=0)
+
+
+class SercopRecordRequest(BaseModel):
+    ocid: str = Field(min_length=1, max_length=200)
 
 
 def create_app(storage: Path | None = None, assisted: bool | None = None, corpus_provider=None) -> FastAPI:
@@ -75,6 +81,10 @@ def create_app(storage: Path | None = None, assisted: bool | None = None, corpus
     async def invalid_request(request, exc):
         return JSONResponse({"detail": str(exc)}, status_code=400)
 
+    @app.exception_handler(sercop_ocds.SercopUnavailable)
+    async def unavailable_source(request, exc):
+        return JSONResponse({"detail": str(exc)}, status_code=503)
+
     @app.exception_handler(StorageConflict)
     async def storage_conflict(request, exc):
         return JSONResponse({"detail": str(exc)}, status_code=409)
@@ -98,9 +108,23 @@ def create_app(storage: Path | None = None, assisted: bool | None = None, corpus
     def cases():
         return app.state.service.store.list_cases()
 
+    @app.get("/api/sources/sercop/search")
+    def search_sercop(year: int, search: str, buyer: str = "", supplier: str = "", page: int = 1):
+        return sercop_ocds.search_processes(year, search, buyer, supplier, page)
+
+    @app.post("/api/sources/sercop/record")
+    def import_sercop(request: SercopRecordRequest):
+        snapshot = sercop_ocds.fetch_process(request.ocid)
+        app.state.service.store.save_source_snapshot(snapshot)
+        return sercop_ocds.public_snapshot(snapshot)
+
     @app.post("/api/cases", status_code=202)
     async def create_case(files: Annotated[list[UploadFile], File()], manifest: Annotated[str, Form()],
-                          request_key: Annotated[str, Form()], title: Annotated[str, Form()] = ""):
+                          request_key: Annotated[str, Form()], title: Annotated[str, Form()] = "",
+                          source_snapshot_id: Annotated[str, Form()] = "",
+                          source_confirmed: Annotated[bool, Form()] = False):
+        if source_snapshot_id and not source_confirmed:
+            raise ValueError("Confirme que los PDF corresponden al proceso seleccionado en SERCOP.")
         try:
             info = json.loads(manifest)
         except json.JSONDecodeError as exc:
@@ -115,7 +139,9 @@ def create_app(storage: Path | None = None, assisted: bool | None = None, corpus
             if len(content) > MAX_FILE_BYTES or total > MAX_TOTAL_BYTES:
                 raise HTTPException(413, "Cada PDF admite hasta 25 MB; el expediente completo, hasta 100 MB.")
             entries.append({**info[index], "name": upload.filename or "documento.pdf", "content": content})
-        return _public_case(app.state.service.create(title, request_key, entries))
+        if source_snapshot_id and not re.fullmatch(r"[0-9a-f]{64}", source_snapshot_id):
+            raise ValueError("La referencia de la ficha de SERCOP no es válida.")
+        return _public_case(app.state.service.create(title, request_key, entries, source_snapshot_id=source_snapshot_id or None))
 
     @app.get("/api/cases/{case_id}")
     def case_detail(case_id: str):
@@ -171,19 +197,21 @@ def create_app(storage: Path | None = None, assisted: bool | None = None, corpus
         elif format == "csv":
             out = io.StringIO()
             writer = csv.writer(out)
-            writer.writerow(["observacion_id", "patron", "titulo", "prioridad_revision", "documento", "pagina", "fragmento", "mitigantes", "preguntas", "estado_humano", "comentario", "engine_version", "taxonomy_sha256", "fuentes", "metodos_identificacion", "tipo_registro", "requisito_id", "item", "atributo", "valor", "unidad", "condicion", "hito", "cotejo_id"])
+            source = case.get("source") or {}
+            source_cells = [source.get(key, "") for key in ("ocid", "source_url", "sha256", "retrieved_at")]
+            writer.writerow(["observacion_id", "patron", "titulo", "prioridad_revision", "documento", "pagina", "fragmento", "mitigantes", "preguntas", "estado_humano", "comentario", "engine_version", "taxonomy_sha256", "fuentes", "metodos_identificacion", "tipo_registro", "requisito_id", "item", "atributo", "valor", "unidad", "condicion", "hito", "cotejo_id", "ocid", "fuente_registro", "sha256_registro", "consulta_registro"])
             for item in case["result"]["items"]:
                 for ev in item["evidence"]:
                     review = case["reviews"].get(item["id"], {})
                     cells = [item["id"], item["pattern_id"], item["title"], item["priority"], ev["document_name"], ev["page"], ev["text"], "; ".join(item["mitigants"]), "; ".join(item["questions"]), review.get("state", "pending"), review.get("comment", ""), case["result"]["provenance"]["engine_version"], case["result"]["provenance"]["taxonomy_sha256"], "; ".join(item.get("sources", [])), "; ".join(item.get("analysis_methods", ["deterministic_rules"]))]
-                    writer.writerow([_csv_cell(cell) for cell in cells + ["observacion"] + [""] * 8])
+                    writer.writerow([_csv_cell(cell) for cell in cells + ["observacion"] + [""] * 8 + source_cells])
             comparison_ids = {source["requirement_id"]: group["comparison_id"]
                               for group in case["result"].get("requirement_comparison", {}).get("comparisons", [])
                               for source in group["sources"]}
             for doc in case["result"]["documents"]:
                 for req in doc.get("analysis", {}).get("requirements", []):
                     cells = ["", "", "Condición documental explícita", "", doc["name"], req["page"], req["evidence_text"], "", "", "", "", case["result"]["provenance"]["engine_version"], case["result"]["provenance"]["taxonomy_sha256"], "Documento original", req["extraction_method"], "requisito", req["requirement_id"], req["item_ref"], req["attribute"], req["value"], req["unit"], req["comparator"], req.get("milestone", ""), comparison_ids.get(req["requirement_id"], "")]
-                    writer.writerow([_csv_cell(cell) for cell in cells])
+                    writer.writerow([_csv_cell(cell) for cell in cells + source_cells])
             body, media = "\ufeff" + out.getvalue(), "text/csv"
         else:
             body, media = _html_report(case), "text/html"
@@ -203,6 +231,9 @@ def create_app(storage: Path | None = None, assisted: bool | None = None, corpus
 
 def _public_case(case):
     """Navigation needs the review, not every internal clause and rule."""
+    case = {**case}
+    if case.get("source"):
+        case["source"] = sercop_ocds.public_snapshot(case["source"])
     if not case["result"]:
         return case
     result = {key: value for key, value in case["result"].items() if key != "taxonomy_context"}
@@ -228,6 +259,9 @@ def _html_report(case):
     parts = [f'<!doctype html><html lang="es"><meta charset="utf-8"><title>{esc(case["title"])}</title><style>body{{font:15px/1.6 system-ui;max-width:900px;margin:40px auto;padding:20px;color:#223438}}article{{border-top:1px solid #ccd5d6;margin-top:28px}}blockquote{{border-left:3px solid #297a70;padding-left:16px}}small{{color:#526466}}</style><h1>{esc(case["title"])}</h1><p>Lectura preliminar para revisión humana.</p><p>{esc(result.get("assisted_summary") or result["summary"])}</p>']
     for doc in result["documents"]:
         parts.append(f'<p><strong>{esc(doc["name"])}</strong> · {esc(doc["role"])} · versión {esc(doc["version"])}<br><small>SHA256: {esc(doc["sha256"])}</small></p>')
+    if case.get("source"):
+        source = case["source"]
+        parts.append(f'<p>Referencia oficial SERCOP: {esc(source["ocid"])}. Consultada: {esc(source["retrieved_at"])}. Entrega: {esc(source["release_id"])}.<br><small>URL: {esc(source["source_url"])} · SHA256: {esc(source["sha256"])}</small></p><p>{esc(source["limitation"])}</p>')
     semantic = result.get("semantic_review", {})
     coverage = semantic.get("coverage") or {}
     if semantic.get("status") == "completed":

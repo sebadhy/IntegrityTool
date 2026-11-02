@@ -243,6 +243,19 @@ export default function App() {
           {result && (
             <>
               <section className="case-heading">
+                {activeCase?.source && (
+                  <p className="sercop-note">
+                    Referencia SERCOP: {activeCase.source.code} ·{" "}
+                    <a
+                      href={activeCase.source.source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Registro oficial
+                    </a>
+                    . Documentos vinculados por confirmación del usuario.
+                  </p>
+                )}
                 <div className="case-heading-top">
                   <span className="eyebrow">EXPEDIENTE DOCUMENTAL</span>
                   <span className="preliminary-state">

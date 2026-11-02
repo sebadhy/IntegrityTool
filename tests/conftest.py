@@ -1,6 +1,7 @@
 import sys
 import importlib
 import os
+import urllib.request
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -24,6 +25,8 @@ def block_external_http_transports(monkeypatch):
 
     async def blocked_async(*args, **kwargs):
         raise AssertionError("External HTTP is disabled in tests; mock the provider.")
+
+    monkeypatch.setattr(urllib.request.OpenerDirector, "open", blocked)
 
     for module_name in ("httpx", "httpx2"):
         try:

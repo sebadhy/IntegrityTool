@@ -1,5 +1,20 @@
 export type Priority = "alta" | "media" | "baja";
 export type ReviewState = "pending" | "confirmed" | "discarded" | "followup";
+export type SercopSnapshot = {
+  snapshot_id: string;
+  ocid: string;
+  code: string;
+  buyer: string;
+  metadata: Record<string, string>;
+  retrieved_at: string;
+  published_at: string;
+  release_id: string;
+  source_url: string;
+  sha256: string;
+  document_reference_count: number;
+  item_count: number;
+  limitation: string;
+};
 export type Evidence = {
   page: number;
   section: string;
@@ -65,6 +80,7 @@ export type CaseSummary = {
   updated_at: string;
 };
 export type ReviewCase = CaseSummary & {
+  source?: SercopSnapshot;
   error?: string;
   documents: CaseDocument[];
   reviews: Record<string, Review>;

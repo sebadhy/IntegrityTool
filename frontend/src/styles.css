@@ -286,6 +286,144 @@ details[open] > summary > svg:last-child {
   border-left: 1px solid #a7b4aa;
   padding-left: 13px;
 }
+.source-modes {
+  display: flex;
+  gap: 24px;
+  margin: 26px 0;
+  border-bottom: 1px solid #d5ded8;
+  flex-wrap: wrap;
+}
+.source-modes button {
+  padding: 12px 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: #536b60;
+  cursor: pointer;
+}
+.source-modes button[aria-pressed="true"] {
+  border-bottom-color: #275e50;
+  color: #214c40;
+  font-weight: 600;
+}
+.sercop-search fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.sercop-search .field-label > select,
+.sercop-search .field-label > input {
+  width: 100%;
+  margin-top: 8px;
+}
+.sercop-search-fields {
+  display: grid;
+  grid-template-columns: minmax(100px, 150px) minmax(0, 1fr);
+  gap: 20px;
+}
+.sercop-search-fields.equal {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 16px 0;
+}
+.sercop-search .primary-button {
+  justify-self: start;
+}
+.sercop-more summary {
+  cursor: pointer;
+  font-size: 14px;
+}
+.sercop-results {
+  list-style: none;
+  padding: 0;
+}
+.sercop-results li {
+  border-top: 1px solid #d5ded8;
+  padding: 22px 0;
+  display: flex;
+  align-items: start;
+  gap: 24px;
+}
+.sercop-results li > div {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sercop-results p {
+  margin: 8px 0;
+  line-height: 1.6;
+}
+.sercop-results .secondary-button {
+  flex-shrink: 0;
+}
+.sercop-pagination {
+  display: flex;
+  gap: 12px;
+  justify-content: end;
+  margin-bottom: 24px;
+}
+.sercop-selection {
+  margin-bottom: 24px;
+}
+.sercop-selection-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 20px;
+}
+.sercop-selection-heading h2 {
+  overflow-wrap: anywhere;
+  font-size: 20px;
+}
+.sercop-facts {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 12px 20px;
+  margin: 24px 0;
+}
+.sercop-facts dt {
+  color: #63766a;
+}
+.sercop-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.sercop-note {
+  font-size: 13px;
+  color: #536b60;
+  line-height: 1.7;
+}
+.sercop-confirm {
+  display: flex;
+  align-items: start;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 18px 0;
+}
+.sercop-confirm input {
+  flex: 0 0 auto;
+  margin-top: 4px;
+}
+@media (max-width: 760px) {
+  .sercop-search-fields,
+  .sercop-search-fields.equal,
+  .sercop-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sercop-facts {
+    gap: 6px;
+  }
+  .sercop-facts dd {
+    margin-bottom: 10px;
+  }
+  .sercop-results li {
+    flex-direction: column;
+  }
+}
 .home-page {
   max-width: 1060px;
   margin: 54px auto 0;

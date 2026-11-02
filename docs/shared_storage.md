@@ -30,6 +30,7 @@ SQLAlchemy Core comparte consultas entre SQLite y PostgreSQL. La tabla `analysis
 - `analysis_jobs`: estado, propietario, token, intento y vencimiento de la reserva.
 - `assisted_requests`: reserva previa y respuesta confirmada o incierta de solicitudes asistidas.
 - `schema_migrations`: versión y comprobante del esquema esperado.
+- `source_snapshots` y `case_sources`: respuestas oficiales inmutables y su vinculación con revisiones; introducidas en el esquema 2. Consulte [actualización y operación OCDS](sercop_ocds.md).
 
 El resultado JSON completo se conserva junto a la proyección consultable. Esta duplicación es deliberada: permite inspección y compatibilidad sin convertir el snapshot en un esquema rígido para cada atributo analítico.
 
