@@ -23,6 +23,7 @@ data/benchmark/
 coverage.xml
 htmlcov/
 data/workbench/
+data/backups/
 frontend/node_modules/
 frontend/dist/
 frontend/test-results/

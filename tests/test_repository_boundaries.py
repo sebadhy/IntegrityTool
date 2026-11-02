@@ -111,6 +111,7 @@ def test_operational_docs_describe_current_components():
 
 
 def test_azure_handoff_links_and_example_configuration_are_consistent():
+    from dotenv import dotenv_values
     for name in ("developer_handoff.md", "azure_deployment.md"):
         source = ROOT / "docs" / name
         targets = re.findall(r"\]\(([^)]+)\)", source.read_text(encoding="utf-8"))
@@ -121,7 +122,15 @@ def test_azure_handoff_links_and_example_configuration_are_consistent():
         content = example.read_text(encoding="utf-8")
         assert "INTEGRITY_DATABASE_URL=" in content
         assert "INTEGRITY_DOCUMENT_STORAGE=azure" in content
-        assert "INTEGRITY_ASSISTED_ENABLED=false" in content
+        values = dotenv_values(example)
+        assert values["INTEGRITY_ASSISTED_ENABLED"] == ("false" if role == "api" else "true")
+        if role == "worker":
+            assert values["LLM_PROVIDER"] == "azure"
+            assert values["INTEGRITY_SEMANTIC_ENABLED"] == "true"
+            assert values["INTEGRITY_LLM_MAX_CALLS"] == "2"
+            assert values["OPENAI_MODEL"] == "DEPLOYMENT_NAME"
+        else:
+            assert not any(key.startswith("OPENAI_") for key in values)
         assert "INTEGRITY_ENTRA_TENANT_ID" not in content
 
 

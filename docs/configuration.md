@@ -10,6 +10,10 @@ Copie `.env.example` a `.env` solo si no existe una configuración propia. Las v
 
 Sin proveedor configurado, la aplicación mantiene el análisis determinístico. El corpus es opcional y se valida por separado.
 
+El [contrato del motor de IA](ai_engine.md) explica qué etapas usan modelos,
+qué datos reciben y cómo comprobar su intervención. En Azure, las variables del
+modelo se configuran únicamente en el trabajador; la API registra los trabajos.
+
 ## Proveedor de procesamiento asistido
 
 Seleccione un único proveedor con `LLM_PROVIDER`. Sin selección explícita se conserva la detección automática: Azure, Groq, Ollama y OpenAI.
@@ -25,6 +29,12 @@ OPENAI_MODEL=<nombre del deployment>
 ```
 
 `OPENAI_MODEL` es el nombre del despliegue Azure. Este proveedor se autentica mediante `OPENAI_API_KEY`. Antes de publicar, valide los contratos de salida estructurada con la versión y modelo elegidos.
+
+Para comprobar únicamente las variables: `python -m src.assistance_check`.
+Para probar explícitamente el cliente y los esquemas con hasta dos solicitudes
+facturables de contenido ficticio: `python -m src.assistance_check --request-model`.
+Estos comandos se ejecutan con las variables del trabajador; no necesitan PDFs
+ni una base de revisiones. No utilizar la prueba de modelos como health check.
 
 ### OpenAI
 

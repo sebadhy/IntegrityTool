@@ -2,6 +2,9 @@
 
 Procedimiento para construir la imagen, configurar los procesos y validar el despliegue. El equipo que administra la suscripción prepara los recursos y el acceso institucional.
 
+Para entender la intervención del modelo antes de configurar el ambiente, leer
+[Motor de IA: dónde, cómo y cuándo interviene](ai_engine.md).
+
 ## 1. Requisitos de acceso compartido
 
 **Acceso actual: local, en `127.0.0.1:8000`.** Antes de publicar la URL se requiere integrar y validar el acceso institucional.
@@ -14,6 +17,13 @@ Antes de compartir la URL, el desarrollador debe integrar y probar:
 - Dominios y origen HTTPS permitidos, protección de operaciones de escritura y rechazo de acceso directo que evada la autenticación.
 
 Implementar la integración en `src/workbench_api.py` y comprobar autenticación, permisos y origen de las solicitudes antes de habilitar el dominio compartido.
+
+El entrypoint `src/container_start.py` escucha en `127.0.0.1`; el middleware de la
+API acepta solo hosts locales. Un ingreso de Container Apps requiere adaptar
+ambos como parte de la integración segura. Cambiar el binding sin identidad,
+permisos y validación de hosts/origen no satisface este requisito. El repositorio
+no incluye todavía esa integración institucional; no es un despliegue público
+listo únicamente con variables de ambiente.
 
 Como ruta de referencia, Azure Container Apps permite delegar el inicio de sesión en la plataforma y recibir información de identidad validada. Configurar el proveedor y vincular la identidad con los permisos de la aplicación. [Documentación oficial de autenticación](https://learn.microsoft.com/en-us/azure/container-apps/authentication).
 
@@ -107,6 +117,24 @@ OPENAI_MODEL=DEPLOYMENT_NAME
 
 `OPENAI_MODEL` identifica el deployment configurado en Azure. Azure OpenAI se autentica mediante `OPENAI_API_KEY`; Blob utiliza la identidad administrada indicada en la sección anterior.
 
+El [ejemplo del trabajador](../deploy/azure/worker.env.example) configura la
+asistencia activa para la entrega con IA. Durante la verificación inicial de
+almacenamiento, sobrescribir temporalmente `INTEGRITY_ASSISTED_ENABLED=false`.
+Las credenciales del modelo no corresponden a la API ni al frontend.
+
+Antes de iniciar revisiones reales, en el entorno del trabajador:
+
+```bash
+python -m src.assistance_check
+# Prueba autorizada, hasta dos solicitudes facturables con contenido ficticio:
+python -m src.assistance_check --request-model
+```
+
+La primera comprobación es local; la segunda prueba los contratos de propuestas
+y síntesis con el deployment real. No utiliza documentos ni una base de datos.
+No ejecutarla automáticamente en cada arranque ni como probe. Conservar su
+salida de estado/procedencia en el comprobante protegido de aceptación.
+
 Probar compatibilidad con los esquemas estructurados y límites del deployment elegido. La aplicación admite hasta tres solicitudes lógicas por expediente y conserva las solicitudes inciertas para evitar repeticiones automáticas. Configurar cuotas y presupuesto global en el recurso. Ante un fallo del proveedor se conserva la lectura determinística.
 
 ## 6. Esquema y datos existentes
@@ -161,6 +189,7 @@ Sin `--check-services` solo valida variables. Con él consulta el esquema, propi
 - [ ] Cargar pliego y especificaciones públicos de prueba; localizar dos evidencias, cambiar página/zoom, guardar comentario y exportar HTML/CSV/JSON.
 - [ ] Reiniciar API y trabajador; verificar conservación de revisiones, originales y trabajos. Navegar no debe solicitar de nuevo modelos.
 - [ ] Confirmar procesamiento con y sin Azure OpenAI y probar fallo/timeout del proveedor sin perder la lectura determinística.
+- [ ] Verificar uso efectivo en `result.assistance.calls`, incluido `cached`, proveedor, deployment y consumo reportado; la configuración activa por sí sola no acredita una llamada. Validar citas y cobertura de `semantic_review`.
 - [ ] Verificar corpus validado o ausencia informada; versiones sustituidas y todas las ocurrencias siguen trazables.
 - [ ] Probar respaldo y restauración de PostgreSQL y Blob; conservar reglas, código, imagen y corpus de referencia. Definir responsables, retención, RPO y RTO.
 - [ ] Revisar memoria/latencia con documentos representativos, conexiones, cola pendiente, OCR y cuota del modelo antes de aumentar réplicas.

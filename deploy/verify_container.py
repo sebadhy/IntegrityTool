@@ -40,6 +40,15 @@ def main():
     for role in ("api", "worker"):
         checked = json.loads(run(image, ["-m", "src.deployment_check", "--role", role], env=common))
         assert checked["ok"] and checked["model_calls"] == 0 and checked["public_http_ready"] is False
+    model_environment = {**common, "INTEGRITY_ASSISTED_ENABLED": "true", "LLM_PROVIDER": "azure",
+        "OPENAI_API_KEY": "container-fixture-not-a-secret", "OPENAI_API_VERSION": "test-version",
+        "OPENAI_MODEL": "test-deployment", "OPENAI_BASE_URL": "https://not-a-real-model.invalid/"}
+    model_configuration = json.loads(run(image, ["-m", "src.assistance_check"], env=model_environment))
+    assert model_configuration["ok"] and model_configuration["enabled"]
+    assert model_configuration["configuration_only"] and model_configuration["model_calls"] == 0
+    invalid_switch = json.loads(run(image, ["-m", "src.deployment_check", "--role", "worker"],
+        env={**model_environment, "INTEGRITY_ASSISTED_ENABLED": "yes"}, expected=1))
+    assert not invalid_switch["ok"]
     # Use only a temporary SQLite fixture, loopback HTTP and a disabled provider.
     # This tests the existing local API, not public/authenticated access in Azure.
     run(image, ["-c", '''
@@ -114,7 +123,7 @@ finally:
     process.wait(timeout=15)
 '''])
     print(json.dumps({"image": image, "non_root": True, "ocr": "spa+eng",
-        "preflight": "ok", "local_api_frontend_worker": "ok", "review_and_exports": "ok", "network": "disabled",
+        "preflight": "ok", "assistance_configuration": "ok", "local_api_frontend_worker": "ok", "review_and_exports": "ok", "network": "disabled",
         "public_http_ready": False, "model_calls": 0}))
 
 

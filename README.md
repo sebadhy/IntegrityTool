@@ -8,6 +8,8 @@ La aplicación utiliza **React + TypeScript + PDF.js**, servida por una **API Py
 
 **Entrega para Azure:** comenzar por [la guía para el desarrollador](docs/developer_handoff.md): componentes, configuración, datos y criterios de aceptación.
 
+**Motor de IA:** [dónde, cómo y cuándo interviene](docs/ai_engine.md), datos enviados, límites, fallos y comprobación del uso efectivo de Azure OpenAI.
+
 ## Inicio rápido
 
 Requisitos: Python 3.11 o superior, Node.js 22.13 o superior (recomendado: 24) y pnpm 11.25. Node solo es necesario para construir la interfaz. Si falta pnpm: `npm install --global pnpm@11.25.0`.
@@ -122,6 +124,7 @@ tests/                          Pruebas de motor, API y contratos
 src/manage_storage.py           Inicialización y migración explícitas
 src/review_worker.py            Inicio del trabajador independiente
 src/deployment_check.py          Comprobaciones sin análisis ni modelos
+src/assistance_check.py          Configuración y prueba explícita del modelo con datos ficticios
 docs/                           Arquitectura, metodología y evaluación
 benchmarks/                     Evaluación aislada de extracción documental
 data/                           Datos locales, no versionados
@@ -155,6 +158,7 @@ La [guía de Azure](docs/azure_deployment.md) detalla construcción, arranque, s
 ## Documentación
 
 - [Entrega al desarrollador](docs/developer_handoff.md)
+- [Motor de IA: ejecución, datos, límites y verificación](docs/ai_engine.md)
 - [Preparación, datos y aceptación en Azure](docs/azure_deployment.md)
 - [Configuración: proveedores, corpus y almacenamiento](docs/configuration.md)
 - [Persistencia compartida, trabajos y migración](docs/shared_storage.md)

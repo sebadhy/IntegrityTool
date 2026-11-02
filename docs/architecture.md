@@ -2,6 +2,9 @@
 
 Integrity Tool conserva un pipeline determinístico primero. En la mesa React puede complementarse con propuestas semánticas acotadas que deben superar validación documental y las mismas etapas de consolidación, relevancia y prioridad. La herramienta no determina irregularidades, responsabilidades ni conclusiones legales.
 
+El [contrato operativo del motor de IA](ai_engine.md) detalla qué etapas invocan
+modelos, qué datos reciben, cuándo se ejecutan y cómo comprobar su procedencia.
+
 ## Flujo principal
 
 ```text

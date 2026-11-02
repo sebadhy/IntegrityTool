@@ -23,6 +23,29 @@ def _https_endpoint(value: str) -> bool:
         return False
 
 
+def assistance_configuration_errors() -> list[str]:
+    """Azure worker contract; never contact a provider or echo secret values."""
+    errors = []
+    for name, default in (("INTEGRITY_ASSISTED_ENABLED", "false"), ("INTEGRITY_SEMANTIC_ENABLED", "true")):
+        if os.getenv(name, default).lower() not in {"true", "false"}:
+            errors.append(f"{name} debe ser true o false.")
+    if os.getenv("INTEGRITY_ASSISTED_ENABLED", "false").lower() != "true":
+        return errors
+    if os.getenv("LLM_PROVIDER", "").strip().lower() != "azure":
+        errors.append("Seleccione LLM_PROVIDER=azure para este ambiente.")
+    for name in ("OPENAI_API_KEY", "OPENAI_API_VERSION", "OPENAI_MODEL"):
+        if not os.getenv(name, "").strip():
+            errors.append(f"Configure {name} en el trabajador.")
+    if not _https_endpoint(os.getenv("OPENAI_BASE_URL", "")):
+        errors.append("OPENAI_BASE_URL debe ser el endpoint HTTPS del recurso Azure OpenAI.")
+    try:
+        if not 0 <= int(os.getenv("INTEGRITY_LLM_MAX_CALLS", "2")) <= 3:
+            raise ValueError("Invalid budget")
+    except ValueError:
+        errors.append("INTEGRITY_LLM_MAX_CALLS debe estar entre 0 y 3.")
+    return errors
+
+
 def configuration_errors(role: str) -> list[str]:
     """Validate the shared storage contract without opening a connection."""
     errors = []
@@ -47,19 +70,8 @@ def configuration_errors(role: str) -> list[str]:
         errors.append("Configure un nombre válido en INTEGRITY_BLOB_CONTAINER.")
     if os.getenv("INTEGRITY_ALLOW_STORAGE_EMULATOR", "false").lower() == "true":
         errors.append("El emulador no se admite en el perfil de despliegue compartido.")
-    if role == "worker" and os.getenv("INTEGRITY_ASSISTED_ENABLED", "false").lower() == "true":
-        if os.getenv("LLM_PROVIDER") != "azure":
-            errors.append("Seleccione LLM_PROVIDER=azure para este ambiente.")
-        for name in ("OPENAI_API_KEY", "OPENAI_API_VERSION", "OPENAI_MODEL"):
-            if not os.getenv(name, "").strip():
-                errors.append(f"Configure {name} en el trabajador.")
-        if not _https_endpoint(os.getenv("OPENAI_BASE_URL", "")):
-            errors.append("OPENAI_BASE_URL debe ser el endpoint HTTPS del recurso Azure OpenAI.")
-        try:
-            if not 0 <= int(os.getenv("INTEGRITY_LLM_MAX_CALLS", "2")) <= 3:
-                raise ValueError("Invalid budget")
-        except ValueError:
-            errors.append("INTEGRITY_LLM_MAX_CALLS debe estar entre 0 y 3.")
+    if role == "worker":
+        errors.extend(assistance_configuration_errors())
     return errors
 
 
