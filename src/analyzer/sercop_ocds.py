@@ -5,7 +5,7 @@ import hashlib
 import json
 import re
 import threading
-import urllib.error
+import uuid
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -173,7 +173,7 @@ def fetch_process(ocid: str) -> dict:
     documents = [doc for container in containers for doc in _list(container.get("documents")) if isinstance(doc, dict)]
     sha = hashlib.sha256(raw).hexdigest()
     retrieved = datetime.now(timezone.utc).isoformat()
-    snapshot_id = hashlib.sha256(f"{url}|{sha}|{retrieved}".encode()).hexdigest()
+    snapshot_id = hashlib.sha256(f"{url}|{sha}|{retrieved}|{uuid.uuid4().hex}".encode()).hexdigest()
     return {"snapshot_id": snapshot_id, "provider": "sercop_ocds", "ocid": ocid,
             "source_url": url, "sha256": sha, "retrieved_at": retrieved,
             "published_at": _text(package.get("publishedDate"), 60), "release_id": _text(release.get("id"), 240),

@@ -3,6 +3,7 @@ import json
 import sqlite3
 import csv
 import io
+from datetime import datetime, timezone
 
 import pytest
 from sqlalchemy import select
@@ -74,6 +75,19 @@ def test_record_has_literal_provenance_without_inventing_budget_or_dates(monkeyp
     assert snapshot["field_sources"]["objeto"] == "/releases/0/tender/description"
     assert hashlib.sha256(snapshot["raw_json"].encode()).hexdigest() == snapshot["sha256"]
     assert "raw_json" not in source.public_snapshot(snapshot)
+
+
+def test_distinct_consultations_do_not_depend_on_clock_precision(monkeypatch):
+    mock_package(monkeypatch)
+    class FrozenClock:
+        @staticmethod
+        def now(tz):
+            return datetime(2026, 11, 2, 12, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(source, "datetime", FrozenClock)
+    first, second = source.fetch_process(OCID), source.fetch_process(OCID)
+    assert first["retrieved_at"] == second["retrieved_at"]
+    assert first["sha256"] == second["sha256"]
+    assert first["snapshot_id"] != second["snapshot_id"]
 
 
 def test_compiled_record_envelope_and_planning_budget(monkeypatch):
