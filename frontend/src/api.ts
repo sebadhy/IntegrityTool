@@ -2,6 +2,8 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, init);
   if (!response.ok) {
     const data = await response.json().catch(() => null);
+    if (response.status === 401)
+      window.dispatchEvent(new Event("integrity-session-expired"));
     throw new Error(
       typeof data?.detail === "string"
         ? data.detail

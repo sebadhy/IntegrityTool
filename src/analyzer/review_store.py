@@ -139,7 +139,7 @@ class ReviewStore:
                 name: value for name, value in values.items() if name not in keys})
         return statement.on_conflict_do_nothing(index_elements=keys)
 
-    def create_case(self, case_id: str, request_key: str, title: str, documents: list[dict], source_snapshot_id: str | None = None) -> str:
+    def create_case(self, case_id: str, request_key: str, title: str, documents: list[dict], source_snapshot_id: str | None = None, *, actor: str | None = None) -> str:
         indices = {doc["id"]: index for index, doc in enumerate(documents)}
         request_data = [title, [{key: doc.get(key) for key in
             ("name", "role", "version", "sha256")} | {
@@ -180,6 +180,9 @@ class ReviewStore:
                 db.execute(s.case_sources.insert().values(case_id=case_id, snapshot_id=source_snapshot_id))
             db.execute(s.jobs.insert().values(id=job_id, case_id=case_id, status="queued", attempt=0,
                                              created_at=now, updated_at=now))
+            if actor:
+                db.execute(s.events.insert().values(case_id=case_id, item_id="", state="created",
+                    comment="Revisión iniciada", reviewer=actor, created_at=now))
         return case_id
 
     def get_case(self, case_id: str) -> dict | None:
@@ -340,7 +343,7 @@ class ReviewStore:
         with self.connection() as db:
             return set(db.scalars(select(s.jobs.c.case_id).where(s.jobs.c.status.in_(["queued", "running"]))))
 
-    def retry_case(self, case_id: str):
+    def retry_case(self, case_id: str, *, actor: str | None = None):
         with self.connection() as db:
             case = db.execute(select(s.cases).where(s.cases.c.id == case_id).with_for_update()).mappings().first()
             if not case or case["status"] not in {"failed", "interrupted"}:
@@ -354,6 +357,9 @@ class ReviewStore:
                 attempt=0, created_at=now, updated_at=now))
             db.execute(s.cases.update().where(s.cases.c.id == case_id).values(
                 current_job_id=identity, status="queued", result=None, error=None, updated_at=now))
+            if actor:
+                db.execute(s.events.insert().values(case_id=case_id, item_id="", state="retry",
+                    comment="Reintento solicitado", reviewer=actor, created_at=now))
 
     def claim_job(self, owner: str, lease_seconds: int = 90, max_attempts: int = 3) -> JobLease | None:
         with self.connection() as db:

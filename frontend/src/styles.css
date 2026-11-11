@@ -319,6 +319,28 @@ details[open] > summary > svg:last-child {
   width: 100%;
   margin-top: 8px;
 }
+.session-gate {
+  max-width: 640px;
+  margin: 80px auto;
+  padding: 24px;
+}
+.session-gate a {
+  display: inline-flex;
+  margin: 12px 12px 0 0;
+}
+.session-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.session-status .environment {
+  overflow-wrap: anywhere;
+}
+.session-status a {
+  color: inherit;
+  flex-shrink: 0;
+}
 .sercop-search-fields {
   display: grid;
   grid-template-columns: minmax(100px, 150px) minmax(0, 1fr);

@@ -1,0 +1,18 @@
+[
+  {
+    "allowedMemberTypes": ["User"],
+    "description": "Consultar todos los expedientes, documentos y exportaciones del equipo autorizado.",
+    "displayName": "Consulta documental",
+    "id": "7ca54c14-976c-4434-90a3-cd96254d7c31",
+    "isEnabled": true,
+    "value": "Integrity.Reader"
+  },
+  {
+    "allowedMemberTypes": ["User"],
+    "description": "Consultar, cargar documentos, iniciar revisiones y registrar comentarios del equipo autorizado.",
+    "displayName": "Revision documental",
+    "id": "ac575477-eb7e-4215-a34e-1e1b277438b2",
+    "isEnabled": true,
+    "value": "Integrity.Reviewer"
+  }
+]

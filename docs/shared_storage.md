@@ -4,7 +4,7 @@
 
 La persistencia incluye SQLite/PostgreSQL, originales en archivos o Azure Blob Storage, proyección consultable de observaciones/evidencias, trabajos persistentes, trabajador separado y migración verificable desde SQLite.
 
-La API mantiene el acceso local. Para habilitar acceso compartido, seguir [la guía de responsabilidades](developer_handoff.md) y [el procedimiento Azure](azure_deployment.md), que incluyen autenticación, permisos y validación operativa.
+La API admite modo local y acceso institucional Entra. Para el espacio compartido del equipo, configurar [acceso y roles](azure_access.md), seguir [la guía de responsabilidades](developer_handoff.md) y completar [la aceptación Azure](azure_deployment.md).
 
 ## Responsabilidades
 
@@ -80,7 +80,7 @@ Ejecute el trabajador en un proceso separado, con la misma configuración:
 python -m src.review_worker
 ```
 
-Para procesar solo un trabajo disponible: `python -m src.review_worker --once`. El proceso web sigue siendo `src.workbench_api:app`; habilitar un dominio público requiere completar primero autenticación y autorización.
+Para procesar solo un trabajo disponible: `python -m src.review_worker --once`. El proceso web es `src.workbench_api:app`; el contenedor exige el perfil Entra configurado para un dominio HTTPS compartido.
 
 ## Recuperación y solicitudes asistidas
 

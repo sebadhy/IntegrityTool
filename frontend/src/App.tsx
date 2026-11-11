@@ -5,6 +5,7 @@ import {
   Download,
   FileText,
   Info,
+  LogOut,
   X,
 } from "lucide-react";
 import { api } from "./api";
@@ -17,6 +18,7 @@ import type {
   ReviewCase,
   ReviewItem,
   ReviewState,
+  Session,
 } from "./types";
 const PdfReader = lazy(() =>
   import("./PdfReader").then((module) => ({ default: module.PdfReader })),
@@ -26,6 +28,27 @@ function usable(value?: string) {
   return value && !/^(no ident|no dispon)/i.test(value);
 }
 export default function App() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [sessionError, setSessionError] = useState("");
+  useEffect(() => {
+    let stopped = false;
+    api<Session>("/session")
+      .then((value) => {
+        if (!stopped) setSession(value);
+      })
+      .catch((error) => {
+        if (!stopped) setSessionError(error.message);
+      });
+    const expired = () => {
+      setSession(null);
+      setSessionError("La sesión venció. Inicie sesión nuevamente.");
+    };
+    window.addEventListener("integrity-session-expired", expired);
+    return () => {
+      stopped = true;
+      window.removeEventListener("integrity-session-expired", expired);
+    };
+  }, []);
   const [caseId, setCaseId] = useState(
     new URLSearchParams(location.search).get("revision") || "",
   );
@@ -73,13 +96,13 @@ export default function App() {
     return () => window.removeEventListener("popstate", handler);
   }, []);
   useEffect(() => {
-    if (!caseId)
+    if (session && !caseId)
       api<CaseSummary[]>("/cases")
         .then(setCases)
         .catch((e) => setError(e.message));
-  }, [caseId]);
+  }, [caseId, session]);
   useEffect(() => {
-    if (!caseId) return;
+    if (!caseId || !session) return;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout>;
     async function load() {
@@ -102,7 +125,7 @@ export default function App() {
       stopped = true;
       clearTimeout(timer);
     };
-  }, [caseId]);
+  }, [caseId, session]);
 
   const result = activeCase?.result;
   const items = result?.items || [];
@@ -126,7 +149,7 @@ export default function App() {
     setView("review");
   }
   async function saveReview(state: ReviewState, comment: string) {
-    if (!activeCase || !selected || saving) return;
+    if (!activeCase || !selected || saving || !session?.can_write) return;
     setSaving(true);
     setError("");
     try {
@@ -138,7 +161,6 @@ export default function App() {
           body: JSON.stringify({
             state,
             comment,
-            reviewer: "Revisor local",
             expected_revision: activeCase.reviews[selected.id]?.revision ?? 0,
           }),
         },
@@ -156,6 +178,37 @@ export default function App() {
     }
   }
 
+  if (!session)
+    return (
+      <main className="session-gate">
+        <p className="eyebrow">Integrity · Revisión documental</p>
+        <h1>{sessionError ? "Acceso institucional" : "Verificando acceso…"}</h1>
+        <p role={sessionError ? "alert" : "status"}>
+          {sessionError || "Espere un momento."}
+        </p>
+        {sessionError && (
+          <>
+            <p>
+              Si su cuenta no tiene permisos, solicite al administrador un rol
+              para el equipo de revisión.
+            </p>
+            <a
+              className="primary-button"
+              href="/.auth/login/aad?post_login_redirect_uri=/"
+            >
+              Iniciar sesión
+            </a>
+            <a
+              className="secondary-button"
+              href="/.auth/logout?post_logout_redirect_uri=/"
+            >
+              Cambiar cuenta
+            </a>
+          </>
+        )}
+      </main>
+    );
+
   return (
     <>
       <header className="app-header">
@@ -171,7 +224,23 @@ export default function App() {
           <span className="brand-divider" />
           <span className="brand-description">Revisión documental</span>
         </button>
-        <span className="environment">Espacio local de trabajo</span>
+        <div className="session-status">
+          <span className="environment">
+            {session.mode === "entra"
+              ? `${session.name} · ${session.can_write ? "Revisión" : "Consulta"}`
+              : "Espacio local de trabajo"}
+          </span>
+          {session.mode === "entra" && (
+            <a
+              className="icon-button"
+              href="/.auth/logout?post_logout_redirect_uri=/"
+              title="Cerrar sesión"
+              aria-label="Cerrar sesión"
+            >
+              <LogOut size={17} />
+            </a>
+          )}
+        </div>
       </header>
       <div className="announcement" aria-live="polite">
         {announcement}
@@ -190,7 +259,12 @@ export default function App() {
         </div>
       )}
       {!caseId ? (
-        <UploadWorkspace cases={cases} onOpen={openCase} onError={setError} />
+        <UploadWorkspace
+          cases={cases}
+          onOpen={openCase}
+          onError={setError}
+          canWrite={session.can_write}
+        />
       ) : (
         <main className={`case-page ${view === "review" ? "is-review" : ""}`}>
           <div className="case-breadcrumb">
@@ -223,21 +297,23 @@ export default function App() {
               <div className="processing-state">
                 <h1>La revisión no se completó</h1>
                 <p>{activeCase.error}</p>
-                <button
-                  className="primary-button"
-                  onClick={async () => {
-                    try {
-                      await api(`/cases/${caseId}/retry`, { method: "POST" });
-                      const id = caseId;
-                      setCaseId("");
-                      setTimeout(() => setCaseId(id), 0);
-                    } catch (e) {
-                      setError((e as Error).message);
-                    }
-                  }}
-                >
-                  Reintentar revisión
-                </button>
+                {session.can_write && (
+                  <button
+                    className="primary-button"
+                    onClick={async () => {
+                      try {
+                        await api(`/cases/${caseId}/retry`, { method: "POST" });
+                        const id = caseId;
+                        setCaseId("");
+                        setTimeout(() => setCaseId(id), 0);
+                      } catch (e) {
+                        setError((e as Error).message);
+                      }
+                    }}
+                  >
+                    Reintentar revisión
+                  </button>
+                )}
               </div>
             )}
           {result && (
@@ -383,6 +459,7 @@ export default function App() {
                       }}
                       onSave={saveReview}
                       saving={saving}
+                      canWrite={session.can_write}
                     />
                   ) : (
                     <aside className="review-detail">
@@ -406,6 +483,11 @@ export default function App() {
       <footer className="app-footer">
         <span>Insumo preliminar para revisión humana.</span>
         <span>No reemplaza el análisis técnico o jurídico.</span>
+        {session.build_revision !== "development" && (
+          <small title={session.build_revision}>
+            Versión {session.build_revision.slice(0, 12)}
+          </small>
+        )}
       </footer>
     </>
   );

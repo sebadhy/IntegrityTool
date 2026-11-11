@@ -2,6 +2,7 @@
 import argparse
 import json
 import subprocess
+from pathlib import Path
 
 
 def run(image, args, *, env=None, expected=0):
@@ -38,8 +39,12 @@ def main():
         "INTEGRITY_WORKER_MODE": "external", "INTEGRITY_ASSISTED_ENABLED": "false",
     }
     for role in ("api", "worker"):
-        checked = json.loads(run(image, ["-m", "src.deployment_check", "--role", role], env=common))
-        assert checked["ok"] and checked["model_calls"] == 0 and checked["public_http_ready"] is False
+        web = {"INTEGRITY_WEB_MODE": "entra", "INTEGRITY_PUBLIC_ORIGIN": "https://integrity.test",
+            "INTEGRITY_ENTRA_TENANT_ID": "11111111-1111-4111-8111-111111111111",
+            "INTEGRITY_ENTRA_CLIENT_ID": "22222222-2222-4222-8222-222222222222",
+            "INTEGRITY_ACCESS_POLICY": "shared_team"} if role == "api" else {}
+        checked = json.loads(run(image, ["-m", "src.deployment_check", "--role", role], env={**common, **web}))
+        assert checked["ok"] and checked["model_calls"] == 0 and checked["deployment_validated"] is False
     model_environment = {**common, "INTEGRITY_ASSISTED_ENABLED": "true", "LLM_PROVIDER": "azure",
         "OPENAI_API_KEY": "container-fixture-not-a-secret", "OPENAI_API_VERSION": "test-version",
         "OPENAI_MODEL": "test-deployment", "OPENAI_BASE_URL": "https://not-a-real-model.invalid/"}
@@ -50,7 +55,7 @@ def main():
         env={**model_environment, "INTEGRITY_ASSISTED_ENABLED": "yes"}, expected=1))
     assert not invalid_switch["ok"]
     # Use only a temporary SQLite fixture, loopback HTTP and a disabled provider.
-    # This tests the existing local API, not public/authenticated access in Azure.
+    # Test the local profile first; the signed-token profile is checked below.
     run(image, ["-c", '''
 import hashlib, json, os, signal, sqlite3, subprocess, sys, time
 import pymupdf
@@ -122,9 +127,10 @@ finally:
     process.send_signal(signal.SIGTERM)
     process.wait(timeout=15)
 '''])
+    run(image, ["-c", Path(__file__).with_name("container_access_smoke.py").read_text(encoding="utf-8")])
     print(json.dumps({"image": image, "non_root": True, "ocr": "spa+eng",
         "preflight": "ok", "assistance_configuration": "ok", "local_api_frontend_worker": "ok", "review_and_exports": "ok", "network": "disabled",
-        "public_http_ready": False, "model_calls": 0}))
+        "signed_identity_and_roles": "ok", "deployment_validated": False, "model_calls": 0}))
 
 
 if __name__ == "__main__":

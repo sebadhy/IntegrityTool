@@ -106,6 +106,7 @@ export function ObservationDetail({
   onEvidence,
   onSave,
   saving,
+  canWrite = true,
 }: {
   item: ReviewItem;
   evidence?: Evidence;
@@ -115,6 +116,7 @@ export function ObservationDetail({
   onEvidence: (index: number) => void;
   onSave: (state: ReviewState, comment: string) => void;
   saving: boolean;
+  canWrite?: boolean;
 }) {
   const [comment, setComment] = useState(review?.comment || "");
   const status = review?.state || "pending";
@@ -203,60 +205,73 @@ export function ObservationDetail({
             {STATES[status]}
           </span>
         </div>
-        <div className="human-actions">
-          <button
-            title="Registra que revisó el aspecto; no confirma una conclusión automática"
-            className={status === "confirmed" ? "action-selected" : ""}
-            disabled={saving}
-            onClick={() => onSave("confirmed", comment)}
-          >
-            <CheckCheck size={15} /> Confirmar revisión
-          </button>
-          <button
-            title="Descartar este aspecto en esta revisión"
-            className={status === "discarded" ? "action-selected" : ""}
-            disabled={saving}
-            onClick={() => onSave("discarded", comment)}
-          >
-            <X size={15} /> Descartar
-          </button>
-          <button
-            title="Dejar pendiente de seguimiento"
-            className={status === "followup" ? "action-selected" : ""}
-            disabled={saving}
-            onClick={() => onSave("followup", comment)}
-          >
-            <Clock3 size={15} /> Seguimiento
-          </button>
-        </div>
-        <details className="comment-details">
-          <summary>
-            <MessageSquare size={14} />
-            {review?.comment ? "Ver o editar comentario" : "Agregar comentario"}
-            <ChevronDown size={13} />
-          </summary>
-          <label>
-            Nota de revisión
-            <textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              rows={3}
-              maxLength={4000}
-              placeholder="Registre lo verificado o la validación pendiente."
-            />
-          </label>
-          <button
-            className="secondary-button"
-            disabled={saving}
-            onClick={() => onSave(status, comment)}
-          >
-            Guardar comentario
-          </button>
-        </details>
+        {canWrite ? (
+          <>
+            <div className="human-actions">
+              <button
+                title="Registra que revisó el aspecto; no confirma una conclusión automática"
+                className={status === "confirmed" ? "action-selected" : ""}
+                disabled={saving}
+                onClick={() => onSave("confirmed", comment)}
+              >
+                <CheckCheck size={15} /> Confirmar revisión
+              </button>
+              <button
+                title="Descartar este aspecto en esta revisión"
+                className={status === "discarded" ? "action-selected" : ""}
+                disabled={saving}
+                onClick={() => onSave("discarded", comment)}
+              >
+                <X size={15} /> Descartar
+              </button>
+              <button
+                title="Dejar pendiente de seguimiento"
+                className={status === "followup" ? "action-selected" : ""}
+                disabled={saving}
+                onClick={() => onSave("followup", comment)}
+              >
+                <Clock3 size={15} /> Seguimiento
+              </button>
+            </div>
+            <details className="comment-details">
+              <summary>
+                <MessageSquare size={14} />
+                {review?.comment
+                  ? "Ver o editar comentario"
+                  : "Agregar comentario"}
+                <ChevronDown size={13} />
+              </summary>
+              <label>
+                Nota de revisión
+                <textarea
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  rows={3}
+                  maxLength={4000}
+                  placeholder="Registre lo verificado o la validación pendiente."
+                />
+              </label>
+              <button
+                className="secondary-button"
+                disabled={saving}
+                onClick={() => onSave(status, comment)}
+              >
+                Guardar comentario
+              </button>
+            </details>
+          </>
+        ) : (
+          <p>
+            {review?.comment ||
+              "Acceso de consulta; no puede modificar esta revisión."}
+          </p>
+        )}
         {review?.updated_at && (
           <small className="saved-note">
             Guardado el {new Date(review.updated_at).toLocaleString("es-EC")} ·
-            Revisor local
+            {review.reviewer.startsWith("entra:")
+              ? "Identidad institucional registrada"
+              : review.reviewer}
           </small>
         )}
       </section>
@@ -267,8 +282,11 @@ export function ObservationDetail({
         <dl>
           <dt>Identificación</dt>
           <dd>
-            {semantic ? "Reglas y propuestas semánticas verificadas por cita" : "Reglas documentales"}
-            {" · "}{item.pattern_id}
+            {semantic
+              ? "Reglas y propuestas semánticas verificadas por cita"
+              : "Reglas documentales"}
+            {" · "}
+            {item.pattern_id}
           </dd>
           <dt>Dimensión</dt>
           <dd>
@@ -293,7 +311,8 @@ export function ObservationDetail({
             {semantic
               ? "Un modelo propuso una lectura de la cláusula. Se comprobaron la cita y el patrón, no la corrección de la interpretación. Consolidación y prioridad aplican criterios explícitos; requiere validación humana."
               : "La identificación de esta observación se realizó mediante reglas."}
-            {generated && ` Además, ${generated.provider} (${generated.model}) apoyó la redacción de la explicación.`}
+            {generated &&
+              ` Además, ${generated.provider} (${generated.model}) apoyó la redacción de la explicación.`}
           </dd>
           <dt>Límites</dt>
           <dd>

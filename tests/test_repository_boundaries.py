@@ -131,7 +131,9 @@ def test_azure_handoff_links_and_example_configuration_are_consistent():
             assert values["OPENAI_MODEL"] == "DEPLOYMENT_NAME"
         else:
             assert not any(key.startswith("OPENAI_") for key in values)
-        assert "INTEGRITY_ENTRA_TENANT_ID" not in content
+            assert values["INTEGRITY_WEB_MODE"] == "entra"
+            assert values["INTEGRITY_ACCESS_POLICY"] == "shared_team"
+            assert "INTEGRITY_ENTRA_TENANT_ID" in values
 
 
 def test_ci_actions_use_explicit_commit_references():
@@ -140,3 +142,9 @@ def test_ci_actions_use_explicit_commit_references():
                   for step in job["steps"] if "uses" in step]
     assert references
     assert all(re.fullmatch(r"actions/[\w-]+@[a-f0-9]{40}", reference) for reference in references)
+
+
+def test_docker_build_excludes_local_frontend_artifacts():
+    patterns = (ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines()
+    assert "frontend/node_modules" in patterns
+    assert "frontend/dist" in patterns

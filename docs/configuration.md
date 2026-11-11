@@ -127,4 +127,4 @@ El texto seleccionable breve se conserva como lectura nativa. Una imagen pequeñ
 
 ## Despliegue compartido
 
-El inicio local escucha en `127.0.0.1:8000` y la API rechaza hosts externos. Antes de habilitar acceso compartido, integrar identidad institucional, autenticación, autorización y operación segura según [la guía de Azure](azure_deployment.md).
+El inicio local escucha en `127.0.0.1:8000` y rechaza conexiones externas. El perfil Azure `INTEGRITY_WEB_MODE=entra` implementa validación de identidad, roles y origen, y el contenedor escucha en `0.0.0.0:8000`. Aplicar [las variables de API](../deploy/azure/api.env.example) y configurar Easy Auth, token store, usuarios y HTTPS según [la guía de acceso](azure_access.md). No se modifican archivos fuente ni se agrega una clave de modelo al frontend.

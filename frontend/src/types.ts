@@ -1,4 +1,12 @@
 export type Priority = "alta" | "media" | "baja";
+export type Session = {
+  mode: "local" | "entra";
+  name: string;
+  actor: string;
+  can_write: boolean;
+  access_policy: "local" | "shared_team";
+  build_revision: string;
+};
 export type ReviewState = "pending" | "confirmed" | "discarded" | "followup";
 export type SercopSnapshot = {
   snapshot_id: string;

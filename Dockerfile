@@ -12,6 +12,7 @@ LABEL org.opencontainers.image.title="Integrity Tool" \
       org.opencontainers.image.source="https://github.com/sebadhy/IntegrityTool" \
       org.opencontainers.image.revision=$REVISION
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
+    INTEGRITY_BUILD_REVISION=$REVISION \
     INTEGRITY_WORKER_MODE=external \
     INTEGRITY_ASSISTED_ENABLED=false \
     APP_CORPUS_PROCESSED_DIR=/tmp/integrity/extracted_text

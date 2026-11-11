@@ -5,33 +5,19 @@ Procedimiento para construir la imagen, configurar los procesos y validar el des
 Para entender la intervención del modelo antes de configurar el ambiente, leer
 [Motor de IA: dónde, cómo y cuándo interviene](ai_engine.md).
 
-## 1. Requisitos de acceso compartido
+## 1. Acceso institucional incluido
 
-**Acceso actual: local, en `127.0.0.1:8000`.** Antes de publicar la URL se requiere integrar y validar el acceso institucional.
+El perfil de Azure está implementado: **Container Apps + Microsoft Entra Easy Auth + verificación criptográfica en la API**. No se requiere modificar código. El desarrollador configura [acceso, roles y token store](azure_access.md) y completa la aceptación del ambiente.
 
-Antes de compartir la URL, el desarrollador debe integrar y probar:
+Esta PoC utiliza un espacio compartido por el equipo autorizado. Reader consulta todos los expedientes; Reviewer además carga, inicia/reintenta análisis y guarda revisiones. Cuentas sin esos roles, de otro tenant, con token vencido o firma inválida no pueden leer datos. Para equipos que deban estar aislados, utilizar instancias y almacenamiento separados.
 
-- Autenticación institucional, acceso del equipo autorizado y cierre de sesión.
-- Autorización de lectura/escritura y política de acceso a cada expediente, incluido el aislamiento requerido entre usuarios o instituciones.
-- Identidad del revisor derivada de la sesión validada. Actualmente, `reviewer` es un campo enviado por el navegador y el historial registra operaciones con una etiqueta local.
-- Dominios y origen HTTPS permitidos, protección de operaciones de escritura y rechazo de acceso directo que evada la autenticación.
-
-Implementar la integración en `src/workbench_api.py` y comprobar autenticación, permisos y origen de las solicitudes antes de habilitar el dominio compartido.
-
-El entrypoint `src/container_start.py` escucha en `127.0.0.1`; el middleware de la
-API acepta solo hosts locales. Un ingreso de Container Apps requiere adaptar
-ambos como parte de la integración segura. Cambiar el binding sin identidad,
-permisos y validación de hosts/origen no satisface este requisito. El repositorio
-no incluye todavía esa integración institucional; no es un despliegue público
-listo únicamente con variables de ambiente.
-
-Como ruta de referencia, Azure Container Apps permite delegar el inicio de sesión en la plataforma y recibir información de identidad validada. Configurar el proveedor y vincular la identidad con los permisos de la aplicación. [Documentación oficial de autenticación](https://learn.microsoft.com/en-us/azure/container-apps/authentication).
+La API valida Host, origen de escrituras y token firmado, y usa el actor del servidor para guardar revisiones. El frontend incluye acceso/cierre de sesión y oculta escritura al rol de consulta. Los eventos locales anteriores se conservan sin atribuirles otra identidad.
 
 ## 2. Arquitectura mínima de referencia
 
 ```text
 Usuario autorizado
-  → acceso HTTPS autenticado y autorizado, pendiente de integración
+  → HTTPS + Easy Auth / Entra + token store privado
   → API FastAPI + frontend estático
       → PostgreSQL: expedientes, resultados, revisiones y trabajos
       → Blob privado: originales por SHA-256
@@ -74,7 +60,7 @@ El entrypoint es `python -m src.container_start`. Comandos dentro de la imagen:
 
 | Proceso | Argumentos del entrypoint | Comportamiento |
 |---|---|---|
-| API | `api` | Sirve frontend y API en `127.0.0.1:8000` |
+| API | `api` | Sirve frontend y API en `0.0.0.0:8000`, con perfil Entra requerido |
 | Trabajador | `worker` | Procesa trabajos persistentes de PostgreSQL |
 
 Para herramientas administrativas, sustituir el entrypoint por `python` y usar el módulo correspondiente. Para consultar sus opciones:
@@ -83,7 +69,7 @@ Para herramientas administrativas, sustituir el entrypoint por `python` y usar e
 docker run --rm --entrypoint python REGISTRY/integrity:COMMIT_SHA -m src.deployment_check --help
 ```
 
-El trabajador maneja SIGTERM y termina después del trabajo actual. Una terminación forzada se recupera mediante la reserva persistente; una respuesta asistida pendiente de guardar puede perderse. Monitorizar el trabajador mediante el estado del proceso y de la cola. Definir los probes de la API al integrar el acceso compartido, manteniendo protegidos los endpoints de datos.
+El trabajador maneja SIGTERM y termina después del trabajo actual. Una terminación forzada se recupera mediante la reserva persistente; una respuesta asistida pendiente de guardar puede perderse. Monitorizar el trabajador mediante el estado del proceso y de la cola. Usar `GET /healthz` en el puerto 8000 como startup/liveness de la API: solo devuelve estado, sin autenticación ni modelos. `/api/health` requiere sesión y permite verificar el commit desplegado.
 
 ## 5. Variables y secretos
 
@@ -93,6 +79,8 @@ Configurar cada proceso según su contrato:
 - [Trabajador](../deploy/azure/worker.env.example).
 
 La API usa `INTEGRITY_WORKER_MODE=external`; el procesamiento se configura en el trabajador. API y trabajador deben apuntar a la misma base y contenedor, con credenciales apropiadas para cada proceso.
+
+Configurar también `INTEGRITY_WEB_MODE=entra`, origen HTTPS exacto, Tenant ID, Client ID y `INTEGRITY_ACCESS_POLICY=shared_team`. El registro de Entra debe ser el mismo de Easy Auth; los UUID van en minúsculas. Configurar puerto destino **8000** y `allowInsecure=false`. El trabajador queda sin ingreso y con al menos una réplica. La [guía de acceso](azure_access.md) detalla roles, redirect URI y token store. Son configuraciones del ambiente, no cambios de código.
 
 PostgreSQL remoto exige `sslmode=verify-full`. La imagen proporciona `/etc/ssl/certs/ca-certificates.crt`; si se exige otra CA, montarla y cambiar `sslrootcert`, conservando la verificación TLS. Codificar los caracteres especiales de la contraseña en la URL. Mantener migraciones con permisos separados de los de ejecución.
 
@@ -178,12 +166,16 @@ python -m src.deployment_check --role worker --check-services --require-corpus
 
 Sin `--check-services` solo valida variables. Con él consulta el esquema, propiedades del contenedor, taxonomía y OCR. `--require-corpus` agrega validación del CSV y correspondencia de PDFs, no OCR del corpus. Los checks no suben documentos, crean tablas, migran ni invocan modelos. Un código de salida distinto de cero indica configuración o comprobaciones fallidas. Los mensajes no imprimen cadenas de conexión ni secretos.
 
-`ok=true` **no autoriza publicación HTTP** ni valida permisos de escritura, autenticación, red privada, restauración o precisión analítica. La salida mantiene `public_http_ready=false` para reflejar el bloqueo actual.
+`ok=true` y `access_controls_configured=true` acreditan la configuración revisada, no un inicio de sesión real, permisos de recursos, restauración ni precisión analítica. `deployment_validated=false` recuerda que falta registrar la aceptación en el ambiente; no representa un bloqueo de código pendiente.
+
+Desde el checkout, comprobar la URL con `python deploy/check_web.py https://FQDN`. Solo realiza lecturas anónimas y con identidad ficticia: espera el frontend correcto, liveness y rechazo de APIs sin sesión válida. Completar después login y roles con cuentas reales en el navegador.
 
 ## 9. Aceptación antes de entregar la URL
 
 - [ ] Commit, digest, recursos, región y costos aprobados y registrados.
-- [ ] Autenticación, permisos y dominio integrados; acceso anónimo o con cabeceras de identidad falsificadas rechazado.
+- [ ] Easy Auth, token store, roles y dominio configurados según [acceso institucional](azure_access.md); acceso anónimo y cabeceras falsificadas rechazados.
+- [ ] `python deploy/check_web.py https://FQDN` aprobado; commit mostrado coincide con el commit de `fusion` e imagen por digest elegidos.
+- [ ] Reader consulta, abre originales y exporta, pero no puede cargar ni modificar. Usuario sin rol no lee expedientes. Política compartida del equipo aprobada.
 - [ ] Intentar consultar un expediente sin permiso, descargar su PDF, exportarlo y modificar comentarios: todos deben rechazarse según la política definida.
 - [ ] Actor de los eventos proviene de una identidad validada. No aceptar `Revisor local` como identidad institucional.
 - [ ] Cargar pliego y especificaciones públicos de prueba; localizar dos evidencias, cambiar página/zoom, guardar comentario y exportar HTML/CSV/JSON.

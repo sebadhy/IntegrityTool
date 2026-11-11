@@ -16,6 +16,10 @@ def shared_environment(tmp_path, monkeypatch):
         "INTEGRITY_BLOB_ACCOUNT_URL": "https://storage.blob.core.windows.net",
         "INTEGRITY_BLOB_CONTAINER": "integrity-documents", "INTEGRITY_ASSISTED_ENABLED": "false",
         "INTEGRITY_ALLOW_STORAGE_EMULATOR": "false",
+        "INTEGRITY_WEB_MODE": "entra", "INTEGRITY_PUBLIC_ORIGIN": "https://integrity.example",
+        "INTEGRITY_ENTRA_TENANT_ID": "11111111-1111-4111-8111-111111111111",
+        "INTEGRITY_ENTRA_CLIENT_ID": "22222222-2222-4222-8222-222222222222",
+        "INTEGRITY_ACCESS_POLICY": "shared_team",
     }
     for name, value in values.items():
         monkeypatch.setenv(name, value)
@@ -110,13 +114,14 @@ def test_worker_can_require_valid_corpus(shared_environment, monkeypatch):
     assert not next(result for result in results if result["check"] == "corpus")["ok"]
 
 
-def test_container_entrypoint_preserves_loopback_binding(shared_environment, monkeypatch):
+def test_container_entrypoint_binds_secure_profile_for_ingress(shared_environment, monkeypatch):
     from src import container_start
     commands = []
     monkeypatch.setattr("sys.argv", ["container_start", "api"])
     monkeypatch.setattr(container_start.os, "execv", lambda executable, args: commands.append(args))
     container_start.main()
-    assert commands[0][commands[0].index("--host") + 1] == "127.0.0.1"
+    assert commands[0][commands[0].index("--host") + 1] == "0.0.0.0"
+    assert "--no-proxy-headers" in commands[0]
     assert "src.workbench_api:app" in commands[0]
 
 
@@ -137,5 +142,6 @@ def test_preflight_ok_does_not_claim_publication_readiness(shared_environment, m
     assert result.value.code == 0
     output = json.loads(capsys.readouterr().out)
     assert output["ok"] and output["model_calls"] == 0
-    assert output["public_http_ready"] is False
+    assert output["access_controls_configured"] is True
+    assert output["deployment_validated"] is False
     assert "test-secret" not in json.dumps(output)

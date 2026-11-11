@@ -9,17 +9,13 @@ La aplicación consta de un frontend **React/TypeScript + PDF.js**, una API **Py
 | Componente | Datos/conexiones | Configuración |
 |---|---|---|
 | Navegador | API del mismo dominio; PDF servido mediante API | Sin claves de modelos ni acceso directo a Blob/PostgreSQL. |
-| API | PostgreSQL, Blob privado y API pública SERCOP por HTTPS | `deploy/azure/api.env.example`; trabajador externo. |
+| API | PostgreSQL, Blob privado, SERCOP y claves públicas de Entra (`login.microsoftonline.com`) por HTTPS | `deploy/azure/api.env.example`; trabajador externo. |
 | Trabajador | Misma base y contenedor, Azure OpenAI por HTTPS, corpus opcional | `deploy/azure/worker.env.example`; deployment y clave del modelo. |
 | Administración | Esquema, migración, respaldos y pruebas de aceptación | Ejecutar comandos con permisos específicos; no exponer como endpoints públicos. |
 
-**Estado de entrega:** motor documental, persistencia PostgreSQL/Blob, trabajos durables e imagen disponibles. **Acceso HTTP actual: local.** Antes de publicar la URL se requiere integrar autenticación, autorización, identidad verificada del revisor y dominio HTTPS.
+**Estado de entrega:** aplicación, trabajador, persistencia e integración de acceso Entra implementados y probados con identidades firmadas sintéticas. El contenedor API escucha en `0.0.0.0:8000` bajo el perfil `entra`. No requiere modificar Python ni React para este despliegue: corresponde configurar recursos, secretos, Easy Auth, token store, roles y HTTPS y completar la aceptación en la suscripción real.
 
-El contenedor también escucha en loopback y el middleware rechaza hosts externos.
-Para un ingreso de Container Apps, el desarrollador debe integrar los controles
-anteriores y adaptar conjuntamente `src/container_start.py` y
-`src/workbench_api.py`; cambiar solamente a `0.0.0.0` no habilita una publicación
-segura. Este pendiente requiere implementación y pruebas, no solo variables Azure.
+La política soportada es **un equipo autorizado con expedientes compartidos**. Reader consulta todos los expedientes; Reviewer además carga y registra revisiones. Una institución que requiera aislamiento utiliza otra instancia/base/contenedores. Consulte [el procedimiento exacto de acceso](azure_access.md).
 
 ## Qué se entrega
 
@@ -34,7 +30,7 @@ segura. Este pendiente requiere implementación y pruebas, no solo variables Azu
 ## Qué corresponde al desarrollador y al equipo Azure
 
 1. Seleccionar región y recursos dentro de la suscripción autorizada; estimar y aprobar costos.
-2. Configurar tenant, acceso del equipo, autenticación y permisos. Integrar y probar esos controles con la API antes de abrir acceso web.
+2. Configurar App registration de un solo tenant, Easy Auth con token store, roles `Integrity.Reader`/`Integrity.Reviewer`, usuarios/grupos y origen HTTPS según [la guía de acceso](azure_access.md). No hay que desarrollar login ni cambiar el binding.
 3. Preparar PostgreSQL, contenedor Blob privado, identidades, secretos, red y registro de imágenes.
 4. Configurar **solo en el trabajador** el endpoint, deployment, versión de API y credenciales de Azure OpenAI. El ejemplo del trabajador deja activa la asistencia; sustituir marcadores y aprobar cuota/costos antes de ejecutarlo. Comprobar primero configuración y luego los contratos con datos ficticios.
 5. Definir las revisiones que se importarán y la versión del corpus. Transferir los datos por un canal protegido, separado del código.
@@ -54,13 +50,15 @@ crean recursos en la suscripción. En la imagen, sustituir el entrypoint por
 
 | Paso | Comando o comprobación | Evidencia |
 |---|---|---|
-| Configuración de API | `python -m src.deployment_check --role api` | Variables válidas; no implica acceso web listo. |
+| Configuración de API | `python -m src.deployment_check --role api` | Almacenamiento, modo Entra, tenant/client y origen válidos; no sustituye login real. |
 | Datos y trabajador | `python -m src.deployment_check --role worker --check-services` | Esquema, acceso a contenedor, taxonomía y OCR. |
 | Configuración IA | `python -m src.assistance_check` | Cero solicitudes a modelos. |
 | Compatibilidad Azure OpenAI | `python -m src.assistance_check --request-model` | Hasta dos solicitudes facturables con contenido ficticio y salida validada. |
 | Expediente público acordado | Cargar originales, iniciar revisión y comprobar citas | Procedencia de `semantic_analysis` y `summary`, cobertura y uso de caché. |
 | Persistencia y fallback | Reiniciar; navegar y exportar; probar asistencia desactivada/fallo | Originales y resultados conservados, sin llamadas por navegación. |
 | Seguridad del ambiente | Probar acceso anónimo, permisos, identidad y descarga/exportación | Rechazos efectivos antes de compartir URL. |
+
+Comprobación inicial de la URL, sin modificar datos: `python deploy/check_web.py https://FQDN`. Debe reconocer el frontend correcto y rechazar datos anónimos e identidad falsificada. Luego iniciar sesión con Reader y Reviewer, comprobar el commit en el pie de la interfaz o `/api/health` y validar permisos con las cuentas reales. Construir la imagen con `--build-arg REVISION=COMMIT_SHA`, conservar su digest y no reutilizar una imagen antigua.
 
 Leer [cómo verificar el uso real](ai_engine.md#7-cómo-comprobar-que-intervino).
 No ejecutar la prueba de modelos como probe periódico. El corpus histórico y las

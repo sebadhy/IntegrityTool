@@ -49,8 +49,11 @@ def assistance_configuration_errors() -> list[str]:
 def configuration_errors(role: str) -> list[str]:
     """Validate the shared storage contract without opening a connection."""
     errors = []
-    if role == "api" and os.getenv("INTEGRITY_WORKER_MODE") != "external":
-        errors.append("La API del contenedor requiere INTEGRITY_WORKER_MODE=external.")
+    if role == "api":
+        from .web_access import web_configuration_errors
+        if os.getenv("INTEGRITY_WEB_MODE") != "entra":
+            errors.append("La API del contenedor requiere INTEGRITY_WEB_MODE=entra.")
+        errors.extend(web_configuration_errors())
     try:
         url = make_url(os.getenv("INTEGRITY_DATABASE_URL", ""))
         if (url.get_backend_name() != "postgresql" or not url.host or not url.database
@@ -128,8 +131,9 @@ def main():
     results = verify_services(args.role, require_corpus=args.require_corpus) if args.check_services and not errors else []
     ok = not errors and all(result["ok"] for result in results)
     print(json.dumps({"ok": ok, "role": args.role, "errors": errors, "checks": results,
-        "model_calls": 0, "public_http_ready": False,
-        "notice": "La API conserva el acceso local. Integrar autenticación, autorización y dominios antes de publicar HTTP. Esta comprobación no valida esos controles."},
+        "model_calls": 0, "access_controls_configured": args.role == "api" and not errors,
+        "deployment_validated": False,
+        "notice": "La comprobación valida configuración y servicios solicitados, no el inicio de sesión real, los permisos de Entra ni la aceptación del ambiente."},
         ensure_ascii=False, indent=2))
     raise SystemExit(0 if ok else 1)
 

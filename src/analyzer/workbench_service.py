@@ -57,7 +57,7 @@ class WorkbenchService:
             self.worker.close()
         self.store.close()
 
-    def create(self, title: str, request_key: str, files: list[dict], source_snapshot_id: str | None = None) -> dict:
+    def create(self, title: str, request_key: str, files: list[dict], source_snapshot_id: str | None = None, *, actor: str | None = None) -> dict:
         if not request_key or len(request_key) > 100:
             raise ValueError("La solicitud de revisión no es válida.")
         if not 1 <= len(files) <= MAX_DOCUMENTS:
@@ -88,11 +88,11 @@ class WorkbenchService:
                               "supersedes": previous, "content": content})
         if len(self.pending) >= 100:
             raise ValueError("Hay varias revisiones pendientes. Espere antes de cargar otra.")
-        case_id = self.store.create_case(str(uuid.uuid4()), request_key, title.strip()[:200] or documents[0]["name"], documents, source_snapshot_id=source_snapshot_id)
+        case_id = self.store.create_case(str(uuid.uuid4()), request_key, title.strip()[:200] or documents[0]["name"], documents, source_snapshot_id=source_snapshot_id, actor=actor)
         return self.store.get_case(case_id)
 
-    def retry(self, case_id: str):
-        self.store.retry_case(case_id)
+    def retry(self, case_id: str, *, actor: str | None = None):
+        self.store.retry_case(case_id, actor=actor)
 
     def run(self, case_id: str):
         try:

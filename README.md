@@ -151,7 +151,7 @@ El benchmark también prepara un cuaderno con originales y páginas seleccionada
 
 El inicio local integra API y trabajador. El contenedor permite ejecutarlos por separado y conserva los trabajos en la base de datos. El Dockerfile construye el frontend e incorpora Python y OCR.
 
-**Acceso actual: local.** Antes de compartir una URL, integrar autenticación institucional, permisos, identidad verificada del revisor y dominio HTTPS. El equipo de despliegue también debe validar respaldos, retención y capacidad de carga.
+**Acceso Azure incluido:** el perfil `entra` incorpora validación de identidad firmada de Microsoft Entra, roles de consulta/revisión, protección de originales y exportaciones y registro del actor verificado. El desarrollador configura Container Apps, Easy Auth, token store, usuarios, secretos y HTTPS siguiendo [la guía de acceso](docs/azure_access.md), sin editar código. La política es un espacio compartido por un equipo autorizado, no expedientes privados por usuario. El modo local conserva loopback.
 
 La [guía de Azure](docs/azure_deployment.md) detalla construcción, arranque, servicios y aceptación. Sustituya los marcadores de los ejemplos por los valores del ambiente y suministre secretos mediante la plataforma. Los documentos y las bases se administran fuera de la imagen.
 
@@ -160,6 +160,7 @@ La [guía de Azure](docs/azure_deployment.md) detalla construcción, arranque, s
 - [Entrega al desarrollador](docs/developer_handoff.md)
 - [Motor de IA: ejecución, datos, límites y verificación](docs/ai_engine.md)
 - [Preparación, datos y aceptación en Azure](docs/azure_deployment.md)
+- [Acceso institucional, roles y configuración de Entra](docs/azure_access.md)
 - [Configuración: proveedores, corpus y almacenamiento](docs/configuration.md)
 - [Persistencia compartida, trabajos y migración](docs/shared_storage.md)
 - [Arquitectura del pipeline documental](docs/architecture.md)
