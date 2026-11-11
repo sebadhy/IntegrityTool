@@ -12,6 +12,37 @@ La aplicación utiliza **React + TypeScript + PDF.js**, servida por una **API Py
 
 **Motor de IA:** [dónde, cómo y cuándo interviene](docs/ai_engine.md), datos enviados, límites, fallos y comprobación del uso efectivo de Azure OpenAI.
 
+## Interfaz de referencia
+
+Capturas reales de la aplicación ejecutada en local con un expediente ficticio. Muestran la interfaz que debe servir el despliegue; los resultados dependen de los documentos y de la configuración disponible.
+
+**Revisión de evidencia:** observaciones a la izquierda, PDF con el fragmento resaltado en el centro y contexto y registro de revisión a la derecha.
+
+![Revisión documental con PDF, evidencia resaltada y acciones del revisor](docs/images/revision-evidencia.png)
+
+<details>
+<summary>Ver acceso, carga de documentos, lectura general y búsqueda en SERCOP</summary>
+
+**Acceso con cuentas locales.** En el perfil Entra, el inicio de sesión se realiza con Microsoft.
+
+![Pantalla de inicio de sesión con cuentas locales](docs/images/acceso.png)
+
+**Carga documental.** Selección del PDF, tipo documental y versión antes de iniciar la revisión.
+
+![Carga de un pliego ficticio y preparación de la revisión](docs/images/carga-documental.png)
+
+**Lectura general.** Datos del expediente, síntesis y aspectos sugeridos para revisión. Este ejemplo se ejecutó sin corpus histórico ni solicitudes a modelos externos.
+
+![Lectura preliminar y observaciones sustentadas en el expediente de demostración](docs/images/lectura-general.png)
+
+**Búsqueda de procesos.** Formulario con los filtros admitidos por la API de SERCOP; la captura no contiene resultados ni procesos reales.
+
+![Formulario de búsqueda en la API de SERCOP](docs/images/busqueda-sercop.png)
+
+</details>
+
+[Procedencia y actualización de las capturas](docs/images/README.md).
+
 ## Inicio rápido
 
 Requisitos: Python 3.11 o superior, Node.js 22.13 o superior (recomendado: 24) y pnpm 11.25. Node solo es necesario para construir la interfaz. Si falta pnpm: `npm install --global pnpm@11.25.0`.

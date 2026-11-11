@@ -43,19 +43,22 @@ Imagen validada: `integrity-tool:onprem-release`, ID `sha256:21dea1b634f3395f529
 | Navegador escritorio y móvil | PASS | Chrome headless, 1440 y 390 px; ingreso/salida y permisos sin errores JS ni desbordamiento. Certificado de laboratorio aceptado solo en ese contexto de navegador. |
 | HTTPS y script del administrador | PASS | `verify_installation.py --exercise`, con certificado y hostname verificados; sin omitir validación TLS. |
 | Imagen y conservación del perfil Azure | PASS | No root, OCR, sin secretos/Git/datos en imagen; smoke de API/worker local y JWT Entra firmados sintéticos, sin red ni modelos. |
-| Instalación limpia y ciclo Compose en Ubuntu CI | PASS | [Job Linux del commit 642792c](https://github.com/sebadhy/IntegrityTool/actions/runs/43033923523/job/130567706967): imagen construida desde checkout limpio, acceso y ciclo completo, incluida restauración. No certifica RHEL. |
+| Instalación limpia y ciclo Compose en Ubuntu CI | PASS | [CI del commit a50e5d6](https://github.com/sebadhy/IntegrityTool/actions/runs/43035041107): imagen construida desde checkout limpio y ciclo completo, incluida restauración. También pasan Python 3.11/3.13 en Ubuntu y Windows, frontend y adaptadores de almacenamiento. No certifica RHEL. |
 | VM Linux independiente de SERCOP | NOT TESTED | Aún no hay servidor asignado confirmado. |
 | Reinicio físico de máquina | NOT TESTED | Requiere VM y coordinación de TI. |
 | RHEL con SELinux enforcing | NOT TESTED | Requiere entorno institucional. |
 | Podman y su proveedor Compose | NOT TESTED | Binario no disponible en el entorno actual. |
 | Azure OpenAI con credencial autorizada real | NOT TESTED | No se dispone de una credencial de prueba autorizada para esta tarea. |
 | Login Entra en tenant real | NOT TESTED | Se conservan pruebas criptográficas sintéticas; no sustituyen aceptación Azure. |
+| Objeto de contratación multilínea | FAIL | Durante la preparación de capturas, un objeto con salto de línea quedó incompleto. `_extract_field_from_text()` conserva la primera línea del campo etiquetado. Requiere ampliar extracción y pruebas; verificar el objeto completo en el PDF mientras tanto. No se modificó el motor en el cambio documental de capturas. |
 
 Los fallos iniciales de la receta se corrigieron antes de esta pasada: partición accidental de opciones tmpfs en YAML, ejecución del inicializador PostgreSQL en un montaje de solo lectura y temporales Nginx fuera de `/tmp`. El inicializador ahora es SQL y el proxy funciona con raíz de solo lectura. La inyección de falla del worker utiliza un error de permisos en su heartbeat temporal; se comprobó el contador de reinicios del motor, no solo un reinicio solicitado manualmente.
 
 CI detectó además que la comprobación de una ruta del contenedor dependía del sistema operativo del administrador. Se corrigió usando semántica POSIX explícita para el perfil OCI Linux, con pruebas que rechazan rutas relativas y rutas Windows. No se retiraron pruebas ni se desactivó la matriz Windows para resolverlo.
 
 No se enviaron solicitudes al proveedor real ni se expusieron credenciales de la demo. Todas las credenciales del laboratorio y los PDFs fueron ficticios. No se modificó la base de revisiones existente ni el servidor de pruebas del equipo.
+
+Las [capturas de referencia](images/README.md) utilizan un objeto breve, de una línea, para documentar la interfaz. No son prueba de cobertura sobre metadatos multilínea ni de precisión analítica sobre expedientes reales. El despliegue está probado en laboratorio/CI; la aceptación funcional institucional sigue pendiente.
 
 ## Archivos entregados
 
