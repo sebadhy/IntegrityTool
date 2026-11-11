@@ -5,7 +5,7 @@ import argparse
 import json
 import os
 import re
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
@@ -87,7 +87,8 @@ def configuration_errors(role: str) -> list[str]:
     if profile == "onprem":
         if os.getenv("INTEGRITY_DOCUMENT_STORAGE") != "filesystem":
             errors.append("El perfil on-premise requiere INTEGRITY_DOCUMENT_STORAGE=filesystem.")
-        path = Path(os.getenv("INTEGRITY_DOCUMENTS_PATH", ""))
+        # This profile describes an OCI Linux path, not the admin host's OS.
+        path = PurePosixPath(os.getenv("INTEGRITY_DOCUMENTS_PATH", ""))
         if not os.getenv("INTEGRITY_DOCUMENTS_PATH") or not path.is_absolute():
             errors.append("Configure INTEGRITY_DOCUMENTS_PATH como ruta persistente absoluta.")
         if role == "worker":

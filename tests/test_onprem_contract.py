@@ -50,6 +50,12 @@ def test_portable_start_keeps_database_tls_and_external_worker(onprem, monkeypat
     assert len(errors) >= 2 and "secret" not in str(errors)
 
 
+@pytest.mark.parametrize("path", ["relative/documents", r"C:\documents"])
+def test_container_storage_path_uses_linux_semantics_on_any_admin_host(onprem, monkeypatch, path):
+    monkeypatch.setenv("INTEGRITY_DOCUMENTS_PATH", path)
+    assert any("INTEGRITY_DOCUMENTS_PATH" in message for message in configuration_errors("api"))
+
+
 @pytest.mark.parametrize("origin", ["http://integrity.example", "https://integrity.example/path",
     "https://integrity.example:443", "https://integrity.example:0", "https://user:pass@integrity.example", "https://integrity.example/"])
 def test_portable_origin_must_be_exact_https(onprem, monkeypatch, origin):
