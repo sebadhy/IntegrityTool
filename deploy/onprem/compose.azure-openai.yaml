@@ -1,0 +1,16 @@
+# Optional overlay. Only the worker receives the model credential.
+services:
+  worker:
+    environment:
+      INTEGRITY_ASSISTED_ENABLED: "true"
+      INTEGRITY_SEMANTIC_ENABLED: "true"
+      INTEGRITY_LLM_MAX_CALLS: ${INTEGRITY_LLM_MAX_CALLS:-2}
+      LLM_PROVIDER: azure
+      OPENAI_API_KEY_FILE: /run/secrets/model_key
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:?Configure el endpoint HTTPS}
+      OPENAI_API_VERSION: ${OPENAI_API_VERSION:?Configure la versión de API}
+      OPENAI_MODEL: ${OPENAI_MODEL:?Configure el nombre del deployment}
+    secrets:
+      - model_key
+secrets:
+  model_key: {file: "${INTEGRITY_SECRETS_DIR:-./.secrets}/model_key"}

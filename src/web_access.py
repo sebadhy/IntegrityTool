@@ -21,10 +21,10 @@ def web_configuration_errors() -> list[str]:
     mode = os.getenv("INTEGRITY_WEB_MODE", "local")
     if mode == "local":
         return []
-    if mode != "entra":
-        return ["INTEGRITY_WEB_MODE debe ser local o entra."]
+    if mode not in {"entra", "password"}:
+        return ["INTEGRITY_WEB_MODE debe ser local, password o entra."]
     errors = []
-    for key in ("INTEGRITY_ENTRA_TENANT_ID", "INTEGRITY_ENTRA_CLIENT_ID"):
+    for key in (("INTEGRITY_ENTRA_TENANT_ID", "INTEGRITY_ENTRA_CLIENT_ID") if mode == "entra" else ()):
         try:
             if str(UUID(os.getenv(key, ""))) != os.getenv(key, ""):
                 raise ValueError()
@@ -33,7 +33,8 @@ def web_configuration_errors() -> list[str]:
     try:
         origin = urlsplit(os.getenv("INTEGRITY_PUBLIC_ORIGIN", ""))
         if (origin.scheme != "https" or not origin.hostname or origin.username or origin.password
-                or origin.path or origin.query or origin.fragment or origin.port is not None
+                or origin.path or origin.query or origin.fragment or (mode == "entra" and origin.port is not None)
+                or (origin.port is not None and (origin.port < 1 or origin.port == 443))
                 or origin.hostname in {"localhost", "127.0.0.1", "::1"}
                 or not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?", origin.hostname)
                 or ".." in origin.hostname or origin.netloc != origin.netloc.lower()):
@@ -43,7 +44,7 @@ def web_configuration_errors() -> list[str]:
     if os.getenv("INTEGRITY_ACCESS_POLICY") != "shared_team":
         errors.append("Confirme INTEGRITY_ACCESS_POLICY=shared_team para el espacio compartido del equipo autorizado.")
     if os.getenv("INTEGRITY_WORKER_MODE") != "external":
-        errors.append("El acceso Entra requiere INTEGRITY_WORKER_MODE=external.")
+        errors.append("El acceso institucional requiere INTEGRITY_WORKER_MODE=external.")
     return errors
 
 
@@ -61,7 +62,8 @@ class WebAccess:
         if errors:
             raise ValueError("\n".join(errors))
         self.mode = os.getenv("INTEGRITY_WEB_MODE", "local")
-        self.origin = os.getenv("INTEGRITY_PUBLIC_ORIGIN", "") if self.mode == "entra" else ""
+        self.origin = os.getenv("INTEGRITY_PUBLIC_ORIGIN", "") if self.mode != "local" else ""
+        self.auth = None
         self.tenant = os.getenv("INTEGRITY_ENTRA_TENANT_ID", "")
         self.client_id = os.getenv("INTEGRITY_ENTRA_CLIENT_ID", "")
         self.keys = None
@@ -81,17 +83,19 @@ class WebAccess:
             raise HTTPException(403, "Dominio no autorizado.")
         if request.method not in {"GET", "HEAD", "OPTIONS"}:
             origin = request.headers.get("origin")
-            if self.mode == "entra":
+            if self.mode != "local":
                 if origin != self.origin:
                     raise HTTPException(403, "Origen de solicitud no autorizado.")
             elif origin and urlsplit(origin).netloc != request.headers.get("host"):
                 raise HTTPException(403, "Origen de solicitud no autorizado.")
-        if self.mode == "entra" and request.headers.get("sec-fetch-site") == "cross-site":
+        if self.mode != "local" and request.headers.get("sec-fetch-site") == "cross-site":
             raise HTTPException(403, "Solicitud entre sitios no autorizada.")
 
     def authenticate(self, headers) -> Identity:
         if self.mode == "local":
             return Identity("Revisor local", "Revisor local", True, "local")
+        if self.mode == "password":
+            return self.auth.authenticate(headers)
         # Easy Auth token store supplies this signed ID token after OIDC login.
         # X-MS-CLIENT-PRINCIPAL and its identity/role headers are deliberately ignored.
         token = headers.get("x-ms-token-aad-id-token", "")

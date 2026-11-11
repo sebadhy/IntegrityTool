@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import logging
+import os
 import threading
+import time
 import uuid
+from pathlib import Path
 
 from .review_store import JobLeaseLost
 
@@ -30,6 +33,7 @@ class ReviewWorker:
 
     def run(self):
         while not self.stop.is_set():
+            self.mark_alive()
             try:
                 worked = self.run_once()
             except Exception:
@@ -37,6 +41,12 @@ class ReviewWorker:
                 worked = False
             if not worked:
                 self.stop.wait(self.poll_seconds)
+
+    @staticmethod
+    def mark_alive():
+        path = os.getenv("INTEGRITY_WORKER_HEARTBEAT_PATH")
+        if path:
+            Path(path).write_text(str(time.time()), encoding="ascii")
 
     def run_once(self) -> bool:
         store = self.service.store
@@ -46,6 +56,7 @@ class ReviewWorker:
         finished = threading.Event()
         def heartbeat():
             while not finished.wait(max(.25, self.lease_seconds / 3)):
+                self.mark_alive()
                 try:
                     if not store.heartbeat(lease, self.lease_seconds):
                         return

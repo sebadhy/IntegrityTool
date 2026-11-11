@@ -1,0 +1,64 @@
+{
+  "ok": true,
+  "image": "integrity-tool:onprem-release",
+  "checks": [
+    {
+      "test": "clean_bootstrap_https_login_and_protection",
+      "status": "PASS"
+    },
+    {
+      "test": "pdf_upload_worker_analysis_evidence_audit_exports",
+      "status": "PASS"
+    },
+    {
+      "test": "reader_permissions_and_revocable_sessions",
+      "status": "PASS"
+    },
+    {
+      "test": "persistent_login_throttle_and_administrative_unlock",
+      "status": "PASS"
+    },
+    {
+      "test": "service_restart_preserves_session_documents_results",
+      "status": "PASS"
+    },
+    {
+      "test": "full_container_recreation_preserves_volumes_and_comments",
+      "status": "PASS"
+    },
+    {
+      "test": "abandoned_worker_lease_recovery",
+      "status": "PASS"
+    },
+    {
+      "test": "worker_failure_exit_automatic_restart_and_persisted_result",
+      "status": "PASS"
+    },
+    {
+      "test": "database_outage_reconnect",
+      "status": "PASS"
+    },
+    {
+      "test": "backup_restore_into_new_database_and_document_volumes",
+      "status": "PASS"
+    },
+    {
+      "test": "physical_vm_reboot",
+      "status": "NOT TESTED"
+    },
+    {
+      "test": "sercop_rhel_selinux",
+      "status": "NOT TESTED"
+    },
+    {
+      "test": "podman",
+      "status": "NOT TESTED"
+    },
+    {
+      "test": "azure_openai_authorized_live_credentials",
+      "status": "NOT TESTED"
+    }
+  ],
+  "scope": "Contenedores Linux sobre el motor disponible; no certifica la VM de destino.",
+  "real_model_calls": 0
+}

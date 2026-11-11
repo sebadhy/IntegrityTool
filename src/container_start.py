@@ -9,6 +9,8 @@ from .deployment_check import configuration_errors
 
 
 def main():
+    from .runtime_secrets import load_secret_files
+    load_secret_files()
     parser = argparse.ArgumentParser(description="Iniciar API institucional o trabajador con almacenamiento compartido.")
     parser.add_argument("role", choices=["api", "worker"])
     role = parser.parse_args().role

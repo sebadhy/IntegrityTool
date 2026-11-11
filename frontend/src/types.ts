@@ -1,6 +1,6 @@
 export type Priority = "alta" | "media" | "baja";
 export type Session = {
-  mode: "local" | "entra";
+  mode: "local" | "entra" | "password";
   name: string;
   actor: string;
   can_write: boolean;

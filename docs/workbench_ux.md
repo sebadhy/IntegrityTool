@@ -30,7 +30,7 @@ La vista general es deliberadamente distinta de la mesa de trabajo. La primera p
 - React/PDF.js permiten controlar la interacción documental y requieren una compilación frontend y una API Python. Ambos componentes utilizan el motor y la taxonomía del repositorio.
 - El visor navega por páginas individuales. El fragmento textual está disponible junto al original; el PDF renderizado carece de capa de texto seleccionable.
 - Los resaltados por texto extraído no son coordenadas OCR verificadas. Si solo se localiza un término, la interfaz lo indica; no se presenta como ubicación exacta de toda la cláusula.
-- El modo local usa una identidad local. El perfil Azure muestra identidad institucional y permisos de consulta/revisión sobre el espacio compartido; la API verifica esos permisos independientemente de los controles visuales. Configurar Entra, conservación y respaldos antes de compartir el ambiente.
+- El modo de desarrollo usa una etiqueta local. Los perfiles institucionales usan cuentas locales o Entra y muestran identidad y permisos sobre el espacio compartido; la API verifica esos permisos independientemente de los controles visuales. Configurar acceso, conservación y respaldos antes de compartir el ambiente.
 - La redacción asistida sigue siendo falible. Se mantiene separada del resultado determinístico y no decide observaciones ni prioridad.
 
 ## Verificación y siguiente validación

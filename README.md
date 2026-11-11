@@ -6,7 +6,9 @@ Herramienta exploratoria de revisión documental de pliegos, especificaciones y 
 
 La aplicación utiliza **React + TypeScript + PDF.js**, servida por una **API Python/FastAPI**. El motor combina reglas y una taxonomía editable con procesamiento asistido opcional. No detecta corrupción, no determina ilegalidad ni reemplaza revisión técnica, jurídica o institucional.
 
-**Entrega para Azure:** comenzar por [la guía para el desarrollador](docs/developer_handoff.md): componentes, configuración, datos y criterios de aceptación.
+**Instalación institucional en una VM Linux:** [guía on-premise con Docker Compose](docs/onprem_installation.md), usuarios locales, HTTPS y persistencia; [resultados de validación y pendientes](docs/onprem_validation.md).
+
+**Azure opcional:** [guía para el desarrollador](docs/developer_handoff.md), con Container Apps, Entra y almacenamiento Azure. El motor documental no depende de ese despliegue.
 
 **Motor de IA:** [dónde, cómo y cuándo interviene](docs/ai_engine.md), datos enviados, límites, fallos y comprobación del uso efectivo de Azure OpenAI.
 
@@ -66,7 +68,7 @@ Se admiten hasta ocho PDFs, de hasta 25 MB cada uno y 100 MB por expediente. Los
 
 En local, los resultados, comentarios y copias de taxonomía se guardan en `data/workbench/reviews.sqlite3`; los originales nuevos, en `data/workbench/documents/`. Los originales de revisiones anteriores siguen disponibles desde su almacenamiento previo. Todo queda fuera de Git. Navegar, cambiar zoom, revisar y exportar no repite el análisis ni vuelve a solicitar contenido al proveedor.
 
-Para almacenamiento compartido, la aplicación admite PostgreSQL y Azure Blob Storage, con trabajos persistentes y un proceso de análisis separado. Consulte [almacenamiento compartido y migración](docs/shared_storage.md).
+Para almacenamiento compartido, la aplicación admite PostgreSQL con archivos persistentes o Azure Blob Storage, trabajos durables y un proceso de análisis separado. Consulte [almacenamiento compartido y migración](docs/shared_storage.md).
 
 ## Cómo funciona
 
@@ -107,6 +109,8 @@ requirements.txt                Dependencias de ejecución
 requirements-dev.txt            Ejecución + herramientas de pruebas
 requirements-azure.txt          Dependencias con adaptadores PostgreSQL/Blob
 Dockerfile                      Imagen de API/trabajador, sin datos ni secretos
+compose.yaml                    Servicios on-premise, HTTPS y persistencia
+deploy/onprem/                  Preparación, verificación y overrides opcionales
 deploy/azure/                   Contratos de variables del ambiente
 frontend/                       Interfaz React/TypeScript y PDF.js
 src/workbench_api.py             API, originales y exportaciones
@@ -152,6 +156,8 @@ El benchmark también prepara un cuaderno con originales y páginas seleccionada
 El inicio local integra API y trabajador. El contenedor permite ejecutarlos por separado y conserva los trabajos en la base de datos. El Dockerfile construye el frontend e incorpora Python y OCR.
 
 **Acceso Azure incluido:** el perfil `entra` incorpora validación de identidad firmada de Microsoft Entra, roles de consulta/revisión, protección de originales y exportaciones y registro del actor verificado. El desarrollador configura Container Apps, Easy Auth, token store, usuarios, secretos y HTTPS siguiendo [la guía de acceso](docs/azure_access.md), sin editar código. La política es un espacio compartido por un equipo autorizado, no expedientes privados por usuario. El modo local conserva loopback.
+
+**Acceso on-premise:** el perfil `password` usa cuentas locales autorizadas, sesiones revocables y roles de consulta/revisión. La [guía Linux](docs/onprem_installation.md) incluye creación del administrador, HTTPS, secretos montados, reinicio y respaldo. Se conserva el mismo motor y la misma interfaz. La aceptación del ambiente institucional sigue siendo necesaria.
 
 La [guía de Azure](docs/azure_deployment.md) detalla construcción, arranque, servicios y aceptación. Sustituya los marcadores de los ejemplos por los valores del ambiente y suministre secretos mediante la plataforma. Los documentos y las bases se administran fuera de la imagen.
 

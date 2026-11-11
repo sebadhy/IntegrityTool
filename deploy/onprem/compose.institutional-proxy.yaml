@@ -1,0 +1,5 @@
+# Start only db, api and worker; terminate HTTPS at the institutional host proxy.
+# The HTTP backend remains loopback-only. Forward the original Host unchanged.
+services:
+  api:
+    ports: ["127.0.0.1:8000:8000"]

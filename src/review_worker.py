@@ -12,6 +12,8 @@ from dotenv import load_dotenv
 def main():
     root = Path(__file__).resolve().parents[1]
     load_dotenv(root / ".env")
+    from .runtime_secrets import load_secret_files
+    load_secret_files()
     parser = argparse.ArgumentParser(description="Ejecutar trabajos persistentes de Integrity Tool.")
     parser.add_argument("--once", action="store_true", help="Procesar un trabajo disponible y terminar.")
     args = parser.parse_args()

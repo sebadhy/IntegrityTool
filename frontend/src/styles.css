@@ -2015,3 +2015,16 @@ details[open] > summary > svg:last-child {
     scroll-behavior: auto !important;
   }
 }
+.session-gate form {
+  display: grid;
+  gap: 12px;
+  max-width: 360px;
+  margin: 24px 0;
+}
+.session-gate input {
+  min-height: 42px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #cbd1d8;
+  border-radius: 4px;
+}

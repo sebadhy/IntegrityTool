@@ -122,6 +122,8 @@ def migrate_sqlite(source: Path, target: ReviewStore | None = None, *, documents
 
 
 def main():
+    from .runtime_secrets import load_secret_files
+    load_secret_files()
     root = Path(__file__).resolve().parents[1]
     load_dotenv(root / ".env")
     parser = argparse.ArgumentParser(description="Preparar o migrar persistencia de Integrity Tool.")

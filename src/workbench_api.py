@@ -17,10 +17,13 @@ from dotenv import load_dotenv
 # Environment must be loaded before modules with path configuration.
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / ".env")
+from .runtime_secrets import load_secret_files
+load_secret_files()
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
@@ -44,6 +47,11 @@ class SercopRecordRequest(BaseModel):
     ocid: str = Field(min_length=1, max_length=200)
 
 
+class LoginRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=80)
+    password: str = Field(min_length=1, max_length=256)
+
+
 def create_app(storage: Path | None = None, assisted: bool | None = None, corpus_provider=None) -> FastAPI:
     access = WebAccess()
     @asynccontextmanager
@@ -56,24 +64,34 @@ def create_app(storage: Path | None = None, assisted: bool | None = None, corpus
             corpus_provider=corpus_provider,
             embedded_worker=worker_mode == "embedded")
         app.state.service = service
-        yield
-        service.close()
+        try:
+            if access.mode == "password":
+                from .local_auth import LocalAuth
+                access.auth = LocalAuth(service.store.engine)
+            yield
+        finally:
+            service.close()
 
     app = FastAPI(title="Integrity Tool", docs_url=None, redoc_url=None, lifespan=lifespan)
 
     @app.middleware("http")
     async def institutional_access(request: Request, call_next):
         try:
-            probe = request.url.path == "/healthz" and request.method in {"GET", "HEAD"}
+            probe = request.url.path in {"/healthz", "/readyz"} and request.method in {"GET", "HEAD"}
             if not probe:
                 access.check_request(request)
+                if access.mode == "password" and request.url.path == "/api/auth/login":
+                    size = request.headers.get("content-length", "")
+                    if not size.isdigit() or int(size) > 4096:
+                        raise HTTPException(413, "La solicitud de acceso supera el tamaño permitido.")
                 # Only the app shell, public assets and liveness are anonymous.
-                public = request.method in {"GET", "HEAD"} and (
-                    request.url.path == "/" or request.url.path.startswith(("/assets/", "/pdf-assets/")))
+                public = (request.method in {"GET", "HEAD"} and (
+                    request.url.path in {"/", "/api/auth/config"} or request.url.path.startswith(("/assets/", "/pdf-assets/")))) or (
+                    access.mode == "password" and request.url.path == "/api/auth/login" and request.method == "POST")
                 if not public:
                     identity = await run_in_threadpool(access.authenticate, request.headers)
                     request.state.identity = identity
-                    if request.method not in {"GET", "HEAD", "OPTIONS"} and not identity.can_write:
+                    if request.method not in {"GET", "HEAD", "OPTIONS"} and not identity.can_write and request.url.path != "/api/auth/logout":
                         raise HTTPException(403, "Su rol permite consultar, pero no modificar revisiones.")
             length = request.headers.get("content-length")
             if length and (not length.isdigit() or int(length) > MAX_TOTAL_BYTES + 1024 * 1024):
@@ -81,23 +99,64 @@ def create_app(storage: Path | None = None, assisted: bool | None = None, corpus
             response = await call_next(request)
         except HTTPException as exc:
             response = JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+        if response.status_code == 429:
+            response.headers["Retry-After"] = "900"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Cache-Control"] = "no-store"
-        if access.mode == "entra":
+        if access.mode != "local":
             response.headers["Strict-Transport-Security"] = "max-age=31536000"
         response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' blob: data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         return response
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_payload(request, exc):
+        # Validation reports must not echo credentials or document contents.
+        return JSONResponse({"detail": "Compruebe los campos y tamaños de la solicitud."}, status_code=422)
 
     @app.api_route("/healthz", methods=["GET", "HEAD"])
     def liveness():
         return {"status": "ok"}
 
+    @app.api_route("/readyz", methods=["GET", "HEAD"])
+    def readiness():
+        from sqlalchemy import text
+        try:
+            with app.state.service.store.connection() as db:
+                db.execute(text("SELECT 1"))
+            return {"status": "ok"}
+        except Exception:
+            return JSONResponse({"status": "unavailable"}, status_code=503)
+
+    @app.get("/api/auth/config")
+    def auth_config():
+        return {"mode": access.mode}
+
+    @app.post("/api/auth/login")
+    def login(payload: LoginRequest):
+        if access.mode != "password":
+            raise HTTPException(404, "Acción no disponible.")
+        from .local_auth import COOKIE, SESSION_SECONDS
+        token, _ = access.auth.login(payload.username, payload.password)
+        response = JSONResponse({"status": "ok"})
+        response.set_cookie(COOKIE, token, max_age=SESSION_SECONDS, path="/", secure=True, httponly=True, samesite="strict")
+        return response
+
+    @app.post("/api/auth/logout")
+    def logout(request: Request):
+        if access.mode != "password":
+            raise HTTPException(404, "Acción no disponible.")
+        from .local_auth import COOKIE
+        access.auth.logout(request.headers)
+        response = JSONResponse({"status": "ok"})
+        response.delete_cookie(COOKIE, path="/", secure=True, httponly=True, samesite="strict")
+        return response
+
     @app.get("/api/session")
     def session(request: Request):
         identity = request.state.identity
         return {"mode": identity.mode, "name": identity.name, "actor": identity.actor,
-                "can_write": identity.can_write, "access_policy": "shared_team" if access.mode == "entra" else "local",
+                "can_write": identity.can_write, "access_policy": "shared_team" if access.mode != "local" else "local",
                 "build_revision": os.getenv("INTEGRITY_BUILD_REVISION", "development")}
 
     @app.exception_handler(ValueError)
@@ -125,7 +184,7 @@ def create_app(storage: Path | None = None, assisted: bool | None = None, corpus
 
     @app.get("/api/health")
     def health():
-        return {"status": "ok", "mode": "institutional" if access.mode == "entra" else "local_pilot",
+        return {"status": "ok", "mode": "institutional" if access.mode != "local" else "local_pilot",
                 "build_revision": os.getenv("INTEGRITY_BUILD_REVISION", "development")}
 
     @app.get("/api/cases")
@@ -167,7 +226,7 @@ def create_app(storage: Path | None = None, assisted: bool | None = None, corpus
             entries.append({**info[index], "name": upload.filename or "documento.pdf", "content": content})
         if source_snapshot_id and not re.fullmatch(r"[0-9a-f]{64}", source_snapshot_id):
             raise ValueError("La referencia de la ficha de SERCOP no es válida.")
-        actor = request.state.identity.actor if access.mode == "entra" else None
+        actor = request.state.identity.actor if access.mode != "local" else None
         return _public_case(app.state.service.create(title, request_key, entries,
             source_snapshot_id=source_snapshot_id or None, actor=actor))
 
@@ -178,7 +237,7 @@ def create_app(storage: Path | None = None, assisted: bool | None = None, corpus
     @app.post("/api/cases/{case_id}/retry", status_code=202)
     def retry(case_id: str, request: Request):
         get_case(case_id)
-        app.state.service.retry(case_id, actor=request.state.identity.actor if access.mode == "entra" else None)
+        app.state.service.retry(case_id, actor=request.state.identity.actor if access.mode != "local" else None)
         return _public_case(get_case(case_id))
 
     @app.get("/api/cases/{case_id}/documents/{document_id}")
@@ -194,7 +253,7 @@ def create_app(storage: Path | None = None, assisted: bool | None = None, corpus
         if not any(item["id"] == item_id for item in (case["result"] or {}).get("items", [])):
             raise HTTPException(404, "La observación no pertenece a esta revisión.")
         app.state.service.store.save_review(case_id, item_id, update.state, update.comment,
-            request.state.identity.actor if access.mode == "entra" else update.reviewer.strip(),
+            request.state.identity.actor if access.mode != "local" else update.reviewer.strip(),
             expected_revision=update.expected_revision)
         return get_case(case_id)["reviews"][item_id]
 

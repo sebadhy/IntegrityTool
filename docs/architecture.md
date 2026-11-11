@@ -98,7 +98,7 @@ Al comenzar una revisión se lee una única copia del YAML y se conserva su cont
 
 Las acciones de navegación, PDF, revisión y exportación usan el resultado guardado. No ejecutan de nuevo el motor ni solicitan contenido al modelo. La respuesta de navegación omite el catálogo y las cláusulas/señales internas completas; la exportación JSON conserva el anexo técnico. La base todavía lee un snapshot completo para armar esa respuesta: la optimización de consultas de detalle por demanda queda pendiente.
 
-`analysis_runs`, `review_findings` y `review_evidence` permiten consultar resultados por ejecución, patrón, prioridad y documento, conservando el snapshot. Comentarios y eventos se guardan en una transacción; el cliente envía la revisión esperada para evitar sobrescritura silenciosa. En modo local el actor es una etiqueta local; en Azure procede del ID token Entra firmado, no del campo enviado por el navegador. La [política de acceso](azure_access.md) define un espacio compartido del equipo.
+`analysis_runs`, `review_findings` y `review_evidence` permiten consultar resultados por ejecución, patrón, prioridad y documento, conservando el snapshot. Comentarios y eventos se guardan en una transacción; el cliente envía la revisión esperada para evitar sobrescritura silenciosa. En desarrollo el actor es una etiqueta local; con cuentas locales procede de la sesión verificada y con Entra, del ID token firmado, nunca del campo enviado por el navegador. Ambos perfiles institucionales definen un espacio compartido del equipo.
 
 ## Expediente y versiones
 
@@ -126,13 +126,15 @@ Los Signals validados pasan a `build_finding_candidates()` y `finalize_candidate
 
 El análisis básico cacheado guarda `Clause[]` y `Signal[]`, incluidos estados de exclusión, dentro del JSON transaccional. La clave incorpora la versión del servicio para distinguir formatos de caché. Abrir una revisión recupera su resultado guardado y conserva la interpretación de esa ejecución.
 
-El corpus sigue evaluándose con reglas; una propuesta semántica nueva no recibe un aumento por rareza de un detector distinto. Esta entrega no implementa inferencia de contradicciones entre documentos, búsqueda comercial ni lectura exhaustiva. El acceso institucional y los roles están implementados en el perfil Azure; la configuración del tenant y la aceptación real se realizan en el ambiente.
+El corpus sigue evaluándose con reglas; una propuesta semántica nueva no recibe un aumento por rareza de un detector distinto. Esta entrega no implementa inferencia de contradicciones entre documentos, búsqueda comercial ni lectura exhaustiva. El acceso institucional admite cuentas locales o Entra; la aceptación real corresponde al ambiente elegido.
 
 ## Interfaz y despliegue
 
 `src/workbench_api.py` expone una API con perfiles local e institucional con carga acotada, estados, originales, revisión y exportación HTML/CSV/JSON. `frontend/` contiene React/TypeScript y PDF.js; el PDF se carga al entrar en lectura detallada, solo se rasteriza la página consultada y el navegador reutiliza el documento. Los resaltados diferencian fragmento localizado de término coincidente; una ubicación no confirmada no se inventa.
 
-El inicio local se enlaza a loopback y rechaza conexiones externas. El contenedor exige modo Entra: valida tokens firmados, tenant, audiencia, vigencia, rol y origen de escrituras; no confía en identidad sin firma ni en cabeceras de proxy. El actor verificado se registra en creación, reintento y revisión. Reader consulta y Reviewer modifica el espacio compartido del equipo; no existe aislamiento por usuario dentro de ese espacio. La interfaz incluye inicio/cierre de sesión y estado de permisos, y no recibe tokens de Entra. El acceso de plataforma, token store, dominio, cifrado de servicios y retención se configuran según [la guía Azure](azure_access.md). No hay CORS abierto. `/healthz` publica solo liveness; los datos y exportaciones requieren rol.
+El inicio de desarrollo se enlaza a loopback y rechaza conexiones externas. El contenedor admite `password` (cuentas y sesiones locales en PostgreSQL) o `entra` (tokens firmados, tenant, audiencia, vigencia y roles). Ambos verifican dominio/origen y registran actor en creación, reintento y revisión. El navegador no establece su identidad mediante un nombre o cabecera libre. Consulta y revisión comparten expedientes; no hay aislamiento por usuario. No hay CORS abierto. `/healthz` publica liveness y `/readyz` disponibilidad de base sin contenido documental; los datos y exportaciones requieren sesión y permisos.
+
+`local_auth.py` contiene hash scrypt, sesiones por digest, vencimiento y límites de intentos compartidos; `manage_users.py` es la consola de administración explícita. Las tablas de acceso tienen un contrato versión 1 independiente del esquema de revisiones. `runtime_secrets.py` lee una lista acotada de archivos `_FILE`. La [receta on-premise](onprem_installation.md) reutiliza la imagen OCI y añade proxy HTTPS, PostgreSQL y volúmenes; la [receta Azure](azure_access.md) conserva su integración de plataforma. Ninguna utiliza una cola adicional ni cambia el motor documental.
 
 ## Evaluación pendiente
 

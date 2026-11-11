@@ -1,5 +1,7 @@
 # Entrega al desarrollador: preparación para Azure
 
+Esta guía describe la opción Azure Container Apps + Entra. Para una VM Linux independiente y usuarios locales, utilizar [instalación on-premise](onprem_installation.md). Son perfiles configurables de la misma aplicación, no proyectos ni motores distintos.
+
 ## Punto de partida
 
 Repositorio: [sebadhy/IntegrityTool, rama fusion](https://github.com/sebadhy/IntegrityTool/tree/fusion). Utilizar un commit revisado de esta rama para construir la imagen. La integración a `main` se realiza después de la validación del equipo.

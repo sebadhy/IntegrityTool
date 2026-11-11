@@ -128,3 +128,9 @@ El texto seleccionable breve se conserva como lectura nativa. Una imagen pequeñ
 ## Despliegue compartido
 
 El inicio local escucha en `127.0.0.1:8000` y rechaza conexiones externas. El perfil Azure `INTEGRITY_WEB_MODE=entra` implementa validación de identidad, roles y origen, y el contenedor escucha en `0.0.0.0:8000`. Aplicar [las variables de API](../deploy/azure/api.env.example) y configurar Easy Auth, token store, usuarios y HTTPS según [la guía de acceso](azure_access.md). No se modifican archivos fuente ni se agrega una clave de modelo al frontend.
+
+## Despliegue portable
+
+El [perfil on-premise](onprem_installation.md) usa `INTEGRITY_DEPLOYMENT_PROFILE=onprem`, `INTEGRITY_WEB_MODE=password`, PostgreSQL y `INTEGRITY_DOCUMENT_STORAGE=filesystem`. Entra (`entra`) y el modo local de desarrollo (`local`, solo loopback) siguen disponibles.
+
+Los secretos `INTEGRITY_DATABASE_URL`, `OPENAI_API_KEY`, `GROQ_API_KEY` e `INTEGRITY_BLOB_CONNECTION_STRING` admiten el sufijo `_FILE`. El archivo se lee al iniciar; valores directos y de archivo distintos provocan un error sin imprimirlos. Rotar requiere recrear el proceso. El Compose base no entrega ninguna credencial de modelos a la API.

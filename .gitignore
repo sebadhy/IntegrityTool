@@ -1,4 +1,8 @@
 .env
+.secrets/
+deploy/onprem/*.env
+installation-results*.json
+backups/
 .env.*
 !.env.example
 deploy/azure/*.env

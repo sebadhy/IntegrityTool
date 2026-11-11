@@ -192,3 +192,7 @@ Actualizar imagen y esquema como un cambio controlado, con respaldo y plan de re
 ## 10. Operación y evaluación
 
 Acordar responsables para la gestión del corpus, cuotas, reconciliación y retención de objetos. Validar carga y recuperación en la suscripción real, y evaluar la calidad analítica con especialistas de SERCOP. Registrar resultados y pendientes como parte de la aceptación del ambiente.
+
+## Otras modalidades
+
+La modalidad Container Apps + Entra descrita aquí se conserva. Para servidores Linux independientes, consultar [la receta on-premise](onprem_installation.md), sin requisitos de cuentas Microsoft.

@@ -1,0 +1,140 @@
+name: integrity
+
+x-app: &app
+  image: ${INTEGRITY_IMAGE:-integrity-tool:onprem}
+  build:
+    context: .
+    args:
+      REVISION: ${INTEGRITY_BUILD_REVISION:-development}
+  restart: unless-stopped
+  read_only: true
+  user: "10001:10001"
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs: ["/tmp:rw,nosuid,nodev,size=512m"]
+  volumes:
+    - documents:/var/lib/integrity/documents
+  secrets: [database_url, db_ca]
+
+x-env: &environment
+  INTEGRITY_DEPLOYMENT_PROFILE: onprem
+  INTEGRITY_WORKER_MODE: external
+  INTEGRITY_WEB_MODE: password
+  INTEGRITY_ACCESS_POLICY: shared_team
+  INTEGRITY_PUBLIC_ORIGIN: ${INTEGRITY_PUBLIC_ORIGIN:?Configure el origen HTTPS en .env}
+  INTEGRITY_DATABASE_URL_FILE: /run/secrets/database_url
+  INTEGRITY_DOCUMENT_STORAGE: filesystem
+  INTEGRITY_DOCUMENTS_PATH: /var/lib/integrity/documents
+  INTEGRITY_ASSISTED_ENABLED: "false"
+
+services:
+  db:
+    image: docker.io/library/postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    entrypoint: [/bin/sh, /opt/integrity/postgres-entrypoint.sh]
+    command: [postgres, -c, ssl=on, -c, ssl_cert_file=/tmp/integrity-tls/server.crt, -c, ssl_key_file=/tmp/integrity-tls/server.key, -c, hba_file=/opt/integrity/pg_hba.conf]
+    volumes:
+      - database:/var/lib/postgresql/data
+      - ./deploy/onprem/postgres-entrypoint.sh:/opt/integrity/postgres-entrypoint.sh:ro,Z
+      - ./deploy/onprem/init-database.sql:/docker-entrypoint-initdb.d/10-integrity.sql:ro,Z
+      - ./deploy/onprem/pg_hba.conf:/opt/integrity/pg_hba.conf:ro,Z
+    secrets: [postgres_password, database_password, db_cert, db_key]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U postgres -d postgres]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    shm_size: 128mb
+
+  api:
+    <<: *app
+    command: [api]
+    environment: *environment
+    depends_on:
+      db: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -m, src.healthcheck, api]
+      interval: 15s
+      timeout: 8s
+      retries: 4
+      start_period: 20s
+
+  worker:
+    <<: *app
+    command: [worker]
+    environment:
+      <<: *environment
+      INTEGRITY_WORKER_HEARTBEAT_PATH: /tmp/worker-heartbeat
+    depends_on:
+      db: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -m, src.healthcheck, worker]
+      interval: 30s
+      timeout: 5s
+      retries: 4
+      start_period: 30s
+    stop_grace_period: 60s
+
+  proxy:
+    image: docker.io/library/nginx:1.28-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236
+    restart: unless-stopped
+    user: "101:101"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    entrypoint: [nginx, -c, /etc/nginx/integrity.conf, -g, "daemon off;"]
+    ports:
+      - "${INTEGRITY_BIND_ADDRESS:-127.0.0.1}:${INTEGRITY_HTTPS_PORT:-8443}:8443"
+    tmpfs: ["/tmp:rw,nosuid,nodev,size=128m"]
+    volumes:
+      - ./deploy/onprem/nginx.conf:/etc/nginx/integrity.conf:ro,Z
+    secrets: [web_cert, web_key]
+    depends_on:
+      api: {condition: service_healthy, restart: true}
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8081/healthz]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+
+  # Explicit operations, not services started by a normal `up`.
+  storage-init:
+    <<: *app
+    profiles: [admin]
+    restart: "no"
+    user: "0:0"
+    cap_add: [CHOWN, FOWNER, DAC_OVERRIDE]
+    entrypoint: [python, -c]
+    command: ["import os; p='/var/lib/integrity/documents'; os.chown(p,10001,10001); os.chmod(p,0o700)"]
+    secrets: []
+    healthcheck: {disable: true}
+
+  admin:
+    <<: *app
+    profiles: [admin]
+    restart: "no"
+    entrypoint: [python]
+    command: [-m, src.deployment_check, --role, api]
+    environment: *environment
+    depends_on:
+      db: {condition: service_healthy}
+    healthcheck: {disable: true}
+
+volumes:
+  database:
+  documents:
+
+secrets:
+  postgres_password: {file: "${INTEGRITY_SECRETS_DIR:-./.secrets}/postgres_password"}
+  database_password: {file: "${INTEGRITY_SECRETS_DIR:-./.secrets}/database_password"}
+  database_url: {file: "${INTEGRITY_SECRETS_DIR:-./.secrets}/database_url"}
+  db_ca: {file: "${INTEGRITY_SECRETS_DIR:-./.secrets}/db_ca.crt"}
+  db_cert: {file: "${INTEGRITY_SECRETS_DIR:-./.secrets}/db_server.crt"}
+  db_key: {file: "${INTEGRITY_SECRETS_DIR:-./.secrets}/db_server.key"}
+  web_cert: {file: "${INTEGRITY_SECRETS_DIR:-./.secrets}/web.crt"}
+  web_key: {file: "${INTEGRITY_SECRETS_DIR:-./.secrets}/web.key"}

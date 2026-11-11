@@ -81,3 +81,4 @@ jobs:
           persist-credentials: false
       - run: docker build --build-arg REVISION=${{ github.sha }} -t integrity:ci .
       - run: python3 deploy/verify_container.py integrity:ci
+      - run: python3 deploy/onprem/validate_stack.py --image integrity:ci --output installation-results.json

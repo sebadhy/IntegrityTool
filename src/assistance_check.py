@@ -1,4 +1,4 @@
-"""Azure model handoff check. Network access requires an explicit CLI option."""
+"""Model handoff check. Network access requires an explicit CLI option."""
 from __future__ import annotations
 
 import argparse
@@ -53,7 +53,9 @@ def check_assistance(*, request_model: bool = False) -> dict:
 
 def main():
     load_dotenv(ROOT / ".env")
-    parser = argparse.ArgumentParser(description="Comprobar configuración de Azure OpenAI sin documentos reales.")
+    from .runtime_secrets import load_secret_files
+    load_secret_files()
+    parser = argparse.ArgumentParser(description="Comprobar el proveedor configurado sin documentos reales.")
     parser.add_argument("--request-model", action="store_true",
         help="Autoriza hasta dos solicitudes facturables con contenido ficticio; sin reintentos ni persistencia.")
     args = parser.parse_args()

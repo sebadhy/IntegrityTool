@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { api } from "./api";
+import { LoginPanel } from "./LoginPanel";
 import { ExecutiveReading, VersionComparison } from "./ExecutiveReading";
 import { ObservationQueue, ObservationDetail } from "./ReviewPanels";
 import { UploadWorkspace } from "./UploadWorkspace";
@@ -30,8 +31,14 @@ function usable(value?: string) {
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [sessionError, setSessionError] = useState("");
+  const [authMode, setAuthMode] = useState("");
   useEffect(() => {
     let stopped = false;
+    api<{ mode: string }>("/auth/config")
+      .then((value) => {
+        if (!stopped) setAuthMode(value.mode);
+      })
+      .catch(() => {});
     api<Session>("/session")
       .then((value) => {
         if (!stopped) setSession(value);
@@ -178,6 +185,17 @@ export default function App() {
     }
   }
 
+  if (!session && authMode === "password")
+    return (
+      <LoginPanel
+        onLogin={(value) => {
+          setSession(value);
+          setSessionError("");
+          setActiveCase(null);
+          setCases([]);
+        }}
+      />
+    );
   if (!session)
     return (
       <main className="session-gate">
@@ -186,7 +204,7 @@ export default function App() {
         <p role={sessionError ? "alert" : "status"}>
           {sessionError || "Espere un momento."}
         </p>
-        {sessionError && (
+        {sessionError && authMode === "entra" && (
           <>
             <p>
               Si su cuenta no tiene permisos, solicite al administrador un rol
@@ -226,7 +244,7 @@ export default function App() {
         </button>
         <div className="session-status">
           <span className="environment">
-            {session.mode === "entra"
+            {session.mode !== "local"
               ? `${session.name} · ${session.can_write ? "Revisión" : "Consulta"}`
               : "Espacio local de trabajo"}
           </span>
@@ -239,6 +257,25 @@ export default function App() {
             >
               <LogOut size={17} />
             </a>
+          )}
+          {session.mode === "password" && (
+            <button
+              className="icon-button"
+              title="Cerrar sesión"
+              aria-label="Cerrar sesión"
+              onClick={async () => {
+                try {
+                  await api("/auth/logout", { method: "POST" });
+                  setSession(null);
+                  setActiveCase(null);
+                  setCases([]);
+                } catch (e) {
+                  setError((e as Error).message);
+                }
+              }}
+            >
+              <LogOut size={17} />
+            </button>
           )}
         </div>
       </header>
