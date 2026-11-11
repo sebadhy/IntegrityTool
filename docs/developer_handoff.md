@@ -4,6 +4,20 @@
 
 Repositorio: [sebadhy/IntegrityTool, rama fusion](https://github.com/sebadhy/IntegrityTool/tree/fusion). Utilizar un commit revisado de esta rama para construir la imagen. La integración a `main` se realiza después de la validación del equipo.
 
+Para una carpeta de despliegue nueva:
+
+```bash
+git clone --branch fusion --single-branch https://github.com/sebadhy/IntegrityTool.git
+cd IntegrityTool
+git branch --show-current
+git rev-parse HEAD
+```
+
+La rama mostrada debe ser `fusion`. Guardar el SHA obtenido y utilizarlo como
+`COMMIT_SHA` al construir y etiquetar la imagen. No reutilizar una carpeta o imagen
+sin comprobar su rama/commit. Si ya hay un checkout con cambios, conservarlos y
+preparar otro limpio para el despliegue; no sobrescribir trabajo del equipo.
+
 La aplicación consta de un frontend **React/TypeScript + PDF.js**, una API **Python/FastAPI** y un trabajador Python que procesa los documentos.
 
 | Componente | Datos/conexiones | Configuración |
