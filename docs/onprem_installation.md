@@ -1,6 +1,13 @@
-# Instalación institucional en una VM Linux
+# Instalación para SERCOP en una VM Linux
 
 Modalidad portable de la pre-PoC: **HTTPS → API e interfaz → PostgreSQL + archivos persistentes**, con un trabajador independiente. Utiliza usuarios locales; no requiere cuentas Microsoft. Azure OpenAI y el despliegue con Entra siguen siendo opciones independientes.
+
+Esta receta puede ejecutarse en una VM del centro de datos de SERCOP o en una
+nube elegida por la institución. No exige Azure Container Apps, Entra ID ni Blob
+Storage. `onprem` es el nombre del **perfil portable de configuración**, no una
+restricción sobre dónde se aloja la VM. El perfil específico `azure` mantiene
+requisitos distintos; no utilizarlo para configurar proveedores alternativos.
+Entregar y construir la rama `fusion`, registrando el commit y digest de imagen.
 
 **Antes de compartir:** completar la aceptación en la VM asignada. El [registro de pruebas](onprem_validation.md) distingue lo comprobado en laboratorio de lo pendiente. No presupone disponibilidad de Docker, Podman, certificados ni credenciales de SERCOP.
 
@@ -15,7 +22,13 @@ Modalidad portable de la pre-PoC: **HTTPS → API e interfaz → PostgreSQL + ar
 
 Solicitar a TI: versión de RHEL/otro Linux, arquitectura CPU, motor y versión, Compose/proveedor, rootless o rootful, SELinux, DNS/certificados, proxy, PostgreSQL y política de respaldo. No es necesario decidir un proveedor cloud.
 
-La carga y revisión de PDFs funciona sin Internet ni modelos externos una vez disponibles las imágenes. La búsqueda de procesos en SERCOP requiere salida HTTPS desde la API a su fuente oficial; no descarga automáticamente los documentos. El procesamiento con Azure OpenAI requiere salida HTTPS desde el trabajador y autorización para enviar fragmentos seleccionados. Confirmar proxy de salida, certificados de confianza y sincronización de reloj con TI.
+La carga y revisión de PDFs funciona sin Internet ni modelos externos una vez
+disponibles las imágenes. La demostración de búsqueda 2026 usa la descarga oficial
+incluida, con corte al 13/11/2026; otros años requieren salida HTTPS desde la API.
+No descarga automáticamente los PDF. Un proveedor de modelos externo requiere
+conectividad desde el trabajador y autorización para enviar fragmentos seleccionados.
+Un modelo institucional puede mantenerse en la red interna. Confirmar proxy,
+certificados de confianza y sincronización de reloj con TI.
 
 ## 2. Preparar una instalación nueva
 
@@ -97,7 +110,36 @@ Configurar ese proxy para reenviar a `127.0.0.1:8000`, conservar el `Host` origi
 
 ## 5. Procesamiento asistido opcional
 
-La instalación base analiza sin un proveedor de modelos. Para Azure OpenAI, guardar la clave autorizada en `.secrets/model_key`; endpoint, versión y nombre de deployment van en `.env`, según su ejemplo. **Solo el trabajador recibe la clave**.
+### Alcance de la portabilidad
+
+La instalación base analiza sin un proveedor de modelos: el Compose tiene
+`INTEGRITY_ASSISTED_ENABLED=false`. No se necesita una cuenta ni una licencia de
+Azure para usar las reglas, taxonomía, OCR, revisión y exportaciones existentes.
+Habilitar asistencia no cambia el proveedor de identidad ni obliga a usar Entra.
+
+| Proveedor seleccionado | Configuración del cliente existente | Condición de uso |
+|---|---|---|
+| `azure` | Azure OpenAI: endpoint, versión de API, deployment y clave. | Acceso y deployment autorizados, contrato JSON compatible. |
+| `openai` | OpenAI o endpoint HTTPS compatible con su API, modelo y clave. | Chat Completions y los parámetros indicados abajo. |
+| `groq` | Endpoint Groq fijado en el cliente, modelo y clave. | El modelo seleccionado debe aceptar el contrato enviado. |
+| `ollama` | Servicio HTTP interno o HTTPS con endpoint `/v1` y modelo instalado. | Compatibilidad con JSON y validación de la respuesta. |
+
+El servicio del modelo se instala o contrata **por separado**. Este Compose no
+descarga modelos ni levanta Ollama, no aprovisiona GPU ni garantiza cuota. Las
+referencias de CPU/RAM del apartado 1 corresponden a la aplicación, no al servidor
+de inferencia. Dimensionar este último según el modelo y las pruebas acordadas.
+
+La receta base ya fija `INTEGRITY_DEPLOYMENT_PROFILE=onprem`. En este perfil el
+validador admite los cuatro proveedores; el perfil `azure` exige Azure OpenAI.
+Seleccionar un único proveedor y un único override de modelos. **Solo el trabajador
+recibe la configuración y la clave del modelo**, nunca React ni la API.
+
+### Azure OpenAI
+
+Guardar la clave autorizada en `.secrets/model_key`; endpoint, versión y nombre
+de deployment van en `.env`, según su ejemplo. No escribir la clave en `.env`,
+YAML, comandos de consola ni repositorio. Mantener los permisos de secretos
+descritos en el apartado 8. Utilizar el override ya incluido:
 
 ```bash
 docker compose -f compose.yaml -f deploy/onprem/compose.azure-openai.yaml config --quiet
@@ -105,15 +147,156 @@ docker compose -f compose.yaml -f deploy/onprem/compose.azure-openai.yaml up -d 
 docker compose -f compose.yaml -f deploy/onprem/compose.azure-openai.yaml exec worker python -m src.assistance_check
 ```
 
-La comprobación anterior no consume solicitudes al modelo. Solo con autorización de costo y uso de la credencial:
+### OpenAI o un endpoint institucional compatible
+
+Después de preparar la instalación, crear el archivo local
+`.secrets/compose.model.yaml` con el siguiente contenido. Es configuración del
+despliegue, no un cambio al motor Python. No combinarlo con el override de Azure:
+
+```yaml
+services:
+  worker:
+    environment:
+      INTEGRITY_ASSISTED_ENABLED: "true"
+      INTEGRITY_SEMANTIC_ENABLED: "true"
+      INTEGRITY_LLM_MAX_CALLS: ${INTEGRITY_LLM_MAX_CALLS:-2}
+      LLM_PROVIDER: openai
+      OPENAI_API_KEY_FILE: /run/secrets/model_key
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_MODEL: ${OPENAI_MODEL:?Configure el modelo autorizado}
+    secrets:
+      - model_key
+secrets:
+  model_key: {file: "${INTEGRITY_SECRETS_DIR:-./.secrets}/model_key"}
+```
+
+Guardar la credencial en `.secrets/model_key`. En `.env`, definir
+`OPENAI_MODEL` con el nombre exacto del modelo autorizado y, para un servidor
+institucional compatible, `OPENAI_BASE_URL=https://SU-SERVIDOR/ruta/v1` con su
+ruta real. El perfil portable exige HTTPS para este endpoint. La autenticación
+del conector usa una clave; un servicio con autenticación o protocolo diferentes
+puede requerir adaptación. El servidor debe ser alcanzable y su certificado
+de confianza para el trabajador; no desactivar la verificación TLS.
+
+### Groq
+
+Usar el mismo archivo local del ejemplo anterior, conservando `secrets` y las
+tres variables `INTEGRITY_*`, pero **reemplazar** las variables del proveedor por:
+
+```yaml
+      LLM_PROVIDER: groq
+      GROQ_API_KEY_FILE: /run/secrets/model_key
+      GROQ_MODEL: ${GROQ_MODEL:?Configure el modelo autorizado}
+```
+
+La credencial Groq va en `.secrets/model_key`; `GROQ_MODEL` va en `.env`.
+No dejar `OPENAI_API_KEY_FILE`, `OPENAI_BASE_URL` ni `OPENAI_MODEL` en este
+override. El cliente utiliza el endpoint Groq configurado en código; no es una
+variable para conectar otro proveedor.
+
+### Ollama en la red institucional
+
+Usar este contenido alternativo completo en `.secrets/compose.model.yaml`:
+
+```yaml
+services:
+  worker:
+    environment:
+      INTEGRITY_ASSISTED_ENABLED: "true"
+      INTEGRITY_SEMANTIC_ENABLED: "true"
+      INTEGRITY_LLM_MAX_CALLS: ${INTEGRITY_LLM_MAX_CALLS:-2}
+      LLM_PROVIDER: ollama
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:?Configure el endpoint interno con /v1}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:?Configure el modelo instalado}
+```
+
+En `.env`, definir por ejemplo
+`OLLAMA_BASE_URL=http://servidor-modelos.interno:11434/v1` y
+`OLLAMA_MODEL=NOMBRE-EXACTO-INSTALADO`, sustituyendo ambos valores por los reales.
+El servicio y el modelo deben existir previamente. **`localhost` dentro del
+trabajador es el propio contenedor**, no la VM ni la computadora del administrador.
+TI debe proporcionar una dirección de red alcanzable y restringida; si el modelo
+está en otro contenedor, acordar su red y DNS. No exponer un servidor de inferencia
+sin protección a Internet. Este conector no configura autenticación personalizada
+del servicio; evaluar proxy, controles de red y eventual adaptación según TI.
+
+### Aplicar, comprobar y cambiar de proveedor
+
+Para los tres ejemplos locales anteriores:
+
+```bash
+docker compose -f compose.yaml -f .secrets/compose.model.yaml config --quiet
+docker compose -f compose.yaml -f .secrets/compose.model.yaml up -d --wait worker
+docker compose -f compose.yaml -f .secrets/compose.model.yaml exec worker python -m src.assistance_check
+```
+
+Crear el archivo y suministrar valores en `.env` no basta: el override debe
+aplicarse para entregar esas variables al trabajador. Conservar la misma
+combinación de archivos `-f` en las siguientes operaciones. Cambiar proveedor,
+endpoint, clave o modelo requiere recrear el trabajador, no reconstruir el motor
+de la aplicación. Hacerlo sin trabajos activos; no borrar resultados, caché ni
+reservas para forzar nuevas llamadas. Retirar configuraciones de modelos que
+ya no se utilicen. No incrustar claves en imágenes ni guardarlas en los volúmenes
+de documentos o resultados.
+
+La comprobación anterior es **solo de configuración**: no llama al modelo ni
+demuestra conectividad, compatibilidad o calidad. Solo con autorización de uso
+de la credencial, tratamiento de datos y eventual costo:
+
+```bash
+docker compose -f compose.yaml -f .secrets/compose.model.yaml exec worker python -m src.assistance_check --request-model
+```
+
+Para Azure, ejecutar la misma prueba con su propio override:
 
 ```bash
 docker compose -f compose.yaml -f deploy/onprem/compose.azure-openai.yaml exec worker python -m src.assistance_check --request-model
 ```
 
-Después cargar un PDF público acordado y comprobar procedencia y uso efectivo en el resultado. El presupuesto predeterminado es de dos solicitudes lógicas por expediente. Consultar [qué recibe y qué hace el motor](ai_engine.md). Los demás proveedores existentes se configuran mediante un override del trabajador siguiendo [configuración](configuration.md); no requieren cambios al motor. No montar claves de proveedores en la API.
+La prueba hace **hasta dos solicitudes con contenido ficticio**, independientes
+del presupuesto por expediente; puede tener costo incluso ante un fallo. No se
+debe ejecutar en health checks, cada arranque ni CI con credenciales reales.
+Después cargar PDFs públicos acordados y comprobar citas, mitigantes, cobertura,
+lenguaje, prioridad y procedencia del modelo en resultados/exportación. Comparar
+con y sin asistencia, registrar falsos positivos y probar fallo del proveedor.
+El presupuesto predeterminado es de dos solicitudes lógicas por expediente, no
+un límite monetario global. Configurar cuotas y alertas por separado.
+
+### Contrato técnico y límites
+
+- El cliente envía **Chat Completions** (`model`, `messages`, `response_format`,
+  `max_completion_tokens`), con timeout de 20 segundos y sin reintentos del SDK.
+  Para Azure/OpenAI/Groq solicita JSON Schema; con Ollama solicita `json_object`
+  y valida luego el mismo esquema en Python. Cambiar solo el nombre del modelo
+  no asegura que estos parámetros o formatos estén soportados.
+- Una respuesta debe ser JSON válido, cumplir los campos y categorías esperados
+  y finalizar correctamente. También se comprueban citas y lenguaje. Pasar la
+  prueba sintética no demuestra precisión analítica ni ausencia de errores.
+- Otro servicio compatible puede usar el conector `openai` si cumple ese contrato.
+  Una API nativa distinta, nuevos mecanismos de autenticación o modelos que no lo
+  admitan requieren un adaptador y pruebas; no hay compatibilidad universal ni
+  conversión automática de protocolos. No hay conectores nativos de Gemini o
+  Anthropic en esta entrega.
+- La asistencia puede proponer candidatos acotados y redactar explicaciones;
+  no decide la prioridad final ni emite conclusiones jurídicas. Sin modelo o si
+  falla su respuesta, se conserva la lectura basada en reglas y se informa el estado.
+  No hay lectura semántica exhaustiva, búsqueda automática de mercado ni garantía
+  de detección completa. Mantener revisión humana.
+- Fragmentos y nombres seleccionados pueden salir hacia el proveedor; no se
+  anonimizan automáticamente. Incluso con un modelo local, verificar ubicación,
+  acceso, registros y retención. Revisar [qué datos recibe y qué hace el motor](ai_engine.md)
+  y la [configuración detallada](configuration.md).
+- La aceptación en la VM, con el proveedor y modelo elegidos por SERCOP, sigue
+  pendiente hasta probar el circuito funcional, persistencia, reinicio y calidad
+  con expedientes representativos. RHEL/SELinux y Podman requieren sus pruebas
+  específicas; la pre-PoC no equivale a una certificación de producción.
 
 ## 6. Persistencia, reinicio y respaldo
+
+Los comandos de este apartado muestran la receta base. Si habilitó un proveedor,
+agregar a **cada comando Compose** la misma combinación `-f compose.yaml -f ...`
+usada para configurarlo; de lo contrario puede recrear el trabajador con asistencia
+desactivada. No cambiar el nombre del proyecto ni eliminar sus volúmenes.
 
 Los volúmenes nombrados `database` y `documents` conservan resultados, evidencias, originales, usuarios y sesiones. La cola es una tabla transaccional de PostgreSQL: no requiere Redis. Mantener el mismo nombre de proyecto Compose; cambiarlo crea volúmenes distintos y puede parecer una pérdida de datos.
 

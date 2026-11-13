@@ -18,6 +18,22 @@ modelo se configuran únicamente en el trabajador; la API registra los trabajos.
 
 Seleccione un único proveedor con `LLM_PROVIDER`. Sin selección explícita se conserva la detección automática: Azure, Groq, Ollama y OpenAI.
 
+Para SERCOP o cualquier VM independiente, usar el perfil portable `onprem`, que
+admite estos proveedores. El perfil específico `azure` conserva validaciones de
+Azure OpenAI. Las variables `.env` no se entregan automáticamente al trabajador
+de Compose: aplicar el override correspondiente, como muestran los
+[ejemplos de instalación](onprem_installation.md#5-procesamiento-asistido-opcional).
+
+Si ejecuta Python sin Compose, definir `INTEGRITY_DEPLOYMENT_PROFILE=onprem`
+también en su ambiente o `.env` para validar proveedores distintos de Azure con
+`src.assistance_check`. El Compose portable ya suministra esa variable.
+
+Esta configuración selecciona conectores existentes, no garantiza compatibilidad
+con cualquier API o modelo. El contrato requiere Chat Completions, JSON validable
+y `max_completion_tokens`; una API distinta necesita un adaptador. Probar el
+modelo autorizado antes de aceptar el ambiente. El repositorio no instala ni
+dimensiona el servidor de inferencia.
+
 ### Azure OpenAI
 
 ```env
@@ -49,7 +65,7 @@ OPENAI_MODEL=<modelo compatible con salidas estructuradas>
 ```env
 LLM_PROVIDER=groq
 GROQ_API_KEY=<clave>
-GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_MODEL=<modelo autorizado y validado>
 ```
 
 Utiliza el cliente compatible con OpenAI incluido en las dependencias.
@@ -59,10 +75,15 @@ Utiliza el cliente compatible con OpenAI incluido en las dependencias.
 ```env
 LLM_PROVIDER=ollama
 OLLAMA_BASE_URL=http://localhost:11434/v1
-OLLAMA_MODEL=llama3.1
+OLLAMA_MODEL=<modelo instalado y validado>
 ```
 
-El servicio y el modelo se instalan por separado. La disponibilidad de un proveedor no acredita la calidad de sus respuestas; se deben evaluar los modelos en documentos representativos.
+El servicio y el modelo se instalan por separado. El ejemplo `localhost` solo
+aplica cuando el proceso Python y el servicio comparten ese host; dentro de un
+contenedor apunta al propio contenedor. En Compose, configurar una dirección
+interna alcanzable desde el trabajador. La disponibilidad de un proveedor no
+acredita la calidad de sus respuestas; se deben evaluar los modelos en documentos
+representativos.
 
 ## Presupuesto y cobertura
 

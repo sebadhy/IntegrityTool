@@ -3,10 +3,19 @@
 Contrato operativo de la versión actual. La configuración habilitada no demuestra
 que se haya realizado una llamada: hay que comprobar el resultado del expediente.
 
+La IA no depende obligatoriamente de Azure. El perfil portable admite los
+conectores Azure OpenAI, OpenAI, Groq y Ollama; el perfil específico de Azure
+mantiene sus propias validaciones. Las referencias a Azure de esta guía describen
+esa modalidad, no un requisito de infraestructura para SERCOP. Para configurar
+un servicio institucional, consultar [ejemplos, contrato de compatibilidad y
+aceptación](onprem_installation.md#5-procesamiento-asistido-opcional). Una API
+distinta puede requerir adaptación; ningún conector garantiza por sí solo la
+calidad de un modelo.
+
 ## 1. Dónde se ejecuta
 
-En Azure, las solicitudes a Azure OpenAI salen del **trabajador Python**, no del
-navegador ni de la API que recibe los archivos. El trabajador utiliza
+En el despliegue con trabajador separado, las solicitudes al proveedor elegido
+salen del **trabajador Python**, no del navegador ni de la API que recibe los archivos. El trabajador utiliza
 `src/analyzer/workbench_service.py`; el cliente y los contratos de respuesta están
 en `src/analyzer/llm_reviewer.py`. Las claves se suministran únicamente al trabajador.
 
@@ -15,10 +24,10 @@ La interfaz utiliza resultados persistidos; no llama directamente al proveedor.
 
 ```mermaid
 flowchart LR
-  A["Carga de documentos y ficha opcional SERCOP"] --> B["API: originales en Blob y trabajo en PostgreSQL"]
+  A["Carga de documentos y ficha opcional SERCOP"] --> B["API: originales persistentes y trabajo en PostgreSQL"]
   B --> C["Trabajador: extracción, reglas, contexto y consolidación"]
   C --> D["Resultado determinístico guardado"]
-  D --> E["Azure OpenAI: propuestas acotadas y síntesis"]
+  D --> E["Proveedor LLM configurado: propuestas acotadas y síntesis"]
   E --> F["Validación de citas, taxonomía y reglas"]
   F --> G["Resultado y procedencia guardados"]
   D --> G
@@ -64,7 +73,7 @@ el PDF, comentar o exportar. Una caché reutilizada no implica una nueva llamada
 Una nueva revisión o un cambio de documentos, reglas o configuración puede
 necesitar nuevas solicitudes.
 
-## 4. Qué información sale hacia Azure OpenAI
+## 4. Qué información recibe el proveedor de modelos
 
 - **Propuestas:** selección de hasta 24 cláusulas activas, hasta 12.000 caracteres
   de texto fuente y un contexto serializado de hasta 19.000 caracteres. Cada
@@ -96,9 +105,10 @@ La decisión y la validación técnica/jurídica corresponden al revisor humano.
 
 ## 6. Configuración y costo
 
-Aplicar [el contrato del trabajador](../deploy/azure/worker.env.example). La API
+Para la modalidad portable, aplicar [el override del proveedor elegido](onprem_installation.md#5-procesamiento-asistido-opcional).
+En el perfil específico Azure, aplicar [el contrato del trabajador](../deploy/azure/worker.env.example). La API
 utiliza [su propio contrato](../deploy/azure/api.env.example), sin clave del modelo.
-`OPENAI_MODEL` es el **nombre del deployment**, no una licencia ni necesariamente
+En Azure, `OPENAI_MODEL` es el **nombre del deployment**, no una licencia ni necesariamente
 el nombre comercial del modelo. Tener acceso a Azure OpenAI no crea el deployment
 ni asigna cuota; lo configura el equipo de la suscripción.
 

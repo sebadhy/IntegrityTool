@@ -12,6 +12,29 @@ La aplicación utiliza **React + TypeScript + PDF.js**, servida por una **API Py
 
 **Motor de IA:** [dónde, cómo y cuándo interviene](docs/ai_engine.md), datos enviados, límites, fallos y comprobación del uso efectivo de Azure OpenAI.
 
+## Portabilidad y elección del motor de IA
+
+La rama `fusion` puede instalarse en infraestructura de SERCOP, en una VM Linux
+propia o alojada en una nube. La [receta portable con Docker Compose](docs/onprem_installation.md)
+incluye aplicación, trabajador, PostgreSQL, archivos persistentes y usuarios locales:
+**no exige Azure, Container Apps ni cuentas Microsoft**. Los usuarios acceden desde
+su navegador; el servidor de esta receta ejecuta contenedores Linux.
+
+El análisis basado en reglas y taxonomía funciona sin LLM. La asistencia es opcional
+y admite los conectores existentes para **Azure OpenAI, OpenAI, Groq y Ollama**.
+SERCOP puede configurar su endpoint, modelo y credenciales en el trabajador,
+incluido un servicio de modelos en su propia red, si cumple el contrato del cliente.
+Véanse [los ejemplos de configuración y aceptación](docs/onprem_installation.md#5-procesamiento-asistido-opcional).
+
+**Portable no significa compatible con cualquier modelo o API sin adaptación.**
+El cliente actual usa Chat Completions compatible con OpenAI y respuestas JSON
+validadas. Una API diferente necesita un adaptador; cambiar el nombre del modelo
+no garantiza compatibilidad ni calidad. El perfil portable `onprem` admite estos
+proveedores; el perfil específico `azure` conserva su contrato de Azure OpenAI.
+El repositorio no instala el servidor de modelos ni proporciona GPU, claves o cuotas.
+La integración y precisión deben validarse con SERCOP antes de aceptar el ambiente;
+la pre-PoC no constituye una certificación de preparación para producción.
+
 ## Interfaz de referencia
 
 Capturas reales de la aplicación ejecutada en local con un expediente ficticio. Muestran la interfaz que debe servir el despliegue; los resultados dependen de los documentos y de la configuración disponible.
