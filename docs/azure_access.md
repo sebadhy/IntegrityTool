@@ -97,6 +97,14 @@ comprobar qué commit se publicó. Conservar también el digest de la imagen.
 
 ## 4. Inicio, cierre y expiración de sesión
 
+Se puede abrir la página inicial desde enlaces de correo, WhatsApp, Teams u otros
+sitios, incluidos enlaces `/?revision=...`. Solo se permite la navegación externa
+al documento principal de `/`; las rutas de datos, exportaciones y acciones
+mantienen validación de sesión, roles y origen. No es necesario copiar y pegar la
+URL ni desactivar la protección entre sitios. Si una versión anterior devuelve
+403 al abrir un enlace, actualizar la imagen de la aplicación; no eliminar estas
+cabeceras en el proxy ni habilitar CORS abierto.
+
 La pantalla ofrece inicio institucional en `/.auth/login/aad`. Una sesión válida
 sin rol muestra denegación, no datos. El encabezado identifica al usuario y su
 permiso; el rol Reader no muestra acciones de escritura. El backend aplica los

@@ -79,6 +79,13 @@ docker compose run --rm admin -m src.manage_users unlock USUARIO
 
 La receta incluye Nginx sin privilegios y publica solo HTTPS. API y PostgreSQL no publican puertos al host. El proxy conserva `Host`; la aplicación verifica dominio y origen de las escrituras y no confía en cabeceras de identidad o proxy enviadas por el cliente.
 
+Los enlaces recibidos por correo, WhatsApp, Teams u otros sitios pueden abrir la
+página inicial, también con `?revision=...`. Esta excepción solo permite navegación
+GET/HEAD a `/` con destino de documento principal: no abre datos, exportaciones,
+peticiones desde otros sitios ni documentos embebidos. La sesión y los permisos
+siguen siendo obligatorios. No eliminar globalmente `Sec-Fetch-Site` en el proxy
+ni desactivar los controles de origen como solución a un error de acceso.
+
 Si TI ya termina TLS en un proxy de **la misma VM**:
 
 ```bash

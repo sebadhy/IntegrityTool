@@ -89,7 +89,15 @@ class WebAccess:
             elif origin and urlsplit(origin).netloc != request.headers.get("host"):
                 raise HTTPException(403, "Origen de solicitud no autorizado.")
         if self.mode != "local" and request.headers.get("sec-fetch-site") == "cross-site":
-            raise HTTPException(403, "Solicitud entre sitios no autorizada.")
+            # External links may open the public app shell, never data or actions.
+            entry_navigation = (
+                request.method in {"GET", "HEAD"}
+                and request.url.path == "/"
+                and request.headers.get("sec-fetch-mode") == "navigate"
+                and request.headers.get("sec-fetch-dest") == "document"
+            )
+            if not entry_navigation:
+                raise HTTPException(403, "Solicitud entre sitios no autorizada.")
 
     def authenticate(self, headers) -> Identity:
         if self.mode == "local":
