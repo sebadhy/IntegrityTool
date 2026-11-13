@@ -9,6 +9,7 @@ export type Session = {
 };
 export type ReviewState = "pending" | "confirmed" | "discarded" | "followup";
 export type SercopSnapshot = {
+  provider?: string;
   snapshot_id: string;
   ocid: string;
   code: string;

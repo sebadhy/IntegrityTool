@@ -32,6 +32,8 @@ from .web_access import WebAccess
 from .analyzer.workbench_service import MAX_FILE_BYTES, MAX_TOTAL_BYTES, WorkbenchService
 from .analyzer.review_store import StorageConflict
 from .analyzer import sercop_ocds
+from . import sercop_suggestions
+from . import sercop_local
 
 LOGGER = logging.getLogger(__name__)
 
@@ -45,6 +47,7 @@ class ReviewUpdate(BaseModel):
 
 class SercopRecordRequest(BaseModel):
     ocid: str = Field(min_length=1, max_length=200)
+    data_source: Literal["api", "snapshot"] = "api"
 
 
 class LoginRequest(BaseModel):
@@ -192,16 +195,25 @@ def create_app(storage: Path | None = None, assisted: bool | None = None, corpus
         return app.state.service.store.list_cases()
 
     @app.get("/api/sources/sercop/search")
-    def search_sercop(request: Request, year: int, search: str, buyer: str = "", supplier: str = "", page: int = 1):
-        if set(request.query_params) - {"year", "search", "buyer", "supplier", "page"}:
+    def search_sercop(request: Request, year: int, search: str = "", buyer: str = "", supplier: str = "", page: int = 1,
+                      data_source: Literal["api", "snapshot"] = "api"):
+        if set(request.query_params) - {"year", "search", "buyer", "supplier", "page", "data_source"}:
             raise HTTPException(400, "Utilice únicamente año, búsqueda, comprador y proveedor como filtros de SERCOP.")
+        if data_source == "snapshot":
+            return sercop_local.search_processes(year, search, buyer, supplier, page)
         return sercop_ocds.search_processes(year, search, buyer, supplier, page)
 
     @app.post("/api/sources/sercop/record")
     def import_sercop(request: SercopRecordRequest):
-        snapshot = sercop_ocds.fetch_process(request.ocid)
+        snapshot = (sercop_local.fetch_process(request.ocid) if request.data_source == "snapshot"
+                    else sercop_ocds.fetch_process(request.ocid))
         app.state.service.store.save_source_snapshot(snapshot)
         return sercop_ocds.public_snapshot(snapshot)
+
+    @app.get("/api/sources/sercop/suggestions")
+    def suggest_sercop(field: Literal["buyer", "supplier", "search"], year: int, q: str = "",
+                       buyer: str = "", supplier: str = "", data_source: Literal["api", "snapshot"] = "api"):
+        return sercop_suggestions.suggestions(field, year, q, buyer, supplier, data_source)
 
     @app.post("/api/cases", status_code=202)
     async def create_case(request: Request, files: Annotated[list[UploadFile], File()], manifest: Annotated[str, Form()],

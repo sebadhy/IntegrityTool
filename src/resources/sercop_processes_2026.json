@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "year": 2026,
+  "process_count": 122264,
+  "supplier_rows": 113469,
+  "published_at": "2026-11-13T08:24:54.127Z",
+  "license": "https://creativecommons.org/licenses/by/3.0/ec/",
+  "source_url": "https://datosabiertos.compraspublicas.gob.ec/PLATAFORMA/download?type=csv&year=2026&month=0&method=all",
+  "source_zip_sha256": "dcf8bf260cc0d2352c51ab8c801f4fb513395cef0ac3e6948e9821f8423ffa1f",
+  "file_sha256": "3d1591f7403048ebf95a45f974516b6088262d70cdbdcf33e4ff03e01cbf05fe",
+  "database_bytes": 269721600,
+  "scope": "Extracto de columnas CSV publicadas. No es una respuesta de la API ni incluye los PDF."
+}

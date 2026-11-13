@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "year": 2026,
+  "published_at": "2026-11-13T08:24:54.127Z",
+  "source_url": "https://datosabiertos.compraspublicas.gob.ec/PLATAFORMA/download?type=csv&year=2026&month=0&method=all",
+  "source_zip_sha256": "dcf8bf260cc0d2352c51ab8c801f4fb513395cef0ac3e6948e9821f8423ffa1f",
+  "catalog_sha256": "1e4e2755a9dbce9cccf45b4c4d828b74a0556cb63281cf6f84bd7de456d52807",
+  "license": "https://creativecommons.org/licenses/by/3.0/ec/",
+  "counts": {
+    "buyer": {
+      "source_rows": 122264,
+      "published_ids": 4549,
+      "name_variants": 4643
+    },
+    "supplier": {
+      "source_rows": 113469,
+      "published_ids": 12724,
+      "name_variants": 12760
+    }
+  },
+  "scope": "Compradores y proveedores publicados en adjudicaciones; no es un registro completo de oferentes ni del RUP."
+}

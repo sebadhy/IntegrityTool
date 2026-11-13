@@ -49,6 +49,13 @@ def test_scrypt_is_salted_and_password_not_stored():
         hash_password("short")
 
 
+def test_sercop_suggestions_require_authenticated_session(client):
+    path = "/api/sources/sercop/suggestions?field=buyer&year=2026&q=hospital"
+    assert client.get(path).status_code == 401
+    assert client.post("/api/auth/login", json={"username": "reader.test", "password": PASSWORD}).status_code == 200
+    assert client.get(path).status_code == 200
+
+
 def test_no_default_accounts_or_second_bootstrap(auth):
     with pytest.raises(ValueError):
         auth.add_user("another.admin", "Otro", "admin", PASSWORD, first_admin=True)

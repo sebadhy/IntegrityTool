@@ -12,6 +12,8 @@ type Process = {
   procedure: string;
 };
 type Results = {
+  data_source?: string;
+  published_at?: string;
   total: number;
   page: number;
   pages: number;
@@ -30,8 +32,6 @@ export function SercopSearch({
   const [year, setYear] = useState(new Date().getFullYear());
   const [search, setSearch] = useState("");
   const [buyer, setBuyer] = useState("");
-  const [recentBuyers, setRecentBuyers] = useState<string[]>([]);
-  const [recentSuppliers, setRecentSuppliers] = useState<string[]>([]);
   const [supplier, setSupplier] = useState("");
   const [ocid, setOcid] = useState("");
   const [results, setResults] = useState<Results | null>(null);
@@ -68,7 +68,10 @@ export function SercopSearch({
     return run("/sources/sercop/record", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ocid }),
+      body: JSON.stringify({
+        ocid,
+        data_source: year === 2026 ? "snapshot" : "api",
+      }),
     });
   }
   function find(page = 1) {
@@ -78,15 +81,8 @@ export function SercopSearch({
       page: String(page),
     });
     if (buyer.trim()) query.set("buyer", buyer.trim());
+    if (year === 2026) query.set("data_source", "snapshot");
     if (supplier.trim()) query.set("supplier", supplier.trim());
-    if (buyer.trim())
-      setRecentBuyers((items) =>
-        [...new Set([buyer.trim(), ...items])].slice(0, 10),
-      );
-    if (supplier.trim())
-      setRecentSuppliers((items) =>
-        [...new Set([supplier.trim(), ...items])].slice(0, 10),
-      );
     return run(`/sources/sercop/search?${query}`);
   }
   if (selected)
@@ -129,9 +125,11 @@ export function SercopSearch({
           </dd>
         </dl>
         <p className="sercop-note">
-          {selected.document_reference_count
-            ? `La API informa ${selected.document_reference_count} referencias documentales; no se descargaron ni verificaron como PDF.`
-            : "El registro consultado no incluye enlaces documentales. Agregue los PDF para revisar su contenido."}
+          {selected.provider === "sercop_bulk_csv"
+            ? "Ficha de la descarga oficial de 2026, con corte al 13/11/2026. No incluye los PDF; agréguelos para revisar su contenido."
+            : selected.document_reference_count
+              ? `La API informa ${selected.document_reference_count} referencias documentales; no se descargaron ni verificaron como PDF.`
+              : "El registro consultado no incluye enlaces documentales. Agregue los PDF para revisar su contenido."}
         </p>
         <small>
           Fuente: SERCOP · consulta{" "}
@@ -141,7 +139,9 @@ export function SercopSearch({
             target="_blank"
             rel="noopener noreferrer"
           >
-            Consultar registro oficial
+            {selected.provider === "sercop_bulk_csv"
+              ? "Consultar descarga oficial"
+              : "Consultar registro oficial"}
           </a>
         </small>
       </section>
@@ -149,6 +149,11 @@ export function SercopSearch({
 
   return (
     <section className="sercop-search" aria-label="Buscar procesos en SERCOP">
+      <p className="sercop-note">
+        {year === 2026
+          ? "Para esta demostración, las sugerencias y los resultados usan la descarga oficial de 2026, con corte al 13/11/2026. No requieren conexión con SERCOP."
+          : "Para este año se consulta la API de SERCOP. La copia local disponible corresponde a 2026."}
+      </p>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -192,26 +197,27 @@ export function SercopSearch({
                     ))}
                   </select>
                 </label>
-                <label className="field-label">
-                  Código o palabras clave
-                  <input
-                    required
-                    minLength={3}
-                    maxLength={200}
-                    value={search}
-                    placeholder="Ej.: SIE-HCAM-2026-023 o medicamentos"
-                    onChange={(e) => {
-                      setSearch(e.target.value);
-                      setResults(null);
-                    }}
-                  />
-                </label>
+                <SearchableTextFilter
+                  label="Código o palabras clave"
+                  field="search"
+                  year={year}
+                  buyer={buyer}
+                  supplier={supplier}
+                  value={search}
+                  required={year !== 2026}
+                  placeholder="Ej.: SIE-HCAM-2026-023 o medicamentos"
+                  onChange={(value) => {
+                    setSearch(value);
+                    setResults(null);
+                  }}
+                />
               </div>
               <div className="sercop-search-fields equal">
                 <SearchableTextFilter
                   label="Comprador"
+                  field="buyer"
+                  year={year}
                   value={buyer}
-                  recent={recentBuyers}
                   onChange={(value) => {
                     setBuyer(value);
                     setResults(null);
@@ -219,8 +225,9 @@ export function SercopSearch({
                 />
                 <SearchableTextFilter
                   label="Proveedor"
+                  field="supplier"
+                  year={year}
                   value={supplier}
-                  recent={recentSuppliers}
                   onChange={(value) => {
                     setSupplier(value);
                     setResults(null);
@@ -228,8 +235,9 @@ export function SercopSearch({
                 />
               </div>
               <small>
-                Opcionales · mínimo tres caracteres. Los filtros se consultan
-                directamente en SERCOP.
+                Comprador y proveedor son opcionales. Las sugerencias usan el
+                catálogo publicado de 2026; puede escribir otros nombres. Para
+                2026 también puede buscar solo por comprador o proveedor.
               </small>
             </>
           ) : (
@@ -246,7 +254,7 @@ export function SercopSearch({
           )}
           <button className="primary-button" type="submit">
             <Search size={16} />
-            {busy ? "Consultando SERCOP…" : "Buscar proceso"}
+            {busy ? "Buscando procesos…" : "Buscar proceso"}
           </button>
         </fieldset>
       </form>
@@ -259,7 +267,10 @@ export function SercopSearch({
               {results.total === 1
                 ? "resultado informado"
                 : "resultados informados"}{" "}
-              por SERCOP · Página {results.page} de {Math.max(1, results.pages)}
+              {results.data_source === "snapshot"
+                ? "en la descarga local de SERCOP"
+                : "por SERCOP"}{" "}
+              · Página {results.page} de {Math.max(1, results.pages)}
             </p>
             {!results.results.length && (
               <p>

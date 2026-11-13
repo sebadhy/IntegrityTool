@@ -82,7 +82,7 @@ No se necesita una clave de modelos para iniciar la aplicación ni ejecutar el m
 
 ## Uso
 
-1. Cargue el pliego o busque el proceso en SERCOP por año y palabras clave, con filtros opcionales de comprador/proveedor o consulta directa por OCID. Los campos desplegables permiten escribir texto y reutilizar búsquedas de la sesión; los filtros se envían a la API oficial. La ficha permite vincular los PDF mediante confirmación humana; no los descarga automáticamente.
+1. Cargue el pliego o busque el proceso por código, palabras clave, comprador, proveedor u OCID. Para la demostración, 2026 usa una copia de la descarga oficial de SERCOP (corte 13/11/2026): sugerencias, búsqueda y selección de ficha funcionan sin consultar la API. Puede buscar solo por comprador o proveedor. Otros años consultan la API. Elegir una sugerencia completa el campo; pulse «Buscar proceso» y seleccione la ficha. Los PDF se agregan manualmente y su correspondencia se confirma antes de analizarlos.
 2. Indique los tipos documentales y las sustituciones de versiones de forma explícita.
 3. Inicie la revisión y consulte el resumen y las observaciones consolidadas.
 4. Abra la evidencia en el PDF; registre revisión, descarte, seguimiento o comentario.
